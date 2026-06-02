@@ -1,0 +1,36 @@
+@startuml
+' title xAS Life of a Recommendation
+
+participant "My Metrics Provider" as MetricsProv
+participant "My Recommender" as Recommender
+participant "xAS Controller" as Controller
+participant "xAS Control Plane" as xAS
+participant "K8s API Server" as APIServer
+
+
+== Sync policies and workloads ==
+
+Controller -> APIServer: Watch ScalingPolicies & workloads
+
+Controller -> xAS: Sync ScalingPolicies & workloads
+
+
+== Life of a recommendation ==
+
+MetricsProv -> xAS : SendMetrics(cpu:0.8)
+
+Recommender -> xAS : GetMetrics(policyId)
+activate xAS
+xAS --> Recommender : cpu:0.8, target:0.7
+deactivate xAS
+
+Recommender -> xAS : UpdateRecommenderState(desired:10)
+
+Controller -> xAS : GetRecommendation(policyId)
+activate xAS
+xAS --> Controller : Recommendation(Desired:10)
+deactivate xAS
+
+Controller -> APIServer : Patch Replicas: 10
+
+@enduml

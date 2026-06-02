@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sample-distribution-decaying
+  labels:
+    sample: distribution-decaying
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: distribution-decaying
+  namespace: sample-distribution-decaying
+  labels:
+    sample: distribution-decaying
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: distribution-decaying
+  template:
+    metadata:
+      labels:
+        app: distribution-decaying
+    spec:
+      containers:
+        - name: stress
+          image: vish/stress
+          args: ["-cpus", "1"]
+          resources:
+            requests:
+              cpu: "100m"
+            limits:
+              cpu: "500m"
+---
+apiVersion: xas.io/v1
+kind: ScalingPolicy
+metadata:
+  name: distribution-decaying
+  namespace: sample-distribution-decaying
+  labels:
+    sample: distribution-decaying
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: distribution-decaying
+  minReplicas: 1
+  maxReplicas: 10
+  
+  metrics:
+    - name: "cpu_distribution"
+      provider: "kubelet"
+      params:
+        type: "cpu"
+      decayingDistribution:
+        halfLife: "24h"
+        bucketSize: "0.1"
+        percentile: "p90"
+
+  scaling:
+    - recommender: "linear"
+      name: "cpu_target"
+      params:
+        metric: "cpu_distribution"
+        target: "0.8" # Target 800m at p90

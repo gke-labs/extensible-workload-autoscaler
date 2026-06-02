@@ -1,0 +1,347 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: scalingpolicies.xas.io
+spec:
+  group: xas.io
+  names:
+    kind: ScalingPolicy
+    listKind: ScalingPolicyList
+    plural: scalingpolicies
+    singular: scalingpolicy
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: ScalingPolicy is the Schema for the scalingpolicies API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ScalingPolicySpec defines the desired state of ScalingPolicy
+            properties:
+              activation:
+                description: |-
+                  Activation defines the list of recommenders that determine if the workload should be Active (>=MinReplicas) or Idle (0).
+                  Logic: Active = Recommender1.Active || Recommender2.Active ...
+                items:
+                  properties:
+                    mode:
+                      description: |-
+                        Mode defines if this recommender is "Active" (enforced) or "DryRun" (observed only).
+                        Default: "Active".
+                      type: string
+                    name:
+                      description: Name is the unique identifier for this recommender
+                        instance within the policy.
+                      type: string
+                    params:
+                      additionalProperties:
+                        type: string
+                      description: Params overrides the configuration from the RecommenderClass.
+                      type: object
+                    recommender:
+                      description: Recommender points to a RecommenderClass by name.
+                      type: string
+                  required:
+                  - name
+                  - recommender
+                  type: object
+                type: array
+              actuationPolicy:
+                description: ActuationPolicy defines how the controller should apply
+                  resource updates.
+                properties:
+                  inPlaceFallback:
+                    description: |-
+                      InPlaceFallback defines the action to take if an in-place pod resize fails or is infeasible.
+                      Supported: "Ignore", "EvictOnFailure". Default: "Ignore".
+                    type: string
+                type: object
+              maxReplicas:
+                description: MaxReplicas is the upper limit for the number of replicas
+                format: int32
+                type: integer
+              metrics:
+                description: Metrics defines how to process the collected raw data
+                  into useful control metrics
+                items:
+                  description: MetricDefinition defines how to transform raw scraped
+                    data into a single control metric value
+                  properties:
+                    decayingDistribution:
+                      description: DecayingDistribution builds a temporal distribution
+                        of scalar samples.
+                      properties:
+                        bucketSize:
+                          description: |-
+                            BucketSize defines the resolution of the histogram.
+                            Example: "0.1" (for CPU cores) or "100Mi" (for Memory).
+                          type: string
+                        halfLife:
+                          description: |-
+                            HalfLife is the duration after which a sample's weight is halved.
+                            Example: "24h".
+                          type: string
+                        percentile:
+                          description: Percentile to calculate (e.g. "p100", "p99").
+                          type: string
+                        rate:
+                          description: |-
+                            Rate calculates a rate over the specified window before sampling.
+                            If set, the input metric is treated as a Counter.
+                          type: string
+                      required:
+                      - bucketSize
+                      - halfLife
+                      - percentile
+                      type: object
+                    distribution:
+                      description: Distribution consumes native buckets and extracts
+                        a specific rank.
+                      properties:
+                        aggregation:
+                          description: |-
+                            Aggregation defines how to combine percentiles from multiple pods.
+                            Supported: "Avg", "Sum", "Max", "Min". Default: "Max".
+                          type: string
+                        percentile:
+                          description: Percentile to calculate (e.g. "p99", "p95").
+                          type: string
+                      required:
+                      - percentile
+                      type: object
+                    filter:
+                      additionalProperties:
+                        type: string
+                      description: Filter allows selecting specific samples based
+                        on labels.
+                      type: object
+                    gauge:
+                      description: Gauge consumes raw scalar values and provides immediate
+                        spatial aggregation.
+                      properties:
+                        aggregation:
+                          description: |-
+                            Aggregation defines how to combine values from multiple pods.
+                            Supported: "Avg", "Sum", "Max", "Min". Default: "Avg".
+                          type: string
+                      type: object
+                    name:
+                      description: Name is the unique identifier for this control
+                        metric (e.g. "total_rps")
+                      type: string
+                    params:
+                      additionalProperties:
+                        type: string
+                      description: Params overrides the configuration from the MetricProviderClass.
+                      type: object
+                    provider:
+                      description: Provider points to a MetricProviderClass by name.
+                      type: string
+                    rate:
+                      description: Rate consumes raw counters and calculates Delta
+                        Value / Delta Time.
+                      properties:
+                        aggregation:
+                          description: |-
+                            Aggregation defines how to combine rates from multiple pods.
+                            Supported: "Avg", "Sum", "Max", "Min". Default: "Sum".
+                          type: string
+                        window:
+                          description: |-
+                            Window defines the temporal period over which the rate is calculated.
+                            Example: "1m", "5m".
+                          type: string
+                      required:
+                      - window
+                      type: object
+                    scope:
+                      description: Scope defines the granularity of the metric. "Global"
+                        (default) or "Pod".
+                      type: string
+                  required:
+                  - name
+                  - provider
+                  type: object
+                type: array
+              minReplicas:
+                description: MinReplicas is the lower limit for the number of replicas
+                format: int32
+                type: integer
+              scaleTargetRef:
+                description: ScaleTargetRef points to the target resource to scale
+                properties:
+                  apiVersion:
+                    description: APIVersion of the referent; e.g. apps/v1
+                    type: string
+                  kind:
+                    description: Kind of the referent; e.g. Deployment, StatefulSet
+                    type: string
+                  name:
+                    description: Name of the referent; e.g. my-app
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+              scaling:
+                description: |-
+                  Scaling defines the list of recommenders that determine the desired replica count.
+                  Logic: Desired = Max(Recommender1.Replicas, Recommender2.Replicas ...)
+                items:
+                  properties:
+                    mode:
+                      description: |-
+                        Mode defines if this recommender is "Active" (enforced) or "DryRun" (observed only).
+                        Default: "Active".
+                      type: string
+                    name:
+                      description: Name is the unique identifier for this recommender
+                        instance within the policy.
+                      type: string
+                    params:
+                      additionalProperties:
+                        type: string
+                      description: Params overrides the configuration from the RecommenderClass.
+                      type: object
+                    recommender:
+                      description: Recommender points to a RecommenderClass by name.
+                      type: string
+                  required:
+                  - name
+                  - recommender
+                  type: object
+                type: array
+            required:
+            - maxReplicas
+            - metrics
+            - scaleTargetRef
+            type: object
+          status:
+            description: ScalingPolicyStatus defines the observed state of ScalingPolicy
+            properties:
+              currentReplicas:
+                description: CurrentReplicas is the current number of replicas of
+                  the target workload.
+                format: int32
+                type: integer
+              decisions:
+                description: Decisions lists the status of each recommender.
+                items:
+                  properties:
+                    active:
+                      type: boolean
+                    error:
+                      type: string
+                    mode:
+                      type: string
+                    phase:
+                      type: string
+                    podResources:
+                      items:
+                        properties:
+                          limits:
+                            additionalProperties:
+                              type: string
+                            type: object
+                          podName:
+                            type: string
+                          requests:
+                            additionalProperties:
+                              type: string
+                            type: object
+                        required:
+                        - podName
+                        type: object
+                      type: array
+                    reason:
+                      type: string
+                    recommenderName:
+                      type: string
+                    replicas:
+                      format: int32
+                      type: integer
+                    type:
+                      type: string
+                    workloadResources:
+                      properties:
+                        limits:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        requests:
+                          additionalProperties:
+                            type: string
+                          type: object
+                      type: object
+                  required:
+                  - active
+                  - phase
+                  - recommenderName
+                  - replicas
+                  - type
+                  type: object
+                type: array
+              desiredReplicas:
+                description: DesiredReplicas is the number of replicas calculated
+                  by the XAS control plane.
+                format: int32
+                type: integer
+              lastUpdated:
+                description: LastUpdated is the timestamp of the last recommendation
+                  calculation (ISO8601).
+                type: string
+              metricStatuses:
+                description: MetricStatuses lists the current value and status of
+                  each metric.
+                items:
+                  properties:
+                    error:
+                      type: string
+                    lastUpdated:
+                      type: string
+                    name:
+                      type: string
+                    value:
+                      type: string
+                  required:
+                  - lastUpdated
+                  - name
+                  - value
+                  type: object
+                type: array
+              selector:
+                description: |-
+                  Selector is the label selector resolved from the target workload.
+                  Used by Agents to identify pods.
+                type: string
+            required:
+            - currentReplicas
+            - desiredReplicas
+            - lastUpdated
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sample-distribution
+  labels:
+    sample: distribution
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: distribution
+  namespace: sample-distribution
+  labels:
+    sample: distribution
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: distribution
+  template:
+    metadata:
+      labels:
+        app: distribution
+    spec:
+      containers:
+        - name: sample-app
+          image: xas-sample:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: distribution
+  namespace: sample-distribution
+  labels:
+    sample: distribution
+spec:
+  ports:
+    - port: 80
+      targetPort: 8080
+  selector:
+    app: distribution
+---
+apiVersion: xas.io/v1
+kind: ScalingPolicy
+metadata:
+  name: distribution
+  namespace: sample-distribution
+  labels:
+    sample: distribution
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: distribution
+  minReplicas: 1
+  maxReplicas: 10
+
+  metrics:
+    - name: "p50_latency"
+      provider: "prometheus"
+      params:
+        metric: "http_request_duration_seconds"
+      distribution:
+        percentile: "p50"
+        aggregation: "Max"
+    - name: "p95_latency"
+      provider: "prometheus"
+      params:
+        metric: "http_request_duration_seconds"
+      distribution:
+        percentile: "p95"
+        aggregation: "Max"
+
+  scaling:
+    - recommender: "linear"
+      name: "p95_latency_target"
+      mode: "DryRun"
+      params:
+        metric: "p95_latency"
+        target: "0.2"
+    - recommender: "linear"
+      name: "p50_latency_target"
+      mode: "DryRun"
+      params:
+        metric: "p50_latency"
+        target: "0.1"
