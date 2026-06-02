@@ -1,0 +1,152 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentstyletype="text/css" data-diagram-type="SEQUENCE" height="441px" preserveAspectRatio="none" style="width:750px;height:441px;background:#FFFFFF;" version="1.1" viewBox="0 0 750 441" width="750px" zoomAndPan="magnify">
+  <defs/>
+  <g>
+    <g>
+      <title>xAS Control Plane</title>
+      <rect fill="#FFFFFF" height="29.2344" style="stroke:#181818;stroke-width:1;" width="10" x="554.5645" y="241.8125"/>
+    </g>
+    <g>
+      <title>xAS Control Plane</title>
+      <rect fill="#FFFFFF" height="29.2344" style="stroke:#181818;stroke-width:1;" width="10" x="554.5645" y="329.5156"/>
+    </g>
+    <g class="participant-lifeline" data-entity-uid="part1" data-qualified-name="MetricsProv" id="part1-lifeline">
+      <g>
+        <title>My Metrics Provider</title>
+        <rect fill="#000000" fill-opacity="0.00000" height="369.5781" width="8" x="70.2275" y="36.4063"/>
+        <line style="stroke:#181818;stroke-width:0.5;stroke-dasharray:5,5;" x1="74" x2="74" y1="36.4063" y2="405.9844"/>
+      </g>
+    </g>
+    <g class="participant-lifeline" data-entity-uid="part2" data-qualified-name="Recommender" id="part2-lifeline">
+      <g>
+        <title>My Recommender</title>
+        <rect fill="#000000" fill-opacity="0.00000" height="369.5781" width="8" x="213.1523" y="36.4063"/>
+        <line style="stroke:#181818;stroke-width:0.5;stroke-dasharray:5,5;" x1="216.4551" x2="216.4551" y1="36.4063" y2="405.9844"/>
+      </g>
+    </g>
+    <g class="participant-lifeline" data-entity-uid="part3" data-qualified-name="Controller" id="part3-lifeline">
+      <g>
+        <title>xAS Controller</title>
+        <rect fill="#000000" fill-opacity="0.00000" height="369.5781" width="8" x="338.3037" y="36.4063"/>
+        <line style="stroke:#181818;stroke-width:0.5;stroke-dasharray:5,5;" x1="341.8496" x2="341.8496" y1="36.4063" y2="405.9844"/>
+      </g>
+    </g>
+    <g class="participant-lifeline" data-entity-uid="part4" data-qualified-name="xAS" id="part4-lifeline">
+      <g>
+        <title>xAS Control Plane</title>
+        <rect fill="#000000" fill-opacity="0.00000" height="369.5781" width="8" x="555.5645" y="36.4063"/>
+        <line style="stroke:#181818;stroke-width:0.5;stroke-dasharray:5,5;" x1="558.6602" x2="558.6602" y1="36.4063" y2="405.9844"/>
+      </g>
+    </g>
+    <g class="participant-lifeline" data-entity-uid="part5" data-qualified-name="APIServer" id="part5-lifeline">
+      <g>
+        <title>K8s API Server</title>
+        <rect fill="#000000" fill-opacity="0.00000" height="369.5781" width="8" x="681.4473" y="36.4063"/>
+        <line style="stroke:#181818;stroke-width:0.5;stroke-dasharray:5,5;" x1="684.4688" x2="684.4688" y1="36.4063" y2="405.9844"/>
+      </g>
+    </g>
+    <g class="participant participant-head" data-entity-uid="part1" data-qualified-name="MetricsProv" id="part1-head">
+      <rect fill="#E2E2F0" height="30.4063" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="138.4551" x="5" y="5"/>
+      <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="124.4551" x="12" y="24.9883">My Metrics Provider</text>
+    </g>
+    <g class="participant participant-tail" data-entity-uid="part1" data-qualified-name="MetricsProv" id="part1-tail">
+      <rect fill="#E2E2F0" height="30.4063" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="138.4551" x="5" y="404.9844"/>
+      <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="124.4551" x="12" y="424.9727">My Metrics Provider</text>
+    </g>
+    <g class="participant participant-head" data-entity-uid="part2" data-qualified-name="Recommender" id="part2-head">
+      <rect fill="#E2E2F0" height="30.4063" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="127.3945" x="153.4551" y="5"/>
+      <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="113.3945" x="160.4551" y="24.9883">My Recommender</text>
+    </g>
+    <g class="participant participant-tail" data-entity-uid="part2" data-qualified-name="Recommender" id="part2-tail">
+      <rect fill="#E2E2F0" height="30.4063" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="127.3945" x="153.4551" y="404.9844"/>
+      <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="113.3945" x="160.4551" y="424.9727">My Recommender</text>
+    </g>
+    <g class="participant participant-head" data-entity-uid="part3" data-qualified-name="Controller" id="part3-head">
+      <rect fill="#E2E2F0" height="30.4063" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="102.9082" x="290.8496" y="5"/>
+      <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="88.9082" x="297.8496" y="24.9883">xAS Controller</text>
+    </g>
+    <g class="participant participant-tail" data-entity-uid="part3" data-qualified-name="Controller" id="part3-tail">
+      <rect fill="#E2E2F0" height="30.4063" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="102.9082" x="290.8496" y="404.9844"/>
+      <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="88.9082" x="297.8496" y="424.9727">xAS Controller</text>
+    </g>
+    <g class="participant participant-head" data-entity-uid="part4" data-qualified-name="xAS" id="part4-head">
+      <rect fill="#E2E2F0" height="30.4063" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="125.8086" x="496.6602" y="5"/>
+      <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="111.8086" x="503.6602" y="24.9883">xAS Control Plane</text>
+    </g>
+    <g class="participant participant-tail" data-entity-uid="part4" data-qualified-name="xAS" id="part4-tail">
+      <rect fill="#E2E2F0" height="30.4063" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="125.8086" x="496.6602" y="404.9844"/>
+      <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="111.8086" x="503.6602" y="424.9727">xAS Control Plane</text>
+    </g>
+    <g class="participant participant-head" data-entity-uid="part5" data-qualified-name="APIServer" id="part5-head">
+      <rect fill="#E2E2F0" height="30.4063" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="105.957" x="632.4688" y="5"/>
+      <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="91.957" x="639.4688" y="24.9883">K8s API Server</text>
+    </g>
+    <g class="participant participant-tail" data-entity-uid="part5" data-qualified-name="APIServer" id="part5-tail">
+      <rect fill="#E2E2F0" height="30.4063" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="105.957" x="632.4688" y="404.9844"/>
+      <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="91.957" x="639.4688" y="424.9727">K8s API Server</text>
+    </g>
+    <g>
+      <title>xAS Control Plane</title>
+      <rect fill="#FFFFFF" height="29.2344" style="stroke:#181818;stroke-width:1;" width="10" x="554.5645" y="241.8125"/>
+    </g>
+    <g>
+      <title>xAS Control Plane</title>
+      <rect fill="#FFFFFF" height="29.2344" style="stroke:#181818;stroke-width:1;" width="10" x="554.5645" y="329.5156"/>
+    </g>
+    <rect fill="#EEEEEE" height="3" style="stroke:#EEEEEE;stroke-width:1;" width="743.4258" x="0" y="67.0234"/>
+    <line style="stroke:#000000;stroke-width:1;" x1="0" x2="743.4258" y1="67.0234" y2="67.0234"/>
+    <line style="stroke:#000000;stroke-width:1;" x1="0" x2="743.4258" y1="70.0234" y2="70.0234"/>
+    <rect fill="#EEEEEE" height="23.2344" style="stroke:#000000;stroke-width:2;" width="182.9683" x="280.2288" y="56.4063"/>
+    <text fill="#000000" font-family="sans-serif" font-size="13" font-weight="bold" lengthAdjust="spacing" textLength="165.731" x="286.2288" y="72.4668">Sync policies and workloads</text>
+    <g class="message" data-entity-1="part3" data-entity-2="part5" id="msg1">
+      <polygon fill="#181818" points="673.4473,106.875,683.4473,110.875,673.4473,114.875,677.4473,110.875" style="stroke:#181818;stroke-width:1;"/>
+      <line style="stroke:#181818;stroke-width:1;" x1="342.3037" x2="679.4473" y1="110.875" y2="110.875"/>
+      <text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="202.2363" x="349.3037" y="105.7012">Watch ScalingPolicies &amp; workloads</text>
+    </g>
+    <g class="message" data-entity-1="part3" data-entity-2="part4" id="msg2">
+      <polygon fill="#181818" points="547.5645,136.1094,557.5645,140.1094,547.5645,144.1094,551.5645,140.1094" style="stroke:#181818;stroke-width:1;"/>
+      <line style="stroke:#181818;stroke-width:1;" x1="342.3037" x2="553.5645" y1="140.1094" y2="140.1094"/>
+      <text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="193.2607" x="349.3037" y="134.9355">Sync ScalingPolicies &amp; workloads</text>
+    </g>
+    <rect fill="#EEEEEE" height="3" style="stroke:#EEEEEE;stroke-width:1;" width="743.4258" x="0" y="168.7266"/>
+    <line style="stroke:#000000;stroke-width:1;" x1="0" x2="743.4258" y1="168.7266" y2="168.7266"/>
+    <line style="stroke:#000000;stroke-width:1;" x1="0" x2="743.4258" y1="171.7266" y2="171.7266"/>
+    <rect fill="#EEEEEE" height="23.2344" style="stroke:#000000;stroke-width:2;" width="167.5815" x="287.9221" y="158.1094"/>
+    <text fill="#000000" font-family="sans-serif" font-size="13" font-weight="bold" lengthAdjust="spacing" textLength="150.3442" x="293.9221" y="174.1699">Life of a recommendation</text>
+    <g class="message" data-entity-1="part1" data-entity-2="part4" id="msg3">
+      <polygon fill="#181818" points="547.5645,208.5781,557.5645,212.5781,547.5645,216.5781,551.5645,212.5781" style="stroke:#181818;stroke-width:1;"/>
+      <line style="stroke:#181818;stroke-width:1;" x1="74.2275" x2="553.5645" y1="212.5781" y2="212.5781"/>
+      <text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="124.0459" x="81.2275" y="207.4043">SendMetrics(cpu:0.8)</text>
+    </g>
+    <g class="message" data-entity-1="part2" data-entity-2="part4" id="msg4">
+      <polygon fill="#181818" points="542.5645,237.8125,552.5645,241.8125,542.5645,245.8125,546.5645,241.8125" style="stroke:#181818;stroke-width:1;"/>
+      <line style="stroke:#181818;stroke-width:1;" x1="217.1523" x2="548.5645" y1="241.8125" y2="241.8125"/>
+      <text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="117.3364" x="224.1523" y="236.6387">GetMetrics(policyId)</text>
+    </g>
+    <g class="message" data-entity-1="part4" data-entity-2="part2" id="msg5">
+      <polygon fill="#181818" points="228.1523,267.0469,218.1523,271.0469,228.1523,275.0469,224.1523,271.0469" style="stroke:#181818;stroke-width:1;"/>
+      <line style="stroke:#181818;stroke-width:1;stroke-dasharray:2,2;" x1="222.1523" x2="558.5645" y1="271.0469" y2="271.0469"/>
+      <text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="103.5176" x="234.1523" y="265.873">cpu:0.8, target:0.7</text>
+    </g>
+    <g class="message" data-entity-1="part2" data-entity-2="part4" id="msg6">
+      <polygon fill="#181818" points="547.5645,296.2813,557.5645,300.2813,547.5645,304.2813,551.5645,300.2813" style="stroke:#181818;stroke-width:1;"/>
+      <line style="stroke:#181818;stroke-width:1;" x1="217.1523" x2="553.5645" y1="300.2813" y2="300.2813"/>
+      <text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="225.4053" x="224.1523" y="295.1074">UpdateRecommenderState(desired:10)</text>
+    </g>
+    <g class="message" data-entity-1="part3" data-entity-2="part4" id="msg7">
+      <polygon fill="#181818" points="542.5645,325.5156,552.5645,329.5156,542.5645,333.5156,546.5645,329.5156" style="stroke:#181818;stroke-width:1;"/>
+      <line style="stroke:#181818;stroke-width:1;" x1="342.3037" x2="548.5645" y1="329.5156" y2="329.5156"/>
+      <text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="176.1411" x="349.3037" y="324.3418">GetRecommendation(policyId)</text>
+    </g>
+    <g class="message" data-entity-1="part4" data-entity-2="part3" id="msg8">
+      <polygon fill="#181818" points="353.3037,354.75,343.3037,358.75,353.3037,362.75,349.3037,358.75" style="stroke:#181818;stroke-width:1;"/>
+      <line style="stroke:#181818;stroke-width:1;stroke-dasharray:2,2;" x1="347.3037" x2="558.5645" y1="358.75" y2="358.75"/>
+      <text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="172.9482" x="359.3037" y="353.5762">Recommendation(Desired:10)</text>
+    </g>
+    <g class="message" data-entity-1="part3" data-entity-2="part5" id="msg9">
+      <polygon fill="#181818" points="673.4473,383.9844,683.4473,387.9844,673.4473,391.9844,677.4473,387.9844" style="stroke:#181818;stroke-width:1;"/>
+      <line style="stroke:#181818;stroke-width:1;" x1="342.3037" x2="679.4473" y1="387.9844" y2="387.9844"/>
+      <text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="106.7422" x="349.3037" y="382.8105">Patch Replicas: 10</text>
+    </g>
+  </g>
+</svg>

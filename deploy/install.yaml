@@ -1,0 +1,313 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: xas-system
+---
+# ==========================================================
+# RBAC
+# ==========================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: xas-controller
+  namespace: xas-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: xas-controller
+rules:
+  # Manage deployments
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  # Read Pods for workload sync and delete for eviction fallback
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+  # Patch pod resize subresource for in-place VPA
+  - apiGroups: [""]
+    resources: ["pods/resize"]
+    verbs: ["patch"]
+  # Manage ScalingPolicies and read Classes
+  - apiGroups: ["xas.io"]
+    resources: ["scalingpolicies", "metricproviderclasses", "recommenderclasses"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["xas.io"]
+    resources: ["scalingpolicies/status"]
+    verbs: ["update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: xas-controller
+subjects:
+  - kind: ServiceAccount
+    name: xas-controller
+    namespace: xas-system
+roleRef:
+  kind: ClusterRole
+  name: xas-controller
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: xas-core-node-metrics-provider
+  namespace: xas-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: xas-core-node-metrics-provider
+rules:
+  # Read Pods to scrape them
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  # Read Node metrics from Kubelet
+  - apiGroups: [""]
+    resources: ["nodes/metrics", "nodes/stats", "nodes/proxy"]
+    verbs: ["get"]
+  # Read Policies to know what to scrape
+  - apiGroups: ["xas.io"]
+    resources: ["scalingpolicies", "metricproviderclasses"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: xas-core-node-metrics-provider
+subjects:
+  - kind: ServiceAccount
+    name: xas-core-node-metrics-provider
+    namespace: xas-system
+roleRef:
+  kind: ClusterRole
+  name: xas-core-node-metrics-provider
+  apiGroup: rbac.authorization.k8s.io
+
+# ==========================================================
+# DEFAULT CLASSES
+# ==========================================================
+---
+apiVersion: xas.io/v1
+kind: MetricProviderClass
+metadata:
+  name: kubelet
+spec:
+  type: Kubelet
+  config:
+    port: "10250"
+    path: "/metrics/resource"
+---
+apiVersion: xas.io/v1
+kind: MetricProviderClass
+metadata:
+  name: prometheus
+spec:
+  type: Prometheus
+  config:
+    port: "8080"
+    path: "/metrics"
+---
+apiVersion: xas.io/v1
+kind: RecommenderClass
+metadata:
+  name: linear
+spec:
+  type: Linear
+---
+apiVersion: xas.io/v1
+kind: RecommenderClass
+metadata:
+  name: threshold
+spec:
+  type: Threshold
+---
+apiVersion: xas.io/v1
+kind: RecommenderClass
+metadata:
+  name: cron
+spec:
+  type: Cron
+---
+apiVersion: xas.io/v1
+kind: RecommenderClass
+metadata:
+  name: cluster-proportional
+spec:
+  type: ClusterProportional
+---
+apiVersion: xas.io/v1
+kind: RecommenderClass
+metadata:
+  name: addon-resizer
+spec:
+  type: AddonResizer
+
+# ==========================================================
+# SERVER (The Control Plane)
+# ==========================================================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xas-server
+  namespace: xas-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xas-server
+  template:
+    metadata:
+      labels:
+        app: xas-server
+    spec:
+      containers:
+        - name: server
+          image: ko://github.com/gke-labs/extensible-workload-autoscaler/cmd/server
+          args:
+            - "--debug"
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: METRICS_PORT
+              value: "9090"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xas-server
+  namespace: xas-system
+spec:
+  selector:
+    app: xas-server
+  ports:
+    - port: 80
+      targetPort: 8080
+
+# ==========================================================
+# CONTROLLER (The Actuator)
+# ==========================================================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xas-controller
+  namespace: xas-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xas-controller
+  template:
+    metadata:
+      labels:
+        app: xas-controller
+    spec:
+      serviceAccountName: xas-controller
+      containers:
+        - name: controller
+          image: ko://github.com/gke-labs/extensible-workload-autoscaler/cmd/controller
+          args:
+            - "--server-address=xas-server.xas-system.svc.cluster.local:80"
+            - "--cluster-name=default"
+            - "--debug"
+# ==========================================================
+# CORE NODE METRICS PROVIDER (The Collector)            
+# ==========================================================
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: xas-core-node-metrics-provider
+  namespace: xas-system
+spec:
+  selector:
+    matchLabels:
+      app: xas-core-node-metrics-provider
+  template:
+    metadata:
+      labels:
+        app: xas-core-node-metrics-provider
+    spec:
+      serviceAccountName: xas-core-node-metrics-provider
+      containers:
+        - name: provider
+          image: ko://github.com/gke-labs/extensible-workload-autoscaler/cmd/core-node-metrics-provider
+          args:
+            - "--server-address=xas-server.xas-system.svc.cluster.local:80"
+            - "--node-name=$(NODE_NAME)"
+            - "--cluster-name=default"
+            - "--debug"
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+# ==========================================================
+# CORE RECOMMENDERS
+# ==========================================================
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: xas-core-recommenders
+  namespace: xas-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: xas-core-recommenders
+rules:
+  - apiGroups: ["xas.io"]
+    resources: ["recommenderclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: xas-core-recommenders
+subjects:
+  - kind: ServiceAccount
+    name: xas-core-recommenders
+    namespace: xas-system
+roleRef:
+  kind: ClusterRole
+  name: xas-core-recommenders
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xas-core-recommenders
+  namespace: xas-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xas-core-recommenders
+  template:
+    metadata:
+      labels:
+        app: xas-core-recommenders
+    spec:
+      serviceAccountName: xas-core-recommenders
+      containers:
+        - name: recommenders
+          image: ko://github.com/gke-labs/extensible-workload-autoscaler/cmd/core-recommenders
+          args:
+            - "--server-address=xas-server.xas-system.svc.cluster.local:80"
+            - "--cluster-name=default"
+            - "--debug"

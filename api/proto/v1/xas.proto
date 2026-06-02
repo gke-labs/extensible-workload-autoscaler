@@ -1,0 +1,417 @@
+syntax = "proto3";
+
+package xas.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/gke-labs/extensible-workload-autoscaler/api/v1";
+
+// XASControlPlane defines the gRPC interface for the Control Plane (Server).
+// It acts as the central state manager for autoscaling policies, workload state,
+// metric ingestion, and decision making.
+service XASControlPlane {
+  
+  // --- Policy Management ---
+  // Create or Update a ScalingPolicy. This is an idempotent "Upsert".
+  rpc UpdatePolicy(UpdatePolicyRequest) returns (Policy);
+  
+  // Delete a ScalingPolicy.
+  rpc DeletePolicy(DeletePolicyRequest) returns (google.protobuf.Empty);
+  
+  // List all known policies, optionally filtered by cluster.
+  rpc ListPolicies(ListPoliciesRequest) returns (ListPoliciesResponse);
+
+  // --- Workload Management (Controller -> Control Plane) ---
+  // Update the Control Plane's view of the workload (Pods) for a specific policy.
+  // This is a full replacement of the pod list.
+  // TODO(): This method should probably just return an empty response (google.protobuf.Empty).
+  rpc UpdateWorkload(UpdateWorkloadRequest) returns (Workload);
+
+  // --- Control Metrics (Recommender -> Control Plane) ---
+  // Read the current aggregated metric values ("Control Metrics") for a policy.
+  // Recommenders use this to make scaling decisions.
+  rpc GetControlMetrics(GetControlMetricsRequest) returns (ControlMetrics);
+
+  // --- Recommender State (Plugin -> Control Plane) ---
+  // Update Status (Decision) for a specific recommender.
+  // Recommenders push their calculated vote here.
+  rpc UpdateRecommenderState(UpdateRecommenderStateRequest) returns (RecommenderState);
+
+  // --- Recommendation (Controller -> Control Plane) ---
+  // Retrieve the final arbitrated recommendation for a policy.
+  // The Controller uses this to scale the target workload.
+  rpc GetRecommendation(GetRecommendationRequest) returns (GetRecommendationResponse);
+
+  // --- Ingestion (Agent -> Control Plane) ---
+  // Push raw metric samples from an Agent (Node).
+  rpc IngestMetrics(IngestMetricsRequest) returns (IngestMetricsResponse);
+}
+
+// =============================================================================
+// Messages
+// =============================================================================
+
+// --- Identifiers ---
+
+// PolicyId uniquely identifies a ScalingPolicy across clusters.
+message PolicyId { 
+  // The cluster this policy belongs to.
+  string cluster_name = 1;
+  // The namespace of the policy.
+  string namespace = 2;
+  // The name of the policy.
+  string name = 3;
+}
+
+// --- Policy ---
+
+// UpdatePolicyRequest is used to create or update a policy definition.
+message UpdatePolicyRequest { 
+  // The policy definition.
+  Policy policy = 1; 
+}
+
+// DeletePolicyRequest identifies a policy to delete.
+message DeletePolicyRequest { 
+  // The unique ID of the policy.
+  PolicyId id = 1; 
+}
+
+// ListPoliciesRequest is used to list policies.
+message ListPoliciesRequest {
+  // The cluster to list policies for (required).
+  string cluster_name = 1; 
+}
+
+// ListPoliciesResponse returns the list of matching policies.
+message ListPoliciesResponse { 
+  // The list of policies.
+  repeated Policy policies = 1; 
+}
+
+// Policy represents the configuration for autoscaling a specific workload.
+message Policy {
+  // The unique identifier of the policy.
+  PolicyId id = 1;
+  
+  // Reference to the target workload to scale.
+  WorkloadRef workload = 3;
+  // Minimum number of replicas.
+  int32 min_replicas = 4;
+  // Maximum number of replicas.
+  int32 max_replicas = 5;
+  
+  // Definitions of metrics to collect and aggregate.
+  repeated MetricDefinition metrics = 6;
+  
+  // Rules for activating/deactivating the workload (Scale to Zero).
+  repeated RecommenderDefinition activation = 7;
+  
+  // Rules for scaling the workload when active (Horizontal Scaling).
+  repeated RecommenderDefinition scaling = 8;
+  
+  // The label selector used to identify pods (e.g. "app=my-app").
+  string selector = 9;
+}
+
+// WorkloadRef identifies the Kubernetes resource to scale.
+message WorkloadRef {
+  // API Group (e.g., "apps").
+  string group = 1;
+  // API Version (e.g., "v1").
+  string version = 2;
+  // Resource Kind (e.g., "Deployment").
+  string kind = 3;
+  // Name of the resource.
+  string name = 4;
+  // Namespace of the resource.
+  string namespace = 5;
+}
+
+// MetricDefinition defines how to collect and process a metric.
+message MetricDefinition {
+  // The name of the metric (used as key in ControlMetrics).
+  string name = 1;
+  // The provider class to use (e.g., "kubelet", "prometheus").
+  string provider = 2;
+  // Provider-specific parameters (e.g., "type": "cpu").
+  map<string, string> params = 3;
+  // Label filters to apply to raw samples before processing.
+  map<string, string> filter = 5;
+
+  // --- Intents ---
+  Gauge gauge = 10;
+  Rate rate = 11;
+  Distribution distribution = 12;
+  DecayingDistribution decaying_distribution = 13;
+
+  // The scope of the metric: "Global" (default) or "Pod".
+  string scope = 14;
+}
+
+message Gauge {
+  // Aggregation method: "Avg", "Sum", "Max", "Min".
+  string aggregation = 1;
+}
+
+message Rate {
+  // The temporal period for rate calculation (e.g. "1m").
+  string window = 1;
+  // Aggregation method: "Avg", "Sum", "Max", "Min".
+  string aggregation = 2;
+}
+
+message Distribution {
+  // The percentile to extract (e.g. "p99").
+  string percentile = 1;
+  // Aggregation method: "Avg", "Sum", "Max", "Min".
+  string aggregation = 2;
+}
+
+message DecayingDistribution {
+  // Half-life duration string (e.g. "24h").
+  string half_life = 1;
+  // Bucket size string (e.g. "0.1").
+  string bucket_size = 2;
+  // The percentile to extract (e.g. "p100").
+  string percentile = 3;
+  // If set, treat input as Counter and calculate rate over this window before sampling.
+  string rate = 4;
+}
+
+// RecommenderDefinition configures a specific scaling algorithm.
+message RecommenderDefinition {
+  // The class of recommender to use (e.g., "linear-fast").
+  string recommender = 1;
+  // Unique name for this recommender instance.
+  string name = 2;
+  // Mode of operation: "Active" (default) or "DryRun".
+  string mode = 3;
+  // Algorithm-specific parameters.
+  map<string, string> params = 4;
+  // The type of recommender algorithm (e.g. "Linear", "Threshold").
+  string type = 5;
+}
+
+
+// --- Workload ---
+
+// UpdateWorkloadRequest synchronizes the Control Plane's view of the workload.
+message UpdateWorkloadRequest {
+  // The policy this workload belongs to.
+  PolicyId id = 1;
+  // The current state of the workload (pods).
+  Workload workload = 2;
+}
+
+// Workload represents the set of pods governed by a policy.
+message Workload {
+  // List of known pods.
+  repeated PodState pods = 1;
+}
+
+// PodState represents a single pod instance.
+message PodState {
+  // The name of the pod.
+  string name = 1;
+  // The node where the pod is running.
+  string node_name = 2;
+  // Whether the pod is ready to serve traffic.
+  bool is_ready = 3;
+}
+
+// --- Control Metrics ---
+
+// GetControlMetricsRequest retrieves aggregated metrics for a policy.
+message GetControlMetricsRequest { 
+  // The policy to fetch metrics for.
+  PolicyId id = 1; 
+}
+
+// PodMetrics contains metrics for a specific pod.
+message PodMetrics {
+  // Map of MetricName -> Value.
+  map<string, double> values = 1;
+}
+
+// ControlMetrics contains the aggregated values calculated by the Control Plane.
+message ControlMetrics {
+  // Map of MetricName -> Aggregated Value.
+  map<string, double> values = 1;
+  // Timestamp of the calculation (Unix seconds).
+  int64 timestamp = 2;
+  // The number of ready replicas.
+  int32 ready_replicas = 3;
+  // Map of PodName -> PodMetrics (for Pod-scoped metrics).
+  map<string, PodMetrics> pod_metrics = 4;
+}
+
+
+// --- Recommender State ---
+
+// UpdateRecommenderStateRequest updates the status (decision) of a recommender.
+message UpdateRecommenderStateRequest {
+  // The policy ID.
+  PolicyId id = 1;
+  // The name of the recommender to update.
+  string recommender_name = 2;
+  // The new status/decision (Vote).
+  RecommenderVote vote = 3;
+}
+
+// ResourceRecommendation defines CPU and Memory requests/limits for a workload.
+message ResourceRecommendation {
+  map<string, string> requests = 1;
+  map<string, string> limits = 2;
+}
+
+// PodResourceRecommendation defines CPU and Memory requests/limits for a specific pod.
+message PodResourceRecommendation {
+  string pod_name = 1;
+  map<string, string> requests = 2;
+  map<string, string> limits = 3;
+}
+
+// RecommenderVote represents the input/decision from a recommender.
+message RecommenderVote {
+  // The desired number of replicas.
+  int32 desired_replicas = 1;
+  // If false, this recommender votes to scale to zero (if Activation type).
+  bool is_active = 2;
+  // Human-readable reason or message.
+  string message = 3;
+  // Workload-level resource recommendation.
+  ResourceRecommendation workload_resources = 4;
+  // Pod-level resource recommendations.
+  repeated PodResourceRecommendation pod_resources = 5;
+}
+
+// RecommenderState represents the full state of a recommender (Config + Status).
+message RecommenderState {
+  // The name of the recommender.
+  string name = 1;
+  // Configuration parameters for this recommender (from Policy).
+  map<string, string> config = 2; 
+  // The current decision/status of this recommender.
+  RecommenderStatus status = 3;
+}
+
+// RecommenderStatus represents the output/decision of a recommender.
+message RecommenderStatus {
+  // The desired number of replicas.
+  int32 desired_replicas = 1;
+  // If false, this recommender votes to scale to zero (if Activation type).
+  bool is_active = 2;
+  // Human-readable reason or message.
+  string message = 3;
+  // Timestamp of the last update.
+  google.protobuf.Timestamp last_updated = 4;
+  // The phase of the recommender: "Scaling" or "Activation".
+  string phase = 5;
+  // The mode of the recommender: "Active" or "DryRun".
+  string mode = 6;
+  // The name of the recommender.
+  string name = 7;
+  // The type of the recommender (e.g. "Linear", "Cron").
+  string type = 8;
+  // Workload-level resource recommendation.
+  ResourceRecommendation workload_resources = 9;
+  // Pod-level resource recommendations.
+  repeated PodResourceRecommendation pod_resources = 10;
+}
+
+
+// --- Recommendation ---
+
+// GetRecommendationRequest retrieves the final recommendation for a policy.
+message GetRecommendationRequest { 
+  // The policy ID.
+  PolicyId id = 1; 
+}
+
+// GetRecommendationResponse wraps the recommendation.
+// If recommendation is not set, it means no decision is available yet.
+message GetRecommendationResponse {
+  Recommendation recommendation = 1;
+  // Status of the input metrics used for the decision.
+  repeated MetricStatus metric_statuses = 2;
+}
+
+// Recommendation is the final arbitrated decision from the Control Plane.
+message Recommendation {
+  // The calculated target replica count.
+  int32 target_replicas = 1;
+  // Explains the decision by listing the status of all recommenders.
+  repeated RecommenderStatus explanation = 2;
+}
+
+// MetricStatus represents the state of a single input metric.
+message MetricStatus {
+  // The name of the metric.
+  string name = 1;
+  // The aggregated value.
+  double value = 2;
+  // Timestamp of the value (Unix seconds).
+  int64 timestamp = 3;
+  // Error message if data is missing or invalid.
+  string error = 4;
+}
+
+
+// --- Ingestion ---
+
+// IngestMetricsRequest pushes a batch of raw metrics to the Control Plane.
+message IngestMetricsRequest {
+  // The cluster name where metrics originated.
+  string cluster_name = 1;
+  // Timestamp of the ingestion (Unix seconds).
+  int64 timestamp = 2;
+  // Group metrics by policy.
+  repeated PolicyBatch policies = 3;
+}
+
+// PolicyBatch groups metrics for a specific policy.
+message PolicyBatch {
+  // The namespace of the policy.
+  string namespace = 1;
+  // The name of the policy.
+  string name = 2;
+  
+  // Batches of metrics, usually grouped by Entity (Pod).
+  repeated MetricBatch batches = 3;
+}
+
+// MetricBatch contains metrics for a specific entity.
+message MetricBatch {
+  // Identifies the source entity (e.g. Pod Name).
+  // Empty string means the metric applies to the Policy as a whole (Global).
+  string entity_key = 1;
+  // The list of metric samples.
+  repeated MetricSample samples = 2;
+}
+
+// MetricSample represents a single data point.
+message MetricSample {
+  // The name of the metric.
+  string name = 1;
+  // Labels associated with the sample.
+  map<string, string> labels = 2;
+  // The scalar value of the sample.
+  double value = 3;
+  // Timestamp of the sample (Unix seconds).
+  int64 timestamp = 4;
+  
+  // Histogram buckets (Le -> Count).
+  map<string, uint64> histogram_buckets = 5;
+  // Sum of all observations in the histogram.
+  double histogram_sum = 6;
+  // Total count of observations in the histogram.
+  uint64 histogram_count = 7;
+}
+
+// IngestMetricsResponse acknowledges successful ingestion.
+message IngestMetricsResponse { 
+  // Whether ingestion was successful.
+  bool success = 1; 
+}

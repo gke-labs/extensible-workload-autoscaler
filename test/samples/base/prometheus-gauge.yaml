@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sample-prometheus-gauge
+  labels:
+    sample: prometheus-gauge
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-gauge
+  namespace: sample-prometheus-gauge
+  labels:
+    sample: prometheus-gauge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-gauge
+  template:
+    metadata:
+      labels:
+        app: prometheus-gauge
+    spec:
+      containers:
+        - name: sample-app
+          image: xas-sample:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-gauge
+  namespace: sample-prometheus-gauge
+  labels:
+    sample: prometheus-gauge
+spec:
+  ports:
+    - port: 80
+      targetPort: 8080
+  selector:
+    app: prometheus-gauge
+---
+apiVersion: xas.io/v1
+kind: ScalingPolicy
+metadata:
+  name: prometheus-gauge
+  namespace: sample-prometheus-gauge
+  labels:
+    sample: prometheus-gauge
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: prometheus-gauge
+  minReplicas: 1
+  maxReplicas: 10
+  
+  metrics:
+    - name: "active_requests"
+      provider: "prometheus"
+      params:
+        metric: "http_requests_active"
+      gauge:
+        aggregation: "Avg"
+      
+  scaling:
+    - recommender: "linear"
+      name: "active_target"
+      params:
+        metric: "active_requests"
+        target: "5.0"
+        mode: "Active"
