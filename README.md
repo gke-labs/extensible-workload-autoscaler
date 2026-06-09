@@ -4,6 +4,12 @@
 
 ## What is xAS?
 
+> [!CAUTION]
+> This is a very early prototype, and is intended mainly to use a tool to investigate
+> API ideas and high-level architectures. It is not intended for production use. We
+> are working with the sig-autoscaling community to begin work on a usable autoscaler
+> based on the ideas explored in this repo.
+
 xAS is the *Extensible Workload Autoscaler* for Kubernetes.
 
 It is a Pod autoscaler that can be used together with, or as a replacement for,
