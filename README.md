@@ -71,7 +71,7 @@ To set up the development environment on a KinD cluster:
 $ hack/create-kind-cluster.sh
 
 # Build and deploy xAS.
-$ hack/deploy.sh kind
+$ hack/deploy.sh
 
 # Deploy the samples.
 $ kubectl apply -k test/samples/overlays/kind
@@ -80,7 +80,7 @@ $ kubectl apply -k test/samples/overlays/kind
 $ kubectl describe scalingpolicy kubelet-cpu -n sample-kubelet-cpu
 
 # Update codebase and CRDs.
-# Re-run `hack/deploy.sh kind` to re-deploy to your KinD cluster.
+# Re-run `hack/deploy.sh` to re-deploy to your KinD cluster.
 ```
 
 To cleanup and delete the cluster, run `hack/delete-kind-cluster.sh`.
