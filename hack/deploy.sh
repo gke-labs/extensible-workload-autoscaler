@@ -29,9 +29,9 @@ echo "Loading Sample App into Kind cluster '$KIND_CLUSTER_NAME'..."
 kind load docker-image "${SAMPLES_IMAGE_NAME}" --name "$KIND_CLUSTER_NAME"
 
 
-echo "===================================================================="
+echo "=========================================================="
 echo "Deploying xAS manifests to kind cluster '${KIND_CLUSTER_NAME}' using ko"
-echo "===================================================================="
+echo "=========================================================="
 
 kubectl apply -f "${ROOT}"/deploy/crd/
 
@@ -40,9 +40,9 @@ export KIND_CLUSTER_NAME # For ko resolve to push images to the KinD image cache
 # Build system binaries and resolve manifest references using ko in one unified step
 "${ROOT}"/hack/run-tool.sh ko resolve -f "${ROOT}"/deploy/install.yaml | envsubst | kubectl apply -f -
 
-echo "===================================================================="
+echo "=========================================================="
 echo "Restarting xAS workloads..."
-echo "===================================================================="
+echo "=========================================================="
 
 # Force restart workloads to pick up the newly built images
 kubectl rollout restart deployment -n xas-system xas-server xas-controller xas-core-recommenders || true
