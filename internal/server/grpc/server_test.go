@@ -17,7 +17,7 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1"
+	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
 	servergrpc "github.com/gke-labs/extensible-workload-autoscaler/internal/server/grpc"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store"

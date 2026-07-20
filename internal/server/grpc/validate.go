@@ -1,7 +1,7 @@
 package grpc
 
 import (
-	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1"
+	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
