@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.0
 // - protoc             v3.21.12
-// source: api/proto/v1/xas.proto
+// source: api/proto/v1alpha/xas.proto
 
-package v1
+package v1alpha
 
 import (
 	context "context"
@@ -20,14 +20,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	XASControlPlane_UpdatePolicy_FullMethodName           = "/xas.v1.XASControlPlane/UpdatePolicy"
-	XASControlPlane_DeletePolicy_FullMethodName           = "/xas.v1.XASControlPlane/DeletePolicy"
-	XASControlPlane_ListPolicies_FullMethodName           = "/xas.v1.XASControlPlane/ListPolicies"
-	XASControlPlane_UpdateWorkload_FullMethodName         = "/xas.v1.XASControlPlane/UpdateWorkload"
-	XASControlPlane_GetControlMetrics_FullMethodName      = "/xas.v1.XASControlPlane/GetControlMetrics"
-	XASControlPlane_UpdateRecommenderState_FullMethodName = "/xas.v1.XASControlPlane/UpdateRecommenderState"
-	XASControlPlane_GetRecommendation_FullMethodName      = "/xas.v1.XASControlPlane/GetRecommendation"
-	XASControlPlane_IngestMetrics_FullMethodName          = "/xas.v1.XASControlPlane/IngestMetrics"
+	XASControlPlane_UpdatePolicy_FullMethodName           = "/xas.v1alpha.XASControlPlane/UpdatePolicy"
+	XASControlPlane_DeletePolicy_FullMethodName           = "/xas.v1alpha.XASControlPlane/DeletePolicy"
+	XASControlPlane_ListPolicies_FullMethodName           = "/xas.v1alpha.XASControlPlane/ListPolicies"
+	XASControlPlane_UpdateWorkload_FullMethodName         = "/xas.v1alpha.XASControlPlane/UpdateWorkload"
+	XASControlPlane_GetControlMetrics_FullMethodName      = "/xas.v1alpha.XASControlPlane/GetControlMetrics"
+	XASControlPlane_UpdateRecommenderState_FullMethodName = "/xas.v1alpha.XASControlPlane/UpdateRecommenderState"
+	XASControlPlane_GetRecommendation_FullMethodName      = "/xas.v1alpha.XASControlPlane/GetRecommendation"
+	XASControlPlane_IngestMetrics_FullMethodName          = "/xas.v1alpha.XASControlPlane/IngestMetrics"
 )
 
 // XASControlPlaneClient is the client API for XASControlPlane service.
@@ -393,7 +393,7 @@ func _XASControlPlane_IngestMetrics_Handler(srv interface{}, ctx context.Context
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var XASControlPlane_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "xas.v1.XASControlPlane",
+	ServiceName: "xas.v1alpha.XASControlPlane",
 	HandlerType: (*XASControlPlaneServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -430,5 +430,5 @@ var XASControlPlane_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "api/proto/v1/xas.proto",
+	Metadata: "api/proto/v1alpha/xas.proto",
 }

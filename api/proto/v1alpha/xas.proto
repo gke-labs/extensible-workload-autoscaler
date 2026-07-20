@@ -1,11 +1,11 @@
 syntax = "proto3";
 
-package xas.v1;
+package xas.v1alpha;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
-option go_package = "github.com/gke-labs/extensible-workload-autoscaler/api/v1";
+option go_package = "github.com/gke-labs/extensible-workload-autoscaler/api/v1alpha";
 
 // XASControlPlane defines the gRPC interface for the Control Plane (Server).
 // It acts as the central state manager for autoscaling policies, workload state,
