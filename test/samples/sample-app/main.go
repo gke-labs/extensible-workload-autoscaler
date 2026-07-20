@@ -51,7 +51,7 @@ var (
 			Help: "A sinewave metric going from 0 to 100 with a period of 1 minute",
 		},
 		func() float64 {
-			return (math.Sin(float64(time.Now().Second()) * (2 * math.Pi / 60.0)) + 1) * 50.0
+			return (math.Sin(float64(time.Now().Second())*(2*math.Pi/60.0)) + 1) * 50.0
 		},
 	)
 
