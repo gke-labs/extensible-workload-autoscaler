@@ -17,7 +17,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1"
+	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 )
 

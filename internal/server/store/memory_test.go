@@ -8,7 +8,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1"
+	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store"
 )

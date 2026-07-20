@@ -5,7 +5,7 @@ import (
 	"math"
 	"strconv"
 
-	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1"
+	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 )
 
 type LinearRecommender struct{}
