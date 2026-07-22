@@ -82,11 +82,11 @@ The deployment script prepares the environment for running end-to-end tests.
 
 *   **Deploy Specific Sample:**
     ```bash
-    kubectl kustomize test/samples/overlays/${TARGET} | kubectl apply -f - --selector=sample=cron
+    kubectl apply -f test/samples/manifests/${TARGET}.yaml
     ```
 *   **Deploy All Samples:**
     ```bash
-    kubectl -k test/samples/overlays/${TARGET}
+    kubectl apply -f test/samples/manifests/
     ```
 
 ## Configuration (CRDs)

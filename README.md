@@ -74,7 +74,7 @@ $ hack/create-kind-cluster.sh
 $ hack/deploy.sh
 
 # Deploy the samples.
-$ kubectl apply -k test/samples/overlays/kind
+$ kubectl apply -f test/samples/manifests
 
 # Observe a sample scaling policy.
 $ kubectl describe scalingpolicy kubelet-cpu -n sample-kubelet-cpu

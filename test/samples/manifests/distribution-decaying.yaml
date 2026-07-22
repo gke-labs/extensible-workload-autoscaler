@@ -25,6 +25,7 @@ spec:
       containers:
         - name: stress
           image: vish/stress
+          imagePullPolicy: IfNotPresent
           args: ["-cpus", "1"]
           resources:
             requests:
