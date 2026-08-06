@@ -43,6 +43,13 @@ metadata:
 spec:
   type: Cron
 ---
+apiVersion: xas.io/v1
+kind: RecommenderClass
+metadata:
+  name: vpa
+spec:
+  type: VPA
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:

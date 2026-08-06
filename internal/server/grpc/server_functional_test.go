@@ -1179,12 +1179,14 @@ func TestGetRecommendation_Aggregation(t *testing.T) {
 			Scaling: []*pb.RecommenderDefinition{
 				{Name: "scale1", Recommender: "Linear", Type: "Linear", Mode: "Active"},
 				{Name: "scale2", Recommender: "Linear", Type: "Linear", Mode: "Active"},
+				{Name: "vpa1", Recommender: "vpa", Type: "VPA", Mode: "Active"},
 			},
 		},
 	})
 
 	// Scenario: act1=true, act2=false -> Active (OR)
 	//           scale1=10, scale2=20 -> 20 (MAX)
+	//					 mem=256Mi, cpu=25m
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: id, RecommenderName: "act1", Vote: &pb.RecommenderVote{IsActive: true},
 	})
@@ -1196,6 +1198,22 @@ func TestGetRecommendation_Aggregation(t *testing.T) {
 	})
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: id, RecommenderName: "scale2", Vote: &pb.RecommenderVote{Replicas: proto.Int32(20), IsActive: true},
+	})
+	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
+		Id: id, RecommenderName: "vpa1", Vote: &pb.RecommenderVote{
+			IsActive: true,
+			WorkloadResources: &pb.ResourceRecommendation{
+				Requests: map[string]string{
+					"cpu":    "25m",
+					"memory": "265Mi",
+				},
+				Limits: map[string]string{
+					"cpu":    "25m",
+					"memory": "265Mi",
+				},
+			},
+			Message: "Recommendation generated successfully.",
+		},
 	})
 
 	memStore.CalculateAll()
@@ -1209,6 +1227,11 @@ func TestGetRecommendation_Aggregation(t *testing.T) {
 				{Name: "scale2", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(20), IsActive: true},
 				{Name: "act1", Type: "Threshold", Phase: "Activation", Mode: "Active", IsActive: true},
 				{Name: "act2", Type: "Threshold", Phase: "Activation", Mode: "Active", IsActive: false},
+				{Name: "vpa1", Type: "VPA", Phase: "Scaling", Mode: "Active", IsActive: true, WorkloadResources: &pb.ResourceRecommendation{
+					Requests: map[string]string{"cpu": "25m", "memory": "265Mi"},
+					Limits:   map[string]string{"cpu": "25m", "memory": "265Mi"},
+				},
+					Message: "Recommendation generated successfully."},
 			},
 		},
 		MetricStatuses: []*pb.MetricStatus{},

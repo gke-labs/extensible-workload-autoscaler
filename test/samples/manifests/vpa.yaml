@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sample-vpa
+  labels:
+    sample: vpa
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-vpa-app
+  namespace: sample-vpa
+  labels:
+    sample: vpa
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sample-vpa-app
+  template:
+    metadata:
+      labels:
+        app: sample-vpa-app
+    spec:
+      containers:
+        - name: stress
+          image: vish/stress
+          imagePullPolicy: IfNotPresent
+          args: ["-cpus", "1"]
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          # In-place resource resize policies (Kubernetes 1.27+)
+          resizePolicy:
+            - resourceName: cpu
+              restartPolicy: NotRequired
+            - resourceName: memory
+              restartPolicy: NotRequired
+---
+apiVersion: xas.io/v1
+kind: ScalingPolicy
+metadata:
+  name: sample-vpa-policy
+  namespace: sample-vpa
+  labels:
+    sample: vpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: sample-vpa-app
+  minReplicas: 1
+  maxReplicas: 5
+
+  metrics:
+    - name: "cpu_p95"
+      provider: "kubelet"
+      params:
+        type: "cpu"
+      decayingDistribution:
+        percentile: "p95"
+        halfLife: "24h"
+        bucketSize: "0.05"
+    - name: "mem_p95"
+      provider: "kubelet"
+      params:
+        type: "memory"
+      decayingDistribution:
+        percentile: "p95"
+        halfLife: "24h"
+        bucketSize: "10485760"
+
+  scaling:
+    - recommender: "vpa"
+      name: "vpa-sizing"
+      params:
+        cpu-metric: "cpu_p95"
+        mem-metric: "mem_p95"
+        cpu-safety-margin: "1.10"
+        mem-safety-margin: "1.10"
