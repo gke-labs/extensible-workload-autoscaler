@@ -145,6 +145,14 @@ metadata:
   name: addon-resizer
 spec:
   type: AddonResizer
+---
+apiVersion: xas.io/v1
+kind: RecommenderClass
+metadata:
+  name: vpa
+spec:
+  type: VPA
+
 
 # ==========================================================
 # SERVER (The Control Plane)

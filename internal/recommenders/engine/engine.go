@@ -12,6 +12,7 @@ import (
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/cron"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/linear"
+	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/vpa"
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 )
@@ -22,8 +23,8 @@ type Engine struct {
 	recommenderLister listers.RecommenderClassLister
 	linear            *linear.LinearRecommender
 	cron              *cron.Recommender
-
-	clusterName string
+	vpa               *vpa.VPARecommender
+	clusterName       string
 }
 
 func NewEngine(recommenderLister listers.RecommenderClassLister, nodeLister corelisters.NodeLister, serverAddress, clusterName string) *Engine {
@@ -40,6 +41,7 @@ func NewEngine(recommenderLister listers.RecommenderClassLister, nodeLister core
 		recommenderLister: recommenderLister,
 		linear:            &linear.LinearRecommender{},
 		cron:              &cron.Recommender{},
+		vpa:               &vpa.VPARecommender{},
 		clusterName:       clusterName,
 	}
 }
@@ -113,6 +115,8 @@ func (e *Engine) processPolicy(policy *pb.Policy) {
 				v = e.linear.Recommend(defCopy, state)
 			case "Cron":
 				v = e.cron.Recommend(defCopy, state)
+			case "VPA":
+				v = e.vpa.Recommend(defCopy, state)
 			default:
 				slog.Warn("Unknown recommender type in class", "type", class.Spec.Type, "class", class.Name)
 			}
