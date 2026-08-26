@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"k8s.io/client-go/kubernetes"
+	customclient "k8s.io/metrics/pkg/client/custom_metrics"
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
@@ -18,6 +19,7 @@ import (
 type CoreClusterMetricsProvider struct {
 	kubeClient            kubernetes.Interface
 	externalMetricsClient externalclient.ExternalMetricsClient
+	customMetricsClient   customclient.CustomMetricsClient
 	providerLister        listers.MetricProviderClassLister
 
 	grpcConn   *grpc.ClientConn
@@ -29,6 +31,7 @@ type CoreClusterMetricsProvider struct {
 func NewCoreClusterMetricsProvider(
 	kubeClient kubernetes.Interface,
 	externalMetricsClient externalclient.ExternalMetricsClient,
+	customMetricsClient customclient.CustomMetricsClient,
 	providerLister listers.MetricProviderClassLister,
 	serverAddress, clusterName string,
 ) *CoreClusterMetricsProvider {
@@ -42,6 +45,7 @@ func NewCoreClusterMetricsProvider(
 	return &CoreClusterMetricsProvider{
 		kubeClient:            kubeClient,
 		externalMetricsClient: externalMetricsClient,
+		customMetricsClient:   customMetricsClient,
 		providerLister:        providerLister,
 		grpcConn:              conn,
 		grpcClient:            client,
@@ -92,6 +96,11 @@ func (p *CoreClusterMetricsProvider) scrapeAndSend() {
 
 			if class.Spec.Type == "ExternalMetrics" {
 				batches := p.processExternalMetric(pol.Id.Namespace, m, class)
+				if len(batches) > 0 {
+					policyMetrics = append(policyMetrics, batches...)
+				}
+			} else if class.Spec.Type == "CustomMetrics" {
+				batches := p.processCustomMetric(pol.Id.Namespace, pol, m, class)
 				if len(batches) > 0 {
 					policyMetrics = append(policyMetrics, batches...)
 				}

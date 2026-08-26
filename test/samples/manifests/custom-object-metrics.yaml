@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sample-custom-object-metrics
+  labels:
+    sample: custom-object-metrics
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: custom-object-consumer
+  namespace: sample-custom-object-metrics
+  labels:
+    sample: custom-object-metrics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: custom-object-consumer
+  template:
+    metadata:
+      labels:
+        app: custom-object-consumer
+    spec:
+      containers:
+        - name: sample-app
+          image: xas-sample:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: custom-object-service
+  namespace: sample-custom-object-metrics
+  labels:
+    sample: custom-object-metrics
+spec:
+  ports:
+    - port: 80
+      targetPort: 8080
+  selector:
+    app: custom-object-consumer
+---
+apiVersion: xas.io/v1
+kind: ScalingPolicy
+metadata:
+  name: custom-object-metrics
+  namespace: sample-custom-object-metrics
+  labels:
+    sample: custom-object-metrics
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: custom-object-consumer
+  minReplicas: 1
+  maxReplicas: 10
+
+  metrics:
+    - name: "service_http_requests"
+      provider: "k8s-custom-metrics"
+      params:
+        targetKind: "Service"
+        targetName: "custom-object-service"
+        metric: "http_requests_per_second"
+      gauge:
+        aggregation: "Avg"
+
+  scaling:
+    - recommender: "linear"
+      name: "service_requests_target"
+      params:
+        metric: "service_http_requests"
+        target: "500.0" # Target 500 req/sec total on the Service

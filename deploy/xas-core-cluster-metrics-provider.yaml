@@ -9,7 +9,7 @@ kind: ClusterRole
 metadata:
   name: xas-core-cluster-metrics-provider
 rules:
-  - apiGroups: ["external.metrics.k8s.io"]
+  - apiGroups: ["external.metrics.k8s.io", "custom.metrics.k8s.io"]
     resources: ["*"]
     verbs: ["get", "list"]
   - apiGroups: ["xas.io"]
@@ -37,6 +37,15 @@ spec:
   type: ExternalMetrics
   config:
     group: "external.metrics.k8s.io"
+---
+apiVersion: xas.io/v1
+kind: MetricProviderClass
+metadata:
+  name: k8s-custom-metrics
+spec:
+  type: CustomMetrics
+  config:
+    group: "custom.metrics.k8s.io"
 ---
 apiVersion: apps/v1
 kind: Deployment

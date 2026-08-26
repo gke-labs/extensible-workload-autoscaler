@@ -9,9 +9,14 @@ import (
 	"syscall"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
+	customclient "k8s.io/metrics/pkg/client/custom_metrics"
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
 
 	provider "github.com/gke-labs/extensible-workload-autoscaler/internal/core-cluster-metrics-provider"
@@ -61,6 +66,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		slog.Error("Error building discovery client", "error", err)
+		os.Exit(1)
+	}
+	mapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(discoveryClient))
+
+	customMetricsClient, err := customclient.NewForVersionForConfig(cfg, mapper, schema.GroupVersion{Group: "custom.metrics.k8s.io", Version: "v1beta2"})
+	if err != nil {
+		slog.Error("Error building custom metrics clientset", "error", err)
+		os.Exit(1)
+	}
+
 	xasClient, err := clientset.NewForConfig(cfg)
 	if err != nil {
 		slog.Error("Error building xas clientset", "error", err)
@@ -70,7 +88,7 @@ func main() {
 	factory := informers.NewSharedInformerFactory(xasClient, time.Second*30)
 	providerLister := factory.Xas().V1().MetricProviderClasses().Lister()
 
-	p := provider.NewCoreClusterMetricsProvider(kubeClient, externalMetricsClient, providerLister, serverAddress, clusterName)
+	p := provider.NewCoreClusterMetricsProvider(kubeClient, externalMetricsClient, customMetricsClient, providerLister, serverAddress, clusterName)
 
 	factory.Start(ctx.Done())
 	factory.WaitForCacheSync(ctx.Done())
