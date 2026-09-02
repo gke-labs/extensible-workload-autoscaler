@@ -43,7 +43,7 @@ fi
 rm -f "$TMP_ERR"
 
 # Check for changes in generated paths
-GEN_PATHS="pkg/client deploy/crd pkg/apis/xas/v1/deepcopy_generated.go api/proto/v1"
+GEN_PATHS="pkg/client deploy/crd pkg/apis/xas/v1/deepcopy_generated.go api/proto/v1alpha"
 if ! git diff --quiet -- $GEN_PATHS; then
     echo "Error: Generated code is out of date."
     echo "The following files have changed:"
