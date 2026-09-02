@@ -193,11 +193,15 @@ type DecisionStatus struct {
 	Phase             string                      `json:"phase"` // "Activation" or "Scaling"
 	Mode              string                      `json:"mode,omitempty"`
 	Active            bool                        `json:"active"`
-	Replicas          int32                       `json:"replicas"`
+	Replicas          *ReplicasRecommendation     `json:"replicas,omitempty"`
 	Reason            string                      `json:"reason,omitempty"`
 	Error             string                      `json:"error,omitempty"`
 	WorkloadResources *ResourceRecommendation     `json:"workloadResources,omitempty"`
 	PodResources      []PodResourceRecommendation `json:"podResources,omitempty"`
+}
+
+type ReplicasRecommendation struct {
+	Replicas int32 `json:"replicas"`
 }
 
 type ResourceRecommendation struct {

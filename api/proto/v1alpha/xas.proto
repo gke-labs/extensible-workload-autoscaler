@@ -273,10 +273,16 @@ message PodResourceRecommendation {
   map<string, string> limits = 3;
 }
 
+// ReplicasRecommendation defines the recommended replica count.
+message ReplicasRecommendation {
+  // The recommended number of replicas.
+  int32 replicas = 1;
+}
+
 // RecommenderVote represents the input/decision from a recommender.
 message RecommenderVote {
-  // The desired number of replicas.
-  int32 desired_replicas = 1;
+  // Recommendation for replicas.
+  ReplicasRecommendation replicas = 1;
   // If false, this recommender votes to scale to zero (if Activation type).
   bool is_active = 2;
   // Human-readable reason or message.
@@ -299,8 +305,6 @@ message RecommenderState {
 
 // RecommenderStatus represents the output/decision of a recommender.
 message RecommenderStatus {
-  // The desired number of replicas.
-  int32 desired_replicas = 1;
   // If false, this recommender votes to scale to zero (if Activation type).
   bool is_active = 2;
   // Human-readable reason or message.
@@ -315,6 +319,8 @@ message RecommenderStatus {
   string name = 7;
   // The type of the recommender (e.g. "Linear", "Cron").
   string type = 8;
+  // Replicas recommendation for the workload.
+  ReplicasRecommendation replicas = 1;
   // Workload-level resource recommendation.
   ResourceRecommendation workload_resources = 9;
   // Pod-level resource recommendations.

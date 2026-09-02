@@ -36,16 +36,20 @@ func (r *Recommender) Recommend(def *pb.RecommenderDefinition, _ *pb.ControlMetr
 		}
 	}
 
-	desired := int32(0)
+	var replicas *pb.ReplicasRecommendation
 	if cfg.replicas != nil {
+		desired := int32(0)
 		if isActive {
 			desired = *cfg.replicas
+		}
+		replicas = &pb.ReplicasRecommendation{
+			Replicas: desired,
 		}
 	}
 
 	return &pb.RecommenderVote{
-		IsActive:        isActive,
-		DesiredReplicas: desired,
+		IsActive: isActive,
+		Replicas: replicas,
 	}
 }
 

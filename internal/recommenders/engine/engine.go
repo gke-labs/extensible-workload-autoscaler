@@ -169,8 +169,9 @@ func (e *Engine) pushDecisions(policy *pb.Policy, decisions []decision) {
 			RecommenderName: d.name,
 			Vote:            d.vote,
 		}
-
-		slog.Debug("Pushing decision", "policy", policy.Id.Name, "recommender", d.name, "desired", d.vote.DesiredReplicas)
+		if d.vote != nil && d.vote.Replicas != nil {
+			slog.Debug("Pushing workload replicas recommendation", "policy", policy.Id.Name, "recommender", d.name, "desired", d.vote.Replicas.Replicas)
+		}
 		_, err := e.client.UpdateRecommenderState(ctx, req)
 		if err != nil {
 			slog.Error("Failed to update decision", "policy", policy.Id.Name, "recommender", d.name, "error", err)

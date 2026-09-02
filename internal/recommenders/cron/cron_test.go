@@ -37,8 +37,10 @@ func TestCronRecommend(t *testing.T) {
 				},
 			},
 			want: &pb.RecommenderVote{
-				IsActive:        true,
-				DesiredReplicas: 5,
+				IsActive: true,
+				Replicas: &pb.ReplicasRecommendation{
+					Replicas: 5,
+				},
 			},
 		},
 		{
@@ -54,8 +56,25 @@ func TestCronRecommend(t *testing.T) {
 				},
 			},
 			want: &pb.RecommenderVote{
-				IsActive:        false,
-				DesiredReplicas: 0,
+				IsActive: false,
+				Replicas: &pb.ReplicasRecommendation{
+					Replicas: 0,
+				},
+			},
+		},
+		{
+			name: "Activation only (no replicas param)",
+			def: &pb.RecommenderDefinition{
+				Name:        "activation_only",
+				Recommender: "Cron",
+				Params: map[string]string{
+					"start":    "0 9 * * *",
+					"end":      "0 17 * * *",
+					"timezone": "UTC",
+				},
+			},
+			want: &pb.RecommenderVote{
+				IsActive: true,
 			},
 		},
 		{

@@ -29,8 +29,10 @@ func TestLinearRecommend(t *testing.T) {
 			readyReplicas:  2,
 			// Desired = 2 * (0.8 / 0.5) = 2 * 1.6 = 3.2 -> ceil(3.2) = 4
 			want: &pb.RecommenderVote{
-				DesiredReplicas: 4,
-				IsActive:        true,
+				Replicas: &pb.ReplicasRecommendation{
+					Replicas: 4,
+				},
+				IsActive: true,
 			},
 		},
 		{
@@ -44,8 +46,10 @@ func TestLinearRecommend(t *testing.T) {
 			readyReplicas:  4,
 			// Desired = 4 * (0.2 / 0.5) = 4 * 0.4 = 1.6 -> ceil(1.6) = 2
 			want: &pb.RecommenderVote{
-				DesiredReplicas: 2,
-				IsActive:        true,
+				Replicas: &pb.ReplicasRecommendation{
+					Replicas: 2,
+				},
+				IsActive: true,
 			},
 		},
 		{

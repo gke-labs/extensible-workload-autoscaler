@@ -279,8 +279,13 @@ spec:
                     recommenderName:
                       type: string
                     replicas:
-                      format: int32
-                      type: integer
+                      properties:
+                        replicas:
+                          format: int32
+                          type: integer
+                      required:
+                      - replicas
+                      type: object
                     type:
                       type: string
                     workloadResources:
@@ -298,7 +303,6 @@ spec:
                   - active
                   - phase
                   - recommenderName
-                  - replicas
                   - type
                   type: object
                 type: array

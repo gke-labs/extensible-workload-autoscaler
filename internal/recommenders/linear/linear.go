@@ -34,8 +34,10 @@ func (r *LinearRecommender) Recommend(def *pb.RecommenderDefinition, state *pb.C
 	desired := int32(math.Ceil(float64(state.ReadyReplicas) * ratio))
 
 	return &pb.RecommenderVote{
-		DesiredReplicas: desired,
-		IsActive:        true,
+		Replicas: &pb.ReplicasRecommendation{
+			Replicas: desired,
+		},
+		IsActive: true,
 	}
 }
 

@@ -319,11 +319,11 @@ func TestRecommendationArbitration(t *testing.T) {
 	// Case 1: All Active. R1=3, R2=5. Result=5.
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "arb-pol"}, RecommenderName: "r1",
-		Vote: &pb.RecommenderVote{DesiredReplicas: 3, IsActive: true},
+		Vote: &pb.RecommenderVote{Replicas: &pb.ReplicasRecommendation{Replicas: 3}, IsActive: true},
 	})
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "arb-pol"}, RecommenderName: "r2",
-		Vote: &pb.RecommenderVote{DesiredReplicas: 5, IsActive: true},
+		Vote: &pb.RecommenderVote{Replicas: &pb.ReplicasRecommendation{Replicas: 5}, IsActive: true},
 	})
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "arb-pol"}, RecommenderName: "a1",
@@ -404,8 +404,10 @@ func TestDump(t *testing.T) {
 		Id:              &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "dump-pol"},
 		RecommenderName: "cpu-rec",
 		Vote: &pb.RecommenderVote{
-			DesiredReplicas: 2,
-			IsActive:        true,
+			Replicas: &pb.ReplicasRecommendation{
+				Replicas: 2,
+			},
+			IsActive: true,
 		},
 	})
 
@@ -482,28 +484,32 @@ func TestDump(t *testing.T) {
       "target_replicas": 2,
       "explanation": [
         {
-          "desired_replicas": 2,
           "is_active": true,
           "last_updated": {
             "seconds": 1000
           },
           "phase": "Scaling",
           "name": "cpu-rec",
-          "type": "Linear"
+          "type": "Linear",
+          "replicas": {
+            "replicas": 2
+          }
         }
       ]
     },
     "LastActive": 1000,
     "Decisions": {
       "cpu-rec": {
-        "desired_replicas": 2,
         "is_active": true,
         "last_updated": {
           "seconds": 1000
         },
         "phase": "Scaling",
         "name": "cpu-rec",
-        "type": "Linear"
+        "type": "Linear",
+        "replicas": {
+          "replicas": 2
+        }
       }
     },
     "ControlMetrics": {
@@ -810,7 +816,7 @@ func TestRemoveRecommender(t *testing.T) {
 	// 2. Simulate R1 vote = 10
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: id, RecommenderName: "r1",
-		Vote: &pb.RecommenderVote{DesiredReplicas: 10, IsActive: true},
+		Vote: &pb.RecommenderVote{Replicas: &pb.ReplicasRecommendation{Replicas: 10}, IsActive: true},
 	})
 
 	s.CalculateAll()
@@ -832,7 +838,7 @@ func TestRemoveRecommender(t *testing.T) {
 	// 4. Simulate Zombie R1 vote = 100
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: id, RecommenderName: "r1",
-		Vote: &pb.RecommenderVote{DesiredReplicas: 100, IsActive: true},
+		Vote: &pb.RecommenderVote{Replicas: &pb.ReplicasRecommendation{Replicas: 100}, IsActive: true},
 	})
 
 	s.CalculateAll()

@@ -479,8 +479,8 @@ const pageTemplate = `
                      }
 
                      let voteHtml = '';
-                     if (d.desired_replicas !== undefined && d.desired_replicas !== null && d.desired_replicas !== 0) {
-                         voteHtml += '<div><strong>Rep:</strong> ' + d.desired_replicas + '</div>';
+                     if (d.replicas && d.replicas.replicas !== undefined && d.replicas.replicas !== null) {
+                         voteHtml += '<div><strong>Rep:</strong> ' + d.replicas.replicas + '</div>';
                      }
 
                      if (d.workload_resources && (d.workload_resources.requests || d.workload_resources.limits)) {
