@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
@@ -38,9 +39,7 @@ func TestCronRecommend(t *testing.T) {
 			},
 			want: &pb.RecommenderVote{
 				IsActive: true,
-				Replicas: &pb.ReplicasRecommendation{
-					Replicas: 5,
-				},
+				Replicas: proto.Int32(5),
 			},
 		},
 		{
@@ -57,9 +56,7 @@ func TestCronRecommend(t *testing.T) {
 			},
 			want: &pb.RecommenderVote{
 				IsActive: false,
-				Replicas: &pb.ReplicasRecommendation{
-					Replicas: 0,
-				},
+				Replicas: proto.Int32(0),
 			},
 		},
 		{

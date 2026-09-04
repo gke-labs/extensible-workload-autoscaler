@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
@@ -29,9 +30,7 @@ func TestLinearRecommend(t *testing.T) {
 			readyReplicas:  2,
 			// Desired = 2 * (0.8 / 0.5) = 2 * 1.6 = 3.2 -> ceil(3.2) = 4
 			want: &pb.RecommenderVote{
-				Replicas: &pb.ReplicasRecommendation{
-					Replicas: 4,
-				},
+				Replicas: proto.Int32(4),
 				IsActive: true,
 			},
 		},
@@ -46,9 +45,7 @@ func TestLinearRecommend(t *testing.T) {
 			readyReplicas:  4,
 			// Desired = 4 * (0.2 / 0.5) = 4 * 0.4 = 1.6 -> ceil(1.6) = 2
 			want: &pb.RecommenderVote{
-				Replicas: &pb.ReplicasRecommendation{
-					Replicas: 2,
-				},
+				Replicas: proto.Int32(2),
 				IsActive: true,
 			},
 		},

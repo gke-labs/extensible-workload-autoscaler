@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
@@ -735,7 +736,7 @@ func TestUpdateRecommenderState_NotFound(t *testing.T) {
 	_, err := client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id:              &pb.PolicyId{ClusterName: "c1", Namespace: "ns", Name: "missing"},
 		RecommenderName: "r1",
-		Vote:            &pb.RecommenderVote{Replicas: &pb.ReplicasRecommendation{Replicas: 1}},
+		Vote:            &pb.RecommenderVote{Replicas: proto.Int32(1)},
 	})
 	if status.Code(err) != codes.NotFound {
 		t.Errorf("Expected NotFound, got %v", err)
@@ -753,7 +754,7 @@ func TestUpdateRecommenderState_NotDefined(t *testing.T) {
 	_, err := client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id:              id,
 		RecommenderName: "undefined",
-		Vote:            &pb.RecommenderVote{Replicas: &pb.ReplicasRecommendation{Replicas: 1}},
+		Vote:            &pb.RecommenderVote{Replicas: proto.Int32(1)},
 	})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Errorf("Expected InvalidArgument, got %v", err)
@@ -774,7 +775,7 @@ func TestUpdateRecommenderState_EmptyClears(t *testing.T) {
 	})
 
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "r1", Vote: &pb.RecommenderVote{Replicas: &pb.ReplicasRecommendation{Replicas: 5}, IsActive: true},
+		Id: id, RecommenderName: "r1", Vote: &pb.RecommenderVote{Replicas: proto.Int32(5), IsActive: true},
 	})
 
 	memStore.CalculateAll()
@@ -782,7 +783,7 @@ func TestUpdateRecommenderState_EmptyClears(t *testing.T) {
 	wantResp1 := &pb.GetRecommendationResponse{
 		Recommendation: &pb.Recommendation{
 			TargetReplicas: 5,
-			Explanation:    []*pb.RecommenderStatus{{Name: "r1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: &pb.ReplicasRecommendation{Replicas: 5}, IsActive: true}},
+			Explanation:    []*pb.RecommenderStatus{{Name: "r1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(5), IsActive: true}},
 		},
 		MetricStatuses: []*pb.MetricStatus{},
 	}
@@ -887,7 +888,7 @@ func TestUpdateRecommenderState_Validation(t *testing.T) {
 		name string
 		vote *pb.RecommenderVote
 	}{
-		{"Negative Replicas", &pb.RecommenderVote{Replicas: &pb.ReplicasRecommendation{Replicas: -1}}},
+		{"Negative Replicas", &pb.RecommenderVote{Replicas: proto.Int32(-1)}},
 	}
 
 	for _, tc := range tests {
@@ -994,10 +995,10 @@ func TestGetRecommendation_Aggregation(t *testing.T) {
 		Id: id, RecommenderName: "act2", Vote: &pb.RecommenderVote{IsActive: false},
 	})
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "scale1", Vote: &pb.RecommenderVote{Replicas: &pb.ReplicasRecommendation{Replicas: 10}, IsActive: true},
+		Id: id, RecommenderName: "scale1", Vote: &pb.RecommenderVote{Replicas: proto.Int32(10), IsActive: true},
 	})
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "scale2", Vote: &pb.RecommenderVote{Replicas: &pb.ReplicasRecommendation{Replicas: 20}, IsActive: true},
+		Id: id, RecommenderName: "scale2", Vote: &pb.RecommenderVote{Replicas: proto.Int32(20), IsActive: true},
 	})
 
 	memStore.CalculateAll()
@@ -1007,8 +1008,8 @@ func TestGetRecommendation_Aggregation(t *testing.T) {
 		Recommendation: &pb.Recommendation{
 			TargetReplicas: 20,
 			Explanation: []*pb.RecommenderStatus{
-				{Name: "scale1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: &pb.ReplicasRecommendation{Replicas: 10}, IsActive: true},
-				{Name: "scale2", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: &pb.ReplicasRecommendation{Replicas: 20}, IsActive: true},
+				{Name: "scale1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(10), IsActive: true},
+				{Name: "scale2", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(20), IsActive: true},
 				{Name: "act1", Type: "Threshold", Phase: "Activation", Mode: "Active", IsActive: true},
 				{Name: "act2", Type: "Threshold", Phase: "Activation", Mode: "Active", IsActive: false},
 			},
@@ -1053,7 +1054,7 @@ func TestGetRecommendation_MetricStatuses(t *testing.T) {
 	// m2 has no data
 
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "r1", Vote: &pb.RecommenderVote{Replicas: &pb.ReplicasRecommendation{Replicas: 5}, IsActive: true},
+		Id: id, RecommenderName: "r1", Vote: &pb.RecommenderVote{Replicas: proto.Int32(5), IsActive: true},
 	})
 
 	memStore.CalculateAll()
@@ -1062,7 +1063,7 @@ func TestGetRecommendation_MetricStatuses(t *testing.T) {
 	wantResp := &pb.GetRecommendationResponse{
 		Recommendation: &pb.Recommendation{
 			TargetReplicas: 5,
-			Explanation:    []*pb.RecommenderStatus{{Name: "r1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: &pb.ReplicasRecommendation{Replicas: 5}, IsActive: true}},
+			Explanation:    []*pb.RecommenderStatus{{Name: "r1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(5), IsActive: true}},
 		},
 		MetricStatuses: []*pb.MetricStatus{
 			{Name: "m1", Value: 10, Timestamp: ts},

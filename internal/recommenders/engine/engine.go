@@ -170,7 +170,7 @@ func (e *Engine) pushDecisions(policy *pb.Policy, decisions []decision) {
 			Vote:            d.vote,
 		}
 		if d.vote != nil && d.vote.Replicas != nil {
-			slog.Debug("Pushing workload replicas recommendation", "policy", policy.Id.Name, "recommender", d.name, "desired", d.vote.Replicas.Replicas)
+			slog.Debug("Pushing workload replicas recommendation", "policy", policy.Id.Name, "recommender", d.name, "desired", *d.vote.Replicas)
 		}
 		_, err := e.client.UpdateRecommenderState(ctx, req)
 		if err != nil {

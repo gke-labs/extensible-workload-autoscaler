@@ -396,7 +396,7 @@ func (s *MemoryStore) UpdateRecommenderState(req *pb.UpdateRecommenderStateReque
 	}
 
 	// Basic validation of vote
-	if req.Vote.Replicas != nil && req.Vote.Replicas.Replicas < 0 {
+	if req.Vote.Replicas != nil && *req.Vote.Replicas < 0 {
 		return fmt.Errorf("desired replicas cannot be negative")
 	}
 
@@ -815,8 +815,8 @@ func (s *MemoryStore) calculateTargetReplicas(ps *PolicyState, isActive bool) (i
 				continue
 			}
 
-			if recDef.Mode != "DryRun" && d.IsActive && d.Replicas != nil && d.Replicas.Replicas > maxReplicas {
-				maxReplicas = d.Replicas.Replicas
+			if recDef.Mode != "DryRun" && d.IsActive && d.Replicas != nil && *d.Replicas > maxReplicas {
+				maxReplicas = *d.Replicas
 			}
 
 			decisionStatuses = append(decisionStatuses, d)
