@@ -279,13 +279,8 @@ spec:
                     recommenderName:
                       type: string
                     replicas:
-                      properties:
-                        replicas:
-                          format: int32
-                          type: integer
-                      required:
-                      - replicas
-                      type: object
+                      format: int32
+                      type: integer
                     type:
                       type: string
                     workloadResources:

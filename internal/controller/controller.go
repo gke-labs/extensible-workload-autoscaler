@@ -432,13 +432,6 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 
 	policyCopy.Status.Decisions = make([]xasv1.DecisionStatus, len(rec.Explanation))
 	for i, d := range rec.Explanation {
-		var rr *xasv1.ReplicasRecommendation
-		if d.Replicas != nil {
-			rr = &xasv1.ReplicasRecommendation{
-				Replicas: d.Replicas.Replicas,
-			}
-		}
-
 		var wrr *xasv1.ResourceRecommendation
 		if d.WorkloadResources != nil {
 			wrr = &xasv1.ResourceRecommendation{
@@ -463,7 +456,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 			Mode:              d.Mode,
 			Active:            d.IsActive,
 			Reason:            d.Message,
-			Replicas:          rr,
+			Replicas:          d.Replicas,
 			WorkloadResources: wrr,
 			PodResources:      prr,
 		}

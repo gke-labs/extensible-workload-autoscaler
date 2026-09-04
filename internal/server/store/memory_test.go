@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"google.golang.org/protobuf/proto"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
@@ -319,11 +320,11 @@ func TestRecommendationArbitration(t *testing.T) {
 	// Case 1: All Active. R1=3, R2=5. Result=5.
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "arb-pol"}, RecommenderName: "r1",
-		Vote: &pb.RecommenderVote{Replicas: &pb.ReplicasRecommendation{Replicas: 3}, IsActive: true},
+		Vote: &pb.RecommenderVote{Replicas: proto.Int32(3), IsActive: true},
 	})
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "arb-pol"}, RecommenderName: "r2",
-		Vote: &pb.RecommenderVote{Replicas: &pb.ReplicasRecommendation{Replicas: 5}, IsActive: true},
+		Vote: &pb.RecommenderVote{Replicas: proto.Int32(5), IsActive: true},
 	})
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "arb-pol"}, RecommenderName: "a1",
@@ -404,9 +405,7 @@ func TestDump(t *testing.T) {
 		Id:              &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "dump-pol"},
 		RecommenderName: "cpu-rec",
 		Vote: &pb.RecommenderVote{
-			Replicas: &pb.ReplicasRecommendation{
-				Replicas: 2,
-			},
+			Replicas: proto.Int32(2),
 			IsActive: true,
 		},
 	})
@@ -491,9 +490,7 @@ func TestDump(t *testing.T) {
           "phase": "Scaling",
           "name": "cpu-rec",
           "type": "Linear",
-          "replicas": {
-            "replicas": 2
-          }
+          "replicas": 2
         }
       ]
     },
@@ -507,9 +504,7 @@ func TestDump(t *testing.T) {
         "phase": "Scaling",
         "name": "cpu-rec",
         "type": "Linear",
-        "replicas": {
-          "replicas": 2
-        }
+        "replicas": 2
       }
     },
     "ControlMetrics": {
@@ -816,7 +811,7 @@ func TestRemoveRecommender(t *testing.T) {
 	// 2. Simulate R1 vote = 10
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: id, RecommenderName: "r1",
-		Vote: &pb.RecommenderVote{Replicas: &pb.ReplicasRecommendation{Replicas: 10}, IsActive: true},
+		Vote: &pb.RecommenderVote{Replicas: proto.Int32(10), IsActive: true},
 	})
 
 	s.CalculateAll()
@@ -838,7 +833,7 @@ func TestRemoveRecommender(t *testing.T) {
 	// 4. Simulate Zombie R1 vote = 100
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: id, RecommenderName: "r1",
-		Vote: &pb.RecommenderVote{Replicas: &pb.ReplicasRecommendation{Replicas: 100}, IsActive: true},
+		Vote: &pb.RecommenderVote{Replicas: proto.Int32(100), IsActive: true},
 	})
 
 	s.CalculateAll()
