@@ -111,11 +111,7 @@ func (s *Server) GetRecommendation(ctx context.Context, req *pb.GetRecommendatio
 		slog.Debug("GetRecommendation: Not Found", "cluster", req.Id.ClusterName, "policy", req.Id.Name)
 		return nil, status.Errorf(codes.NotFound, "policy not found")
 	}
-	target := int32(0)
-	if rec.Recommendation != nil {
-		target = rec.Recommendation.TargetReplicas
-	}
-	slog.Debug("GetRecommendation: Serving", "cluster", req.Id.ClusterName, "policy", req.Id.Name, "replicas", target)
+	slog.Debug("GetRecommendation: Serving", "cluster", req.Id.ClusterName, "policy", req.Id.Name)
 	return rec, nil
 }
 

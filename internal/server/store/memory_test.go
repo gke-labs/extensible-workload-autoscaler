@@ -333,8 +333,8 @@ func TestRecommendationArbitration(t *testing.T) {
 
 	s.CalculateAll()
 	rec, _ := s.GetRecommendation(&pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "arb-pol"})
-	if rec.Recommendation.TargetReplicas != 5 {
-		t.Errorf("Case 1: Want 5, Got %d", rec.Recommendation.TargetReplicas)
+	if rec.Recommendation.GetTargetReplicas() != 5 {
+		t.Errorf("Case 1: Want 5, Got %d", rec.Recommendation.GetTargetReplicas())
 	}
 
 	// Case 2: Inactive (Scale to Zero). a1=False.
@@ -350,8 +350,8 @@ func TestRecommendationArbitration(t *testing.T) {
 	s.CalculateAll()
 
 	rec, _ = s.GetRecommendation(&pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "arb-pol"})
-	if rec.Recommendation.TargetReplicas != 0 {
-		t.Errorf("Case 2: Want 0 (Inactive), Got %d", rec.Recommendation.TargetReplicas)
+	if rec.Recommendation.GetTargetReplicas() != 0 {
+		t.Errorf("Case 2: Want 0 (Inactive), Got %d", rec.Recommendation.GetTargetReplicas())
 	}
 }
 
@@ -816,8 +816,8 @@ func TestRemoveRecommender(t *testing.T) {
 
 	s.CalculateAll()
 	rec, _ := s.GetRecommendation(id)
-	if rec.Recommendation.TargetReplicas != 10 {
-		t.Errorf("Initial: Want 10, Got %d", rec.Recommendation.TargetReplicas)
+	if rec.Recommendation.GetTargetReplicas() != 10 {
+		t.Errorf("Initial: Want 10, Got %d", rec.Recommendation.GetTargetReplicas())
 	}
 
 	// 3. Update Policy: Remove R1

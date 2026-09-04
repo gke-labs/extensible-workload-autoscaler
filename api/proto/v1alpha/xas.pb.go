@@ -1770,7 +1770,7 @@ func (x *GetRecommendationResponse) GetMetricStatuses() []*MetricStatus {
 type Recommendation struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The calculated target replica count.
-	TargetReplicas int32 `protobuf:"varint,1,opt,name=target_replicas,json=targetReplicas,proto3" json:"target_replicas,omitempty"`
+	TargetReplicas *int32 `protobuf:"varint,1,opt,name=target_replicas,json=targetReplicas,proto3,oneof" json:"target_replicas,omitempty"`
 	// Explains the decision by listing the status of all recommenders.
 	Explanation   []*RecommenderStatus `protobuf:"bytes,2,rep,name=explanation,proto3" json:"explanation,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1808,8 +1808,8 @@ func (*Recommendation) Descriptor() ([]byte, []int) {
 }
 
 func (x *Recommendation) GetTargetReplicas() int32 {
-	if x != nil {
-		return x.TargetReplicas
+	if x != nil && x.TargetReplicas != nil {
+		return *x.TargetReplicas
 	}
 	return 0
 }
@@ -2385,10 +2385,11 @@ const file_xas_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\v2\x15.xas.v1alpha.PolicyIdR\x02id\"\xa4\x01\n" +
 	"\x19GetRecommendationResponse\x12C\n" +
 	"\x0erecommendation\x18\x01 \x01(\v2\x1b.xas.v1alpha.RecommendationR\x0erecommendation\x12B\n" +
-	"\x0fmetric_statuses\x18\x02 \x03(\v2\x19.xas.v1alpha.MetricStatusR\x0emetricStatuses\"{\n" +
-	"\x0eRecommendation\x12'\n" +
-	"\x0ftarget_replicas\x18\x01 \x01(\x05R\x0etargetReplicas\x12@\n" +
-	"\vexplanation\x18\x02 \x03(\v2\x1e.xas.v1alpha.RecommenderStatusR\vexplanation\"l\n" +
+	"\x0fmetric_statuses\x18\x02 \x03(\v2\x19.xas.v1alpha.MetricStatusR\x0emetricStatuses\"\x94\x01\n" +
+	"\x0eRecommendation\x12,\n" +
+	"\x0ftarget_replicas\x18\x01 \x01(\x05H\x00R\x0etargetReplicas\x88\x01\x01\x12@\n" +
+	"\vexplanation\x18\x02 \x03(\v2\x1e.xas.v1alpha.RecommenderStatusR\vexplanationB\x12\n" +
+	"\x10_target_replicas\"l\n" +
 	"\fMetricStatus\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x01R\x05value\x12\x1c\n" +
@@ -2572,6 +2573,7 @@ func file_xas_proto_init() {
 	}
 	file_xas_proto_msgTypes[22].OneofWrappers = []any{}
 	file_xas_proto_msgTypes[24].OneofWrappers = []any{}
+	file_xas_proto_msgTypes[27].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
