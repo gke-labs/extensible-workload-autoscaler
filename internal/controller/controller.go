@@ -272,12 +272,13 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	}
 
 	rec := resp.Recommendation
-	slog.Debug("Got recommendation", "policy", policy.Name, "target", rec.TargetReplicas)
-	slog.Info("Recommendation", "deployment", deploymentName, "targetReplicas", rec.TargetReplicas, "currentDesired", *deployment.Spec.Replicas)
+	currentReplicas := int32(0)
+	if deployment.Spec.Replicas != nil {
+		currentReplicas = *deployment.Spec.Replicas
+	}
+	slog.Info("Recommendation", "deployment", deploymentName, "targetReplicas", rec.TargetReplicas, "currentReplicas", currentReplicas)
 
 	// 5. Actuate
-	desired := rec.TargetReplicas
-
 	var workloadRes *pb.ResourceRecommendation
 	var podRes []*pb.PodResourceRecommendation
 	for _, exp := range rec.Explanation {
@@ -289,19 +290,14 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		}
 	}
 
-	needsUpdate := false
-	deploymentCopy := deployment.DeepCopy()
-
-	if deployment.Spec.Replicas == nil || *deployment.Spec.Replicas != desired {
-		slog.Debug("Actuating scale", "deployment", deploymentName, "to", desired)
-		slog.Info("SCALING", "deployment", deploymentName, "from", *deployment.Spec.Replicas, "to", desired)
-		deploymentCopy.Spec.Replicas = &desired
-		needsUpdate = true
-	}
-
-	if needsUpdate {
-		_, err := c.kubeclientset.AppsV1().Deployments(policy.Namespace).Update(context.TODO(), deploymentCopy, metav1.UpdateOptions{})
-		if err != nil {
+	// If there's a horizontal recommendation, and it differs from the deployment's current value, actuate.
+	if rec.TargetReplicas != nil &&
+		(deployment.Spec.Replicas == nil || *deployment.Spec.Replicas != *rec.TargetReplicas) {
+		slog.Info("SCALING", "deployment", deploymentName, "from", currentReplicas, "to", *rec.TargetReplicas)
+		deploymentCopy := deployment.DeepCopy()
+		deploymentCopy.Spec.Replicas = rec.TargetReplicas
+		if _, err := c.kubeclientset.AppsV1().Deployments(policy.Namespace).
+			Update(context.TODO(), deploymentCopy, metav1.UpdateOptions{}); err != nil {
 			return err
 		}
 	}
@@ -419,8 +415,14 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 
 	// 5. Update Status
 	policyCopy := policy.DeepCopy()
-	policyCopy.Status.CurrentReplicas = *deployment.Spec.Replicas
-	policyCopy.Status.DesiredReplicas = desired
+	if deployment.Spec.Replicas != nil {
+		policyCopy.Status.CurrentReplicas = *deployment.Spec.Replicas
+	}
+	if rec.TargetReplicas != nil {
+		policyCopy.Status.DesiredReplicas = *rec.TargetReplicas
+	} else if deployment.Spec.Replicas != nil {
+		policyCopy.Status.DesiredReplicas = *deployment.Spec.Replicas
+	}
 	policyCopy.Status.LastUpdated = time.Now().Format(time.RFC3339)
 
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
@@ -475,6 +477,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	_, err = c.xasclientset.XasV1().ScalingPolicies(policy.Namespace).UpdateStatus(context.TODO(), policyCopy, metav1.UpdateOptions{})
 	return err
 }
+
 func (c *Controller) getRecommendation(namespace, policyName string) (*pb.GetRecommendationResponse, error) {
 	req := &pb.GetRecommendationRequest{
 		Id: &pb.PolicyId{ClusterName: c.clusterName, Namespace: namespace, Name: policyName},

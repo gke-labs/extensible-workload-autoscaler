@@ -164,7 +164,7 @@ func TestServerEndToEndGRPC(t *testing.T) {
 	rec := resp.Recommendation
 
 	wantRec := &pb.Recommendation{
-		TargetReplicas: 4,
+		TargetReplicas: proto.Int32(4),
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(4), IsActive: true, Phase: "Scaling", Mode: "Active", Name: "cpu", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1010, 0))}, // cpu
 		},
@@ -287,7 +287,7 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 	rec := resp.Recommendation
 
 	wantRec := &pb.Recommendation{
-		TargetReplicas: 16,
+		TargetReplicas: proto.Int32(16),
 		Explanation:    []*pb.RecommenderStatus{{Replicas: proto.Int32(16), IsActive: true, Phase: "Scaling", Name: "cpu", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1012, 0))}},
 	}
 	if diff := cmp.Diff(wantRec, rec, protocmp.Transform()); diff != "" {
@@ -361,7 +361,7 @@ func TestExternalMetricGRPC(t *testing.T) {
 	rec := resp.Recommendation
 
 	wantRec := &pb.Recommendation{
-		TargetReplicas: 100,
+		TargetReplicas: proto.Int32(100),
 		Explanation:    []*pb.RecommenderStatus{{Replicas: proto.Int32(100), IsActive: true, Phase: "Scaling", Name: "queue_target", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))}},
 	}
 	if diff := cmp.Diff(wantRec, rec, protocmp.Transform()); diff != "" {
@@ -435,7 +435,7 @@ func TestPerPodExternalMetricGRPC(t *testing.T) {
 	rec := resp.Recommendation
 
 	wantRec := &pb.Recommendation{
-		TargetReplicas: 2,
+		TargetReplicas: proto.Int32(2),
 		Explanation:    []*pb.RecommenderStatus{{Replicas: proto.Int32(2), IsActive: true, Phase: "Scaling", Name: "latency_target", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))}},
 	}
 	if diff := cmp.Diff(wantRec, rec, protocmp.Transform()); diff != "" {
@@ -500,7 +500,7 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	rec := resp.Recommendation
 
 	wantWakeUp := &pb.Recommendation{
-		TargetReplicas: 5,
+		TargetReplicas: proto.Int32(5),
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(5), IsActive: true, Phase: "Scaling", Name: "target", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))},
 			{IsActive: true, Phase: "Activation", Name: "act_queue", Type: "Threshold", LastUpdated: timestamppb.New(time.Unix(1000, 0))},
@@ -538,7 +538,7 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	rec = resp.Recommendation
 
 	wantCooldown := &pb.Recommendation{
-		TargetReplicas: 1, // MinReplicas (Control Plane kept active due to window)
+		TargetReplicas: proto.Int32(1), // MinReplicas (Control Plane kept active due to window)
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(0), IsActive: true, Phase: "Scaling", Name: "target", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1003, 0))},
 			{IsActive: false, Phase: "Activation", Name: "act_queue", Type: "Threshold", LastUpdated: timestamppb.New(time.Unix(1003, 0))},
@@ -571,7 +571,7 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	rec = resp.Recommendation
 
 	wantScaleDown := &pb.Recommendation{
-		TargetReplicas: 0,
+		TargetReplicas: proto.Int32(0),
 		Explanation: []*pb.RecommenderStatus{
 			{IsActive: false, Phase: "Activation", Name: "act_queue", Type: "Threshold", LastUpdated: timestamppb.New(time.Unix(1009, 0))},
 			// Note: If Inactive, Scaling recommenders might be omitted by Control Plane or present.
@@ -644,7 +644,7 @@ func TestDryRunGRPC(t *testing.T) {
 	rec := resp.Recommendation
 
 	wantRec := &pb.Recommendation{
-		TargetReplicas: 10,
+		TargetReplicas: proto.Int32(10),
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(10), IsActive: true, Phase: "Scaling", Mode: "Active", Name: "active_obj", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))},
 			{Replicas: proto.Int32(100), IsActive: true, Phase: "Scaling", Mode: "DryRun", Name: "dry_obj", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))},
@@ -833,7 +833,7 @@ func TestHistogramLatencyScalingGRPC(t *testing.T) {
 	rec := resp.Recommendation
 
 	wantRec := &pb.Recommendation{
-		TargetReplicas: 2,
+		TargetReplicas: proto.Int32(2),
 		Explanation:    []*pb.RecommenderStatus{{Replicas: proto.Int32(2), IsActive: true, Phase: "Scaling", Name: "latency_obj", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1010, 0))}},
 	}
 	if diff := cmp.Diff(wantRec, rec, protocmp.Transform()); diff != "" {
@@ -1326,7 +1326,7 @@ func TestRecommenderInactiveGRPC(t *testing.T) {
 	rec := resp.Recommendation
 
 	wantRec := &pb.Recommendation{
-		TargetReplicas: 5,
+		TargetReplicas: proto.Int32(5),
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(5), IsActive: true, Phase: "Scaling", Name: "r_active", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))},
 			{Replicas: proto.Int32(100), IsActive: false, Phase: "Scaling", Name: "r_inactive", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))},
@@ -1510,7 +1510,7 @@ func TestRemoveScalingSectionGRPC(t *testing.T) {
 	// 3. Calc Recommendation
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: id})
-	if resp.Recommendation == nil || resp.Recommendation.TargetReplicas != 10 {
+	if resp.Recommendation == nil || resp.Recommendation.GetTargetReplicas() != 10 {
 		t.Errorf("Initial: Want 10, Got %v", resp.Recommendation)
 	}
 
@@ -1692,8 +1692,8 @@ func TestRecommenderArbitrationGRPC(t *testing.T) {
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 
 	// Should equal Max(5, 20) = 20
-	if resp.Recommendation.TargetReplicas != 20 {
-		t.Errorf("Arbitration failed: Want 20, Got %d", resp.Recommendation.TargetReplicas)
+	if resp.Recommendation.GetTargetReplicas() != 20 {
+		t.Errorf("Arbitration failed: Want 20, Got %d", resp.Recommendation.GetTargetReplicas())
 	}
 }
 

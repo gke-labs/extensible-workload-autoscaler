@@ -341,7 +341,7 @@ message GetRecommendationResponse {
 // Recommendation is the final arbitrated decision from the Control Plane.
 message Recommendation {
   // The calculated target replica count.
-  int32 target_replicas = 1;
+  optional int32 target_replicas = 1;
   // Explains the decision by listing the status of all recommenders.
   repeated RecommenderStatus explanation = 2;
 }

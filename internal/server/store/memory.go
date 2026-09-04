@@ -526,7 +526,7 @@ func (s *MemoryStore) CalculateAll() {
 			ReadyReplicas: int32(readyReplicas),
 			Timestamp:     now,
 		}
-		s.processDecisions(ps, now, currentControlMetrics)
+		s.processDecisions(ps, now)
 	}
 }
 
@@ -730,20 +730,22 @@ func parsePercentile(s string) float64 {
 	return 0.95
 }
 
-func (s *MemoryStore) processDecisions(ps *PolicyState, now int64, controlMetrics map[string]float64) {
+func (s *MemoryStore) processDecisions(ps *PolicyState, now int64) {
 	policy := ps.Policy
 	isActive := false
+	var activationStatuses []*pb.RecommenderStatus
+
 	if len(policy.Activation) == 0 {
 		isActive = true
 	} else {
 		for _, recDef := range policy.Activation {
 			if d, ok := ps.Decisions[recDef.Name]; ok {
+				activationStatuses = append(activationStatuses, d)
 				if recDef.Mode == "DryRun" {
 					continue
 				}
 				if d.IsActive {
 					isActive = true
-					break
 				}
 			}
 		}
@@ -769,66 +771,63 @@ func (s *MemoryStore) processDecisions(ps *PolicyState, now int64, controlMetric
 		}
 	}
 
-	maxReplicas, scalingStatuses := s.calculateTargetReplicas(ps, isActive)
+	// Returns the arbitrated number of replicas and vertical recommendations status.
+	// hasRecommendation is true if activators and recommenders have decided on a
+	// number of replicas: workload is inactive (0 replicas), or active and a
+	// recommender has decided on a positive number of replicas.
+	replicas, scalingStatuses := s.calculateTargetReplicas(ps, isActive)
 
-	if policy.MaxReplicas > 0 && maxReplicas > policy.MaxReplicas {
-		maxReplicas = policy.MaxReplicas
-	}
-
-	var activationStatuses []*pb.RecommenderStatus
-	for _, recDef := range policy.Activation {
-		d, ok := ps.Decisions[recDef.Name]
-		if !ok {
-			continue
-		}
-		activationStatuses = append(activationStatuses, d)
-	}
-
-	// Arbitration: If we are active but have no scaling recommenders, we have no recommendation.
-	// We only actuate if:
-	// 1. We have at least one scaling recommender decision.
-	// 2. OR, we are explicitly scaling to 0 (isActive = false).
-	if isActive && len(scalingStatuses) == 0 {
+	if replicas == nil && scalingStatuses == nil {
 		ps.Recommendation = nil
-	} else {
-		explanation := append(scalingStatuses, activationStatuses...)
-		ps.Recommendation = &pb.Recommendation{
-			TargetReplicas: maxReplicas,
-			Explanation:    explanation,
-		}
+		return
+	}
+
+	explanation := append(activationStatuses, scalingStatuses...)
+	ps.Recommendation = &pb.Recommendation{
+		TargetReplicas: replicas,
+		Explanation:    explanation,
 	}
 
 	if policy.Workload != nil {
-		metrics.RecordRecommendation(policy.Id.ClusterName, policy.Id.Namespace, policy.Id.Name, policy.Workload.Group, policy.Workload.Version, policy.Workload.Kind, policy.Workload.Name, maxReplicas)
+		if replicas != nil {
+			metrics.RecordRecommendation(policy.Id.ClusterName, policy.Id.Namespace, policy.Id.Name, policy.Workload.Group, policy.Workload.Version, policy.Workload.Kind, policy.Workload.Name, *replicas)
+		}
 		metrics.RecordActive(policy.Id.ClusterName, policy.Id.Namespace, policy.Id.Name, policy.Workload.Group, policy.Workload.Version, policy.Workload.Kind, policy.Workload.Name, isActive)
 	}
 }
 
-func (s *MemoryStore) calculateTargetReplicas(ps *PolicyState, isActive bool) (int32, []*pb.RecommenderStatus) {
-	maxReplicas := int32(0)
+func (s *MemoryStore) calculateTargetReplicas(ps *PolicyState, isActive bool) (*int32, []*pb.RecommenderStatus) {
+	if !isActive {
+		return new(int32), nil
+	}
+
+	var targetReplicas *int32
 	var decisionStatuses []*pb.RecommenderStatus
 
-	if isActive {
-		for _, recDef := range ps.Policy.Scaling {
-			d, ok := ps.Decisions[recDef.Name]
-			if !ok {
-				continue
-			}
-
-			if recDef.Mode != "DryRun" && d.IsActive && d.Replicas != nil && *d.Replicas > maxReplicas {
-				maxReplicas = *d.Replicas
-			}
-
-			decisionStatuses = append(decisionStatuses, d)
+	for _, recDef := range ps.Policy.Scaling {
+		d, ok := ps.Decisions[recDef.Name]
+		if !ok {
+			continue
 		}
 
-		if maxReplicas < ps.Policy.MinReplicas {
-			maxReplicas = ps.Policy.MinReplicas
+		// If multiple (non-dry-run) recommendations exist, take the highest.
+		if recDef.Mode != "DryRun" && d.IsActive && d.Replicas != nil && (targetReplicas == nil || *d.Replicas >= *targetReplicas) {
+			r := *d.Replicas
+			targetReplicas = &r
 		}
-	} else {
-		maxReplicas = 0
+
+		decisionStatuses = append(decisionStatuses, d)
 	}
-	return maxReplicas, decisionStatuses
+
+	if targetReplicas == nil {
+		return nil, decisionStatuses
+	}
+
+	if ps.Policy.MaxReplicas > 0 {
+		*targetReplicas = min(*targetReplicas, ps.Policy.MaxReplicas)
+	}
+	*targetReplicas = max(*targetReplicas, ps.Policy.MinReplicas)
+	return targetReplicas, decisionStatuses
 }
 
 func aggregate(values []float64, method string) float64 {

@@ -782,7 +782,7 @@ func TestUpdateRecommenderState_EmptyClears(t *testing.T) {
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: id})
 	wantResp1 := &pb.GetRecommendationResponse{
 		Recommendation: &pb.Recommendation{
-			TargetReplicas: 5,
+			TargetReplicas: proto.Int32(5),
 			Explanation:    []*pb.RecommenderStatus{{Name: "r1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(5), IsActive: true}},
 		},
 		MetricStatuses: []*pb.MetricStatus{},
@@ -843,7 +843,6 @@ func TestUpdateRecommenderState_VerticalResources(t *testing.T) {
 
 	wantResp := &pb.GetRecommendationResponse{
 		Recommendation: &pb.Recommendation{
-			TargetReplicas: 0,
 			Explanation: []*pb.RecommenderStatus{
 				{
 					Name:              "r1",
@@ -1006,7 +1005,7 @@ func TestGetRecommendation_Aggregation(t *testing.T) {
 
 	wantResp := &pb.GetRecommendationResponse{
 		Recommendation: &pb.Recommendation{
-			TargetReplicas: 20,
+			TargetReplicas: proto.Int32(20),
 			Explanation: []*pb.RecommenderStatus{
 				{Name: "scale1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(10), IsActive: true},
 				{Name: "scale2", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(20), IsActive: true},
@@ -1062,7 +1061,7 @@ func TestGetRecommendation_MetricStatuses(t *testing.T) {
 
 	wantResp := &pb.GetRecommendationResponse{
 		Recommendation: &pb.Recommendation{
-			TargetReplicas: 5,
+			TargetReplicas: proto.Int32(5),
 			Explanation:    []*pb.RecommenderStatus{{Name: "r1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(5), IsActive: true}},
 		},
 		MetricStatuses: []*pb.MetricStatus{
