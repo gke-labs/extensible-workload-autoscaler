@@ -23,7 +23,6 @@ The system architecture follows a Hub-and-Spoke model:
 ### Prerequisites
 *   Go 1.25+
 *   Docker
-*   Kubernetes Cluster (Kind or GKE)
 
 ### Commands
 
@@ -58,36 +57,10 @@ The system architecture follows a Hub-and-Spoke model:
     Runs formatting, vet, and build checks.
 
 ### Local Deployment
-See `hack/setup-cluster.sh` for setting up a local Kind cluster with the system installed.
 
 ## Deployment & Usage
 
-### 1. Deploy System (Kind or GKE)
-Use `hack/deploy.sh` to build and deploy the system.
-
-*   **Kind:**
-    ```bash
-    ./hack/deploy.sh kind [tag]
-    ```
-    Loads images directly into the `xas-e2e` cluster.
-
-*   **GKE:**
-    ```bash
-    ./hack/deploy.sh gke [tag]
-    ```
-    Builds and pushes images to Artifact Registry (defaults to `gke-dev` in `us-central1`), then deploys to the current context. Also installs GMP PodMonitoring.
-
-### 2. Deploy Sample Policies
-The deployment script prepares the environment for running end-to-end tests.
-
-*   **Deploy Specific Sample:**
-    ```bash
-    kubectl apply -f test/samples/manifests/${TARGET}.yaml
-    ```
-*   **Deploy All Samples:**
-    ```bash
-    kubectl apply -f test/samples/manifests/
-    ```
+See [Read-me file](README.md).
 
 ## Configuration (CRDs)
 
