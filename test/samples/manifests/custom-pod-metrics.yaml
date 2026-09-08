@@ -50,7 +50,6 @@ spec:
       params:
         targetKind: "Pod"
         metric: "http_requests_per_second"
-        selector: "app=custom-pod-consumer"
       gauge:
         aggregation: "Avg"
 

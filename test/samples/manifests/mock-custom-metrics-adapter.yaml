@@ -101,6 +101,8 @@ spec:
                               pass
 
                           items = []
+                          num_pods = max(1, len(pod_names))
+                          per_pod_val = max(1, int(pod_requests / num_pods))
                           for pod_name in pod_names:
                               items.append({
                                   'describedObject': {
@@ -113,7 +115,7 @@ spec:
                                       'name': 'http_requests_per_second'
                                   },
                                   'timestamp': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
-                                  'value': str(pod_requests)
+                                  'value': str(per_pod_val)
                               })
 
                           res = {
