@@ -41,6 +41,9 @@ func (p *CoreClusterMetricsProvider) processCustomMetric(
 
 	explicitKind := getParam("targetKind")
 	targetKind := explicitKind
+	if targetKind == "" && m.Scope == "Pod" {
+		targetKind = "Pod"
+	}
 	if targetKind == "" && pol.Workload != nil {
 		targetKind = pol.Workload.Kind
 	}
@@ -72,17 +75,14 @@ func (p *CoreClusterMetricsProvider) processCustomMetric(
 
 	// Handle Pod Metrics (scraped across individual pods matching workload label selector)
 	if targetKind == "Pod" {
-		selectorStr := getParam("podSelector")
-		if selectorStr == "" {
-			selectorStr = pol.Selector
-		}
+		selectorStr := pol.Selector
 
 		var podSelector labels.Selector
 		var err error
 		if selectorStr != "" {
 			podSelector, err = labels.Parse(selectorStr)
 			if err != nil {
-				slog.Error("Failed to parse pod label selector for custom pod metric", "metric", m.Name, "selector", selectorStr, "error", err)
+				slog.Error("Failed to parse workload label selector for custom pod metric", "metric", m.Name, "selector", selectorStr, "error", err)
 				return nil
 			}
 		} else {
