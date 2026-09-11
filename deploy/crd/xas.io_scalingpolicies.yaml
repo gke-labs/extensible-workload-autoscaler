@@ -176,8 +176,12 @@ spec:
                       - window
                       type: object
                     scope:
-                      description: Scope defines the granularity of the metric. "Global"
-                        (default) or "Pod".
+                      description: |-
+                        Scope defines the granularity of the metric.
+                        "Global" (default) reports a single aggregated value for the whole workload.
+                        "Pod" reports one value per pod; samples from individual containers are
+                        summed into their pod's value.
+                        "Container" reports one value per container, plus the pod-level rollup.
                       type: string
                   required:
                   - name
@@ -285,6 +289,11 @@ spec:
                       type: string
                     workloadResources:
                       properties:
+                        containerName:
+                          description: |-
+                            ContainerName is the container this recommendation applies to.
+                            Empty means the first container of the pod.
+                          type: string
                         limits:
                           additionalProperties:
                             type: string

@@ -103,7 +103,7 @@ func TestProcessCustomMetric(t *testing.T) {
 
 		want := []*pb.MetricBatch{
 			{
-				EntityKey: "custom-metrics-consumer-pod-1",
+				PodName: "custom-metrics-consumer-pod-1",
 				Samples: []*pb.MetricSample{
 					{
 						Name:      "pod_http_requests",
@@ -149,7 +149,7 @@ func TestProcessCustomMetric(t *testing.T) {
 
 		want := []*pb.MetricBatch{
 			{
-				EntityKey: "",
+				PodName: "",
 				Samples: []*pb.MetricSample{
 					{
 						Name:      "service_http_requests",

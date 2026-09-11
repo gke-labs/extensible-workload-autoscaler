@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -163,12 +164,15 @@ func (a *CoreNodeMetricsProvider) processKubeletMetric(pod corev1.Pod, m *pb.Met
 	metricMode := getParam("mode")
 	containerName := getParam("container")
 
-	var totalVal float64
 	var maxTS int64
 	var foundAny bool
 
 	var totalUsage float64
 	var totalRequest float64
+
+	// Per-container values, used to emit container scoped samples.
+	containerValues := make(map[string]float64)
+	containerTimestamps := make(map[string]int64)
 
 	for cName, cStats := range podStats.Containers {
 		if containerName != "" && containerName != cName {
@@ -224,7 +228,8 @@ func (a *CoreNodeMetricsProvider) processKubeletMetric(pod corev1.Pod, m *pb.Met
 					foundAny = true
 				}
 			} else {
-				totalVal += val
+				containerValues[cName] = val
+				containerTimestamps[cName] = ts
 				if ts > maxTS {
 					maxTS = ts
 				}
@@ -233,24 +238,42 @@ func (a *CoreNodeMetricsProvider) processKubeletMetric(pod corev1.Pod, m *pb.Met
 		}
 	}
 
-	if foundAny {
-		finalVal := totalVal
-		if metricMode == "utilization" {
-			if totalRequest > 0 {
-				finalVal = (totalUsage / totalRequest)
-			} else {
-				finalVal = 0
-			}
-		}
+	if !foundAny {
+		return nil
+	}
 
+	if metricMode == "utilization" {
+		// Utilization is only meaningful at the pod level: the ratio of the
+		// aggregated usage over the aggregated requests cannot be decomposed
+		// into per-container samples.
+		finalVal := 0.0
+		if totalRequest > 0 {
+			finalVal = totalUsage / totalRequest
+		}
 		return []*pb.MetricBatch{{
-			EntityKey: pod.Name,
+			PodName: pod.Name,
 			Samples: []*pb.MetricSample{
 				{Name: m.Name, Value: finalVal, Timestamp: maxTS},
 			},
 		}}
 	}
-	return nil
+
+	// Emit one batch per container. The Control Plane sums container samples
+	// back into a pod-level value while keeping the per-container breakdown
+	// available in ControlMetrics.pod_metrics[pod].container_metrics.
+	batches := make([]*pb.MetricBatch, 0, len(containerValues))
+	for cName, val := range containerValues {
+		batches = append(batches, &pb.MetricBatch{
+			PodName:       pod.Name,
+			ContainerName: cName,
+			Samples: []*pb.MetricSample{
+				{Name: m.Name, Value: val, Timestamp: containerTimestamps[cName]},
+			},
+		})
+	}
+	// Map iteration order is random; sort for deterministic output.
+	sort.Slice(batches, func(i, j int) bool { return batches[i].ContainerName < batches[j].ContainerName })
+	return batches
 }
 
 func getContainerRequest(pod *corev1.Pod, containerName, metricType string) (float64, bool) {

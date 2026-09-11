@@ -70,7 +70,7 @@ func TestProcessExternalMetric(t *testing.T) {
 			},
 			want: []*pb.MetricBatch{
 				{
-					EntityKey: "",
+					PodName: "",
 					Samples: []*pb.MetricSample{
 						{
 							Name:      "queue_depth",

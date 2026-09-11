@@ -279,11 +279,18 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	slog.Info("Recommendation", "deployment", deploymentName, "targetReplicas", rec.TargetReplicas, "currentReplicas", currentReplicas)
 
 	// 5. Actuate
-	var workloadRes *pb.ResourceRecommendation
+	// Workload level recommendations are keyed by target container so that
+	// several recommenders can each size a different container. An empty
+	// container name means "the first container of the pod".
+	workloadRes := make(map[string]*pb.ResourceRecommendation)
+	var workloadResOrder []string
 	var podRes []*pb.PodResourceRecommendation
 	for _, exp := range rec.Explanation {
 		if exp.WorkloadResources != nil {
-			workloadRes = exp.WorkloadResources
+			if _, seen := workloadRes[exp.WorkloadResources.ContainerName]; !seen {
+				workloadResOrder = append(workloadResOrder, exp.WorkloadResources.ContainerName)
+			}
+			workloadRes[exp.WorkloadResources.ContainerName] = exp.WorkloadResources
 		}
 		if len(exp.PodResources) > 0 {
 			podRes = append(podRes, exp.PodResources...)
@@ -302,8 +309,16 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		}
 	}
 
-	// Helper to patch pod resize
+	// Helper to patch pod resize. An empty containerName targets the pod's
+	// first container.
 	patchPodResize := func(pod *corev1.Pod, containerName string, requests, limits map[string]string) {
+		if len(pod.Spec.Containers) == 0 {
+			return
+		}
+		if containerName == "" {
+			containerName = pod.Spec.Containers[0].Name
+		}
+
 		var targetContainer *corev1.Container
 		for i, c := range pod.Spec.Containers {
 			if c.Name == containerName {
@@ -312,6 +327,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 			}
 		}
 		if targetContainer == nil {
+			slog.Warn("Container not found for resource recommendation", "pod", pod.Name, "container", containerName)
 			return
 		}
 
@@ -378,14 +394,15 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	}
 
 	// Actuate Workload Resources via /resize subresource on all matching pods
-	if workloadRes != nil {
+	if len(workloadRes) > 0 {
 		selector := labels.Set(deployment.Spec.Selector.MatchLabels).String()
 		pods, err := c.kubeclientset.CoreV1().Pods(policy.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector})
 		if err == nil {
 			for i := range pods.Items {
 				pod := &pods.Items[i]
-				if len(pod.Spec.Containers) > 0 {
-					patchPodResize(pod, pod.Spec.Containers[0].Name, workloadRes.Requests, workloadRes.Limits)
+				for _, containerName := range workloadResOrder {
+					res := workloadRes[containerName]
+					patchPodResize(pod, res.ContainerName, res.Requests, res.Limits)
 				}
 			}
 		}
@@ -394,8 +411,8 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	// Actuate Pod Resources via /resize subresource
 	for _, pr := range podRes {
 		pod, err := c.kubeclientset.CoreV1().Pods(policy.Namespace).Get(context.TODO(), pr.PodName, metav1.GetOptions{})
-		if err == nil && len(pod.Spec.Containers) > 0 {
-			patchPodResize(pod, pod.Spec.Containers[0].Name, pr.Requests, pr.Limits)
+		if err == nil {
+			patchPodResize(pod, "", pr.Requests, pr.Limits)
 		}
 	}
 
@@ -437,8 +454,9 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		var wrr *xasv1.ResourceRecommendation
 		if d.WorkloadResources != nil {
 			wrr = &xasv1.ResourceRecommendation{
-				Requests: d.WorkloadResources.Requests,
-				Limits:   d.WorkloadResources.Limits,
+				ContainerName: d.WorkloadResources.ContainerName,
+				Requests:      d.WorkloadResources.Requests,
+				Limits:        d.WorkloadResources.Limits,
 			}
 		}
 

@@ -164,8 +164,8 @@ func (a *CoreNodeMetricsProvider) processPrometheusMetric(pod corev1.Pod, m *pb.
 
 	if len(samples) > 0 {
 		return []*pb.MetricBatch{{
-			EntityKey: pod.Name,
-			Samples:   samples,
+			PodName: pod.Name,
+			Samples: samples,
 		}}
 	}
 	return nil

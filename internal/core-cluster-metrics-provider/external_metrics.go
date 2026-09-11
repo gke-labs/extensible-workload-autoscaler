@@ -70,8 +70,8 @@ func (p *CoreClusterMetricsProvider) processExternalMetric(namespace string, m *
 
 	if len(samples) > 0 {
 		return []*pb.MetricBatch{{
-			EntityKey: "", // Global / External metric scope
-			Samples:   samples,
+			PodName: "", // Global / External metric scope
+			Samples: samples,
 		}}
 	}
 
