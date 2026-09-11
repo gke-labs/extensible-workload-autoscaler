@@ -379,14 +379,28 @@ const pageTemplate = `
                 }
             }
 
-            // Render Pod-Scoped Metrics (as distinct rows for clarity or grouped)
+            // Render Pod- and Container-Scoped Metrics (as distinct rows for clarity or grouped)
             if (ps.ControlMetrics && ps.ControlMetrics.pod_metrics && Object.keys(ps.ControlMetrics.pod_metrics).length > 0) {
                 // Collect all pod metrics by metric name first to keep the table organized
                 const podMetricsByName = {};
                 for (const [podName, podData] of Object.entries(ps.ControlMetrics.pod_metrics)) {
-                    for (const [name, val] of Object.entries(podData.values)) {
+                    const podValues = (podData.values && podData.values.values) || {};
+                    const containerMetrics = podData.container_metrics || {};
+
+                    for (const [name, val] of Object.entries(podValues)) {
                         if (!podMetricsByName[name]) podMetricsByName[name] = [];
-                        podMetricsByName[name].push({pod: podName, val: val});
+
+                        // Collect the per-container breakdown for this metric, if any.
+                        const containers = [];
+                        for (const [containerName, containerData] of Object.entries(containerMetrics)) {
+                            const containerValues = (containerData && containerData.values) || {};
+                            if (name in containerValues) {
+                                containers.push({container: containerName, val: containerValues[name]});
+                            }
+                        }
+                        containers.sort((a, b) => a.container.localeCompare(b.container));
+
+                        podMetricsByName[name].push({pod: podName, val: val, containers: containers});
                     }
                 }
 
@@ -412,10 +426,14 @@ const pageTemplate = `
                         paramsStr = Object.entries(def.params).map(([k, v]) => k + '=' + v).join(', ');
                     }
 
-                    // Build a string displaying the pod values
+                    // Build a string displaying the pod values, with the
+                    // per-container breakdown nested underneath when available.
                     let podValsHtml = '<div style="max-height: 80px; overflow-y: auto; font-size: 0.9rem;">';
                     pods.forEach(p => {
                          podValsHtml += '<div><span class="text-muted-small">' + p.pod + ':</span> <strong>' + formatFloat(p.val) + '</strong></div>';
+                         (p.containers || []).forEach(c => {
+                             podValsHtml += '<div style="padding-left: 1rem;"><span class="text-muted-small">&#8627; ' + c.container + ':</span> ' + formatFloat(c.val) + '</div>';
+                         });
                     });
                     podValsHtml += '</div>';
 
@@ -485,6 +503,9 @@ const pageTemplate = `
 
                      if (d.workload_resources && (d.workload_resources.requests || d.workload_resources.limits)) {
                          let resHtml = '<div style="margin-top: 4px; font-size: 0.9rem; color: var(--primary);">';
+                         if (d.workload_resources.container_name) {
+                             resHtml += '<strong>Container:</strong> ' + d.workload_resources.container_name + '<br>';
+                         }
                          if (d.workload_resources.requests) {
                              resHtml += '<strong>Req:</strong> ' + Object.entries(d.workload_resources.requests).map(([k,v])=>k+':'+v).join(', ') + '<br>';
                          }
