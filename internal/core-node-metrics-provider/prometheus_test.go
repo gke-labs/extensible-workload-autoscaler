@@ -63,7 +63,7 @@ http_requests_total 10
 				}
 			},
 			want: []*pb.MetricBatch{{
-				EntityKey: "pod-1",
+				PodName: "pod-1",
 				Samples: []*pb.MetricSample{
 					{
 						Name:   "req_count",
@@ -90,7 +90,7 @@ custom 10
 				}
 			},
 			want: []*pb.MetricBatch{{
-				EntityKey: "pod-1",
+				PodName: "pod-1",
 				Samples: []*pb.MetricSample{
 					{
 						Name:   "custom",
@@ -122,7 +122,7 @@ class_path 10
 				}
 			},
 			want: []*pb.MetricBatch{{
-				EntityKey: "pod-1",
+				PodName: "pod-1",
 				Samples: []*pb.MetricSample{
 					{
 						Name:   "class_path",
@@ -154,7 +154,7 @@ override 10
 				}
 			},
 			want: []*pb.MetricBatch{{
-				EntityKey: "pod-1",
+				PodName: "pod-1",
 				Samples: []*pb.MetricSample{
 					{
 						Name:   "override",
@@ -177,7 +177,7 @@ http_requests_total{method="post",code="400"}    3 1395066363000
 				Params:   map[string]string{"metric": "http_requests_total"},
 			},
 			want: []*pb.MetricBatch{{
-				EntityKey: "pod-1",
+				PodName: "pod-1",
 				Samples: []*pb.MetricSample{
 					{
 						Name:   "req_count",
@@ -204,7 +204,7 @@ queue_size 42
 				Params:   map[string]string{"metric": "queue_size"},
 			},
 			want: []*pb.MetricBatch{{
-				EntityKey: "pod-1",
+				PodName: "pod-1",
 				Samples: []*pb.MetricSample{
 					{
 						Name:   "q_size",
@@ -229,7 +229,7 @@ lat_count 15
 				Params:   map[string]string{"metric": "lat"},
 			},
 			want: []*pb.MetricBatch{{
-				EntityKey: "pod-1",
+				PodName: "pod-1",
 				Samples: []*pb.MetricSample{
 					{
 						Name:   "latency",
@@ -257,7 +257,7 @@ requested 456
 				Params:   map[string]string{"metric": "requested"},
 			},
 			want: []*pb.MetricBatch{{
-				EntityKey: "pod-1",
+				PodName: "pod-1",
 				Samples: []*pb.MetricSample{
 					{
 						Name:   "my_metric",

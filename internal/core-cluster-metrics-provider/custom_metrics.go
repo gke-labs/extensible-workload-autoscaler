@@ -110,7 +110,7 @@ func (p *CoreClusterMetricsProvider) processCustomMetric(
 
 			podName := item.DescribedObject.Name
 			batches = append(batches, &pb.MetricBatch{
-				EntityKey: podName,
+				PodName: podName,
 				Samples: []*pb.MetricSample{
 					{
 						Name:      m.Name,
@@ -144,7 +144,7 @@ func (p *CoreClusterMetricsProvider) processCustomMetric(
 
 	return []*pb.MetricBatch{
 		{
-			EntityKey: "",
+			PodName: "",
 			Samples: []*pb.MetricSample{
 				{
 					Name:      m.Name,

@@ -107,8 +107,8 @@ func TestServerEndToEndGRPC(t *testing.T) {
 			{
 				Namespace: ns, Name: policyName,
 				Batches: []*pb.MetricBatch{
-					{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
-					{EntityKey: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
+					{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
+					{PodName: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
 				},
 			},
 		},
@@ -124,8 +124,8 @@ func TestServerEndToEndGRPC(t *testing.T) {
 			{
 				Namespace: ns, Name: policyName,
 				Batches: []*pb.MetricBatch{
-					{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 108, Timestamp: ts}}},
-					{EntityKey: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 108, Timestamp: ts}}},
+					{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 108, Timestamp: ts}}},
+					{PodName: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 108, Timestamp: ts}}},
 				},
 			},
 		},
@@ -226,10 +226,10 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 			{
 				Namespace: ns, Name: policyName,
 				Batches: []*pb.MetricBatch{
-					{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
-					{EntityKey: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
-					{EntityKey: "p3", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
-					{EntityKey: "p4", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
+					{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
+					{PodName: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
+					{PodName: "p3", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
+					{PodName: "p4", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
 				},
 			},
 		},
@@ -245,8 +245,8 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 			{
 				Namespace: ns, Name: policyName,
 				Batches: []*pb.MetricBatch{
-					{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 120, Timestamp: ts}}},
-					{EntityKey: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 120, Timestamp: ts}}},
+					{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 120, Timestamp: ts}}},
+					{PodName: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 120, Timestamp: ts}}},
 				},
 			},
 		},
@@ -262,8 +262,8 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 			{
 				Namespace: ns, Name: policyName,
 				Batches: []*pb.MetricBatch{
-					{EntityKey: "p3", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 124, Timestamp: ts}}},
-					{EntityKey: "p4", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 124, Timestamp: ts}}},
+					{PodName: "p3", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 124, Timestamp: ts}}},
+					{PodName: "p4", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 124, Timestamp: ts}}},
 				},
 			},
 		},
@@ -338,7 +338,7 @@ func TestExternalMetricGRPC(t *testing.T) {
 		Policies: []*pb.PolicyBatch{
 			{
 				Namespace: ns, Name: policyName,
-				Batches: []*pb.MetricBatch{{EntityKey: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 1000, Timestamp: ts}}}},
+				Batches: []*pb.MetricBatch{{PodName: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 1000, Timestamp: ts}}}},
 			},
 		},
 	})
@@ -410,8 +410,8 @@ func TestPerPodExternalMetricGRPC(t *testing.T) {
 			{
 				Namespace: ns, Name: policyName,
 				Batches: []*pb.MetricBatch{
-					{EntityKey: "pod-1", Samples: []*pb.MetricSample{{Name: "sidecar_latency", Value: 50, Timestamp: ts}}},
-					{EntityKey: "pod-2", Samples: []*pb.MetricSample{{Name: "sidecar_latency", Value: 150, Timestamp: ts}}},
+					{PodName: "pod-1", Samples: []*pb.MetricSample{{Name: "sidecar_latency", Value: 50, Timestamp: ts}}},
+					{PodName: "pod-2", Samples: []*pb.MetricSample{{Name: "sidecar_latency", Value: 150, Timestamp: ts}}},
 				},
 			},
 		},
@@ -482,7 +482,7 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
 		Timestamp:   ts,
-		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{EntityKey: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 50, Timestamp: ts}}}}}},
+		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 50, Timestamp: ts}}}}}},
 	})
 
 	memStore.CalculateAll()
@@ -520,7 +520,7 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
 		Timestamp:   ts,
-		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{EntityKey: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 0, Timestamp: ts}}}}}},
+		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 0, Timestamp: ts}}}}}},
 	})
 
 	memStore.CalculateAll()
@@ -554,7 +554,7 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
 		Timestamp:   ts,
-		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{EntityKey: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 0, Timestamp: ts}}}}}},
+		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 0, Timestamp: ts}}}}}},
 	})
 	memStore.CalculateAll()
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
@@ -625,7 +625,7 @@ func TestDryRunGRPC(t *testing.T) {
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
 		Timestamp:   ts,
-		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "m1", Value: 100, Timestamp: ts}}}}}},
+		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m1", Value: 100, Timestamp: ts}}}}}},
 	})
 
 	memStore.CalculateAll()
@@ -709,7 +709,7 @@ func TestHistogramWithFilterGRPC(t *testing.T) {
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: policyName,
 			Batches: []*pb.MetricBatch{{
-				EntityKey: "p1",
+				PodName: "p1",
 				Samples: []*pb.MetricSample{
 					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "GET"}, HistogramBuckets: buckets0, Timestamp: ts},
 					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "POST"}, HistogramBuckets: buckets0, Timestamp: ts},
@@ -728,7 +728,7 @@ func TestHistogramWithFilterGRPC(t *testing.T) {
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: policyName,
 			Batches: []*pb.MetricBatch{{
-				EntityKey: "p1",
+				PodName: "p1",
 				Samples: []*pb.MetricSample{
 					// A: 50 fast
 					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "GET"}, HistogramBuckets: map[string]uint64{"0.1": 50, "0.5": 50, "+Inf": 50}, Timestamp: ts},
@@ -794,7 +794,7 @@ func TestHistogramLatencyScalingGRPC(t *testing.T) {
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: policyName,
 			Batches: []*pb.MetricBatch{{
-				EntityKey: "p1",
+				PodName: "p1",
 				Samples: []*pb.MetricSample{{
 					Name: "latency", Timestamp: ts,
 					HistogramBuckets: map[string]uint64{"0.05": 0, "0.2": 0, "+Inf": 0},
@@ -812,7 +812,7 @@ func TestHistogramLatencyScalingGRPC(t *testing.T) {
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: policyName,
 			Batches: []*pb.MetricBatch{{
-				EntityKey: "p1",
+				PodName: "p1",
 				Samples: []*pb.MetricSample{{
 					Name: "latency", Timestamp: ts,
 					HistogramBuckets: map[string]uint64{"0.05": 80, "0.2": 100, "+Inf": 100},
@@ -880,7 +880,7 @@ func TestWindowedMetricsGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "cpu_hist", Value: 1.0, Timestamp: ts}}}}}},
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu_hist", Value: 1.0, Timestamp: ts}}}}}},
 	})
 
 	memStore.CalculateAll()
@@ -1093,8 +1093,8 @@ func TestMultiplePoliciesGRPC(t *testing.T) {
 		ClusterName: "default",
 		Timestamp:   ts,
 		Policies: []*pb.PolicyBatch{
-			{Namespace: "default", Name: p1, Batches: []*pb.MetricBatch{{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "cpu", Value: 0.5, Timestamp: ts}}}}},
-			{Namespace: "default", Name: p2, Batches: []*pb.MetricBatch{{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "mem", Value: 1024, Timestamp: ts}}}}},
+			{Namespace: "default", Name: p1, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu", Value: 0.5, Timestamp: ts}}}}},
+			{Namespace: "default", Name: p2, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "mem", Value: 1024, Timestamp: ts}}}}},
 		},
 	})
 
@@ -1170,8 +1170,8 @@ func TestNamespaceIsolationGRPC(t *testing.T) {
 		ClusterName: "default",
 		Timestamp:   ts,
 		Policies: []*pb.PolicyBatch{
-			{Namespace: "ns1", Name: name, Batches: []*pb.MetricBatch{{EntityKey: "p", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: ts}}}}},
-			{Namespace: "ns2", Name: name, Batches: []*pb.MetricBatch{{EntityKey: "p", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: ts}}}}},
+			{Namespace: "ns1", Name: name, Batches: []*pb.MetricBatch{{PodName: "p", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: ts}}}}},
+			{Namespace: "ns2", Name: name, Batches: []*pb.MetricBatch{{PodName: "p", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: ts}}}}},
 		},
 	})
 
@@ -1244,13 +1244,13 @@ func TestMetricAggregationGRPC(t *testing.T) {
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: policyName,
 			Batches: []*pb.MetricBatch{
-				{EntityKey: "p1", Samples: []*pb.MetricSample{
+				{PodName: "p1", Samples: []*pb.MetricSample{
 					{Name: "m_avg", Value: 10, Timestamp: ts},
 					{Name: "m_sum", Value: 10, Timestamp: ts},
 					{Name: "m_max", Value: 10, Timestamp: ts},
 					{Name: "m_min", Value: 10, Timestamp: ts},
 				}},
-				{EntityKey: "p2", Samples: []*pb.MetricSample{
+				{PodName: "p2", Samples: []*pb.MetricSample{
 					{Name: "m_avg", Value: 30, Timestamp: ts},
 					{Name: "m_sum", Value: 30, Timestamp: ts},
 					{Name: "m_max", Value: 30, Timestamp: ts},
@@ -1383,7 +1383,7 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "load", Value: 100.0, Timestamp: ts}}}}}},
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "load", Value: 100.0, Timestamp: ts}}}}}},
 	})
 
 	memStore.CalculateAll()
@@ -1416,7 +1416,7 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "load", Value: 200.0, Timestamp: ts}}}}}},
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "load", Value: 200.0, Timestamp: ts}}}}}},
 	})
 
 	memStore.CalculateAll()
@@ -1436,7 +1436,7 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "load", Value: 300.0, Timestamp: ts}}}}}},
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "load", Value: 300.0, Timestamp: ts}}}}}},
 	})
 
 	memStore.CalculateAll()
@@ -1570,7 +1570,7 @@ func TestSlidingWindowGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: ts}}}}}},
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: ts}}}}}},
 	})
 	memStore.CalculateAll()
 	cm, _ := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
@@ -1581,7 +1581,7 @@ func TestSlidingWindowGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: ts}}}}}},
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: ts}}}}}},
 	})
 	memStore.CalculateAll()
 	cm, _ = client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
@@ -1592,7 +1592,7 @@ func TestSlidingWindowGRPC(t *testing.T) {
 	ts = clk.Now().Unix() // 1090
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: ts}}}}}},
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: ts}}}}}},
 	})
 	memStore.CalculateAll()
 	cm, _ = client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
@@ -1628,7 +1628,7 @@ func TestMetricGCGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: ts}}}}}},
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: ts}}}}}},
 	})
 
 	// Verify exists
@@ -1723,7 +1723,7 @@ func TestPolicyMutationGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: ts}}}}}},
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: ts}}}}}},
 	})
 	memStore.CalculateAll()
 
@@ -1748,7 +1748,7 @@ func TestPolicyMutationGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{EntityKey: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: ts}}}}}},
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: ts}}}}}},
 	})
 
 	memStore.CalculateAll()

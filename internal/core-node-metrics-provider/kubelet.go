@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -161,96 +162,92 @@ func (a *CoreNodeMetricsProvider) processKubeletMetric(pod corev1.Pod, m *pb.Met
 
 	metricType := getParam("type")
 	metricMode := getParam("mode")
-	containerName := getParam("container")
 
-	var totalVal float64
-	var maxTS int64
-	var foundAny bool
-
-	var totalUsage float64
-	var totalRequest float64
+	// Everything is computed and emitted per container: one batch per
+	// container, each carrying that container's own sample. The Control Plane
+	// keeps the per-container breakdown in
+	// ControlMetrics.pod_metrics[pod].container_metrics and derives the
+	// pod-level value from the container samples.
+	batches := make([]*pb.MetricBatch, 0, len(podStats.Containers))
 
 	for cName, cStats := range podStats.Containers {
-		if containerName != "" && containerName != cName {
+		val, ts, ok := a.containerUsage(pod, cName, cStats, metricType, m.Name, seenKeys)
+		if !ok {
 			continue
 		}
 
-		var val float64
-		var ts int64
-		found := false
-
-		if metricType == "cpu" && cStats.CPUUsageSeconds != nil {
-			rawVal := *cStats.CPUUsageSeconds
-			if cStats.Timestamp != nil {
-				ts = *cStats.Timestamp / 1000
-			} else {
-				ts = time.Now().Unix()
-			}
-
-			stateKey := fmt.Sprintf("%s/%s/%s/cpu/%s", pod.Namespace, pod.Name, cName, m.Name)
-			seenKeys[stateKey] = true
-
-			last, ok := a.lastSamples[stateKey]
-			a.lastSamples[stateKey] = SampleState{Timestamp: ts, Value: rawVal}
-
-			if ok && ts > last.Timestamp {
-				diff := rawVal - last.Value
-				if diff < 0 {
-					diff = rawVal
-				}
-				rate := diff / float64(ts-last.Timestamp)
-				val = rate
-				found = true
-			}
-		} else if metricType == "memory" && cStats.MemoryBytes != nil {
-			val = *cStats.MemoryBytes
-			if cStats.Timestamp != nil {
-				ts = *cStats.Timestamp / 1000
-			} else {
-				ts = time.Now().Unix()
-			}
-			found = true
-		}
-
-		if found {
-			if metricMode == "utilization" {
-				reqVal, ok := getContainerRequest(&pod, cName, metricType)
-				if ok && reqVal > 0 {
-					totalUsage += val
-					totalRequest += reqVal
-					if ts > maxTS {
-						maxTS = ts
-					}
-					foundAny = true
-				}
-			} else {
-				totalVal += val
-				if ts > maxTS {
-					maxTS = ts
-				}
-				foundAny = true
-			}
-		}
-	}
-
-	if foundAny {
-		finalVal := totalVal
 		if metricMode == "utilization" {
-			if totalRequest > 0 {
-				finalVal = (totalUsage / totalRequest)
-			} else {
-				finalVal = 0
+			// Utilization is a per-container ratio: the container usage over
+			// the request of that very same container. A container without a
+			// request for this resource has no meaningful ratio, so it is
+			// skipped.
+			req, ok := getContainerRequest(&pod, cName, metricType)
+			if !ok || req <= 0 {
+				continue
 			}
+			val /= req
 		}
 
-		return []*pb.MetricBatch{{
-			EntityKey: pod.Name,
+		batches = append(batches, &pb.MetricBatch{
+			PodName:       pod.Name,
+			ContainerName: cName,
 			Samples: []*pb.MetricSample{
-				{Name: m.Name, Value: finalVal, Timestamp: maxTS},
+				{Name: m.Name, Value: val, Timestamp: ts},
 			},
-		}}
+		})
 	}
-	return nil
+
+	if len(batches) == 0 {
+		return nil
+	}
+
+	// Map iteration order is random; sort for deterministic output.
+	sort.Slice(batches, func(i, j int) bool { return batches[i].ContainerName < batches[j].ContainerName })
+	return batches
+}
+
+// containerUsage returns the current usage of a single container for the given
+// metric type, along with the timestamp of the sample (in seconds).
+//
+// For "cpu" the raw kubelet counter is converted into a rate (cores) using the
+// previously scraped sample, so no value is reported on the very first scrape.
+// For "memory" the working set gauge is reported as is (bytes).
+func (a *CoreNodeMetricsProvider) containerUsage(pod corev1.Pod, containerName string, cStats *KubeletContainerMetrics, metricType, metricName string, seenKeys map[string]bool) (float64, int64, bool) {
+	timestamp := func() int64 {
+		if cStats.Timestamp != nil {
+			return *cStats.Timestamp / 1000
+		}
+		return time.Now().Unix()
+	}
+
+	switch {
+	case metricType == "cpu" && cStats.CPUUsageSeconds != nil:
+		rawVal := *cStats.CPUUsageSeconds
+		ts := timestamp()
+
+		stateKey := fmt.Sprintf("%s/%s/%s/cpu/%s", pod.Namespace, pod.Name, containerName, metricName)
+		seenKeys[stateKey] = true
+
+		last, ok := a.lastSamples[stateKey]
+		a.lastSamples[stateKey] = SampleState{Timestamp: ts, Value: rawVal}
+
+		if !ok || ts <= last.Timestamp {
+			return 0, 0, false
+		}
+
+		diff := rawVal - last.Value
+		if diff < 0 {
+			// Counter reset (container restart): treat the current value as
+			// the delta.
+			diff = rawVal
+		}
+		return diff / float64(ts-last.Timestamp), ts, true
+
+	case metricType == "memory" && cStats.MemoryBytes != nil:
+		return *cStats.MemoryBytes, timestamp(), true
+	}
+
+	return 0, 0, false
 }
 
 func getContainerRequest(pod *corev1.Pod, containerName, metricType string) (float64, bool) {

@@ -53,7 +53,7 @@ func TestProcessKubeletMetric(t *testing.T) {
 		want     []*pb.MetricBatch
 	}{
 		{
-			name: "CPU Rate (Cores) - Aggregated",
+			name: "CPU Rate (Cores) - Per Container",
 			def: &pb.MetricDefinition{
 				Name:     "cpu_cores",
 				Provider: "kubelet",
@@ -66,14 +66,22 @@ func TestProcessKubeletMetric(t *testing.T) {
 			metrics2: &KubeletPodMetrics{Containers: map[string]*KubeletContainerMetrics{
 				// Main: +1.0s in 10s -> 0.1 cores.
 				// Sidecar: +0.5s in 10s -> 0.05 cores.
-				// Total: 0.15 cores.
+				// The Control Plane sums them back to 0.15 cores for the pod.
 				"main":    {CPUUsageSeconds: floatPtr(11.0), Timestamp: intPtr(1000010000)},
 				"sidecar": {CPUUsageSeconds: floatPtr(5.5), Timestamp: intPtr(1000010000)},
 			}},
-			want: []*pb.MetricBatch{{
-				EntityKey: "test-pod",
-				Samples:   []*pb.MetricSample{{Name: "cpu_cores", Value: 0.15, Timestamp: 1000010}},
-			}},
+			want: []*pb.MetricBatch{
+				{
+					PodName:       "test-pod",
+					ContainerName: "main",
+					Samples:       []*pb.MetricSample{{Name: "cpu_cores", Value: 0.1, Timestamp: 1000010}},
+				},
+				{
+					PodName:       "test-pod",
+					ContainerName: "sidecar",
+					Samples:       []*pb.MetricSample{{Name: "cpu_cores", Value: 0.05, Timestamp: 1000010}},
+				},
+			},
 		},
 		{
 			name: "CPU Utilization (%) - From Class",
@@ -92,14 +100,24 @@ func TestProcessKubeletMetric(t *testing.T) {
 				"sidecar": {CPUUsageSeconds: floatPtr(5.0), Timestamp: intPtr(1000000000)},
 			}},
 			metrics2: &KubeletPodMetrics{Containers: map[string]*KubeletContainerMetrics{
-				// Total Used: 0.15. Total Req: 0.15. -> 100%.
+				// Each container is rated against its own request:
+				// main    0.1 cores / 0.1 request  -> 100%.
+				// sidecar 0.05 cores / 0.05 request -> 100%.
 				"main":    {CPUUsageSeconds: floatPtr(11.0), Timestamp: intPtr(1000010000)},
 				"sidecar": {CPUUsageSeconds: floatPtr(5.5), Timestamp: intPtr(1000010000)},
 			}},
-			want: []*pb.MetricBatch{{
-				EntityKey: "test-pod",
-				Samples:   []*pb.MetricSample{{Name: "cpu_util", Value: 1.0, Timestamp: 1000010}},
-			}},
+			want: []*pb.MetricBatch{
+				{
+					PodName:       "test-pod",
+					ContainerName: "main",
+					Samples:       []*pb.MetricSample{{Name: "cpu_util", Value: 1.0, Timestamp: 1000010}},
+				},
+				{
+					PodName:       "test-pod",
+					ContainerName: "sidecar",
+					Samples:       []*pb.MetricSample{{Name: "cpu_util", Value: 1.0, Timestamp: 1000010}},
+				},
+			},
 		},
 		{
 			name: "Memory Bytes",
@@ -112,8 +130,9 @@ func TestProcessKubeletMetric(t *testing.T) {
 				"main": {MemoryBytes: floatPtr(1024 * 1024), Timestamp: intPtr(1000000000)}, // 1Mi
 			}},
 			want: []*pb.MetricBatch{{
-				EntityKey: "test-pod",
-				Samples:   []*pb.MetricSample{{Name: "mem_bytes", Value: 1048576, Timestamp: 1000000}},
+				PodName:       "test-pod",
+				ContainerName: "main",
+				Samples:       []*pb.MetricSample{{Name: "mem_bytes", Value: 1048576, Timestamp: 1000000}},
 			}},
 		},
 		{
@@ -128,29 +147,39 @@ func TestProcessKubeletMetric(t *testing.T) {
 				"main": {MemoryBytes: floatPtr(50 * 1024 * 1024), Timestamp: intPtr(1000000000)},
 			}},
 			want: []*pb.MetricBatch{{
-				EntityKey: "test-pod",
-				Samples:   []*pb.MetricSample{{Name: "mem_util", Value: 0.5, Timestamp: 1000000}},
+				PodName:       "test-pod",
+				ContainerName: "main",
+				Samples:       []*pb.MetricSample{{Name: "mem_util", Value: 0.5, Timestamp: 1000000}},
 			}},
 		},
 		{
-			name: "Specific Container Filter",
+			name: "Uneven Per-Container Rates",
 			def: &pb.MetricDefinition{
-				Name:     "sidecar_cpu",
+				Name:     "cpu_per_container",
 				Provider: "kubelet",
-				Params:   map[string]string{"type": "cpu", "container": "sidecar"},
+				Params:   map[string]string{"type": "cpu"},
 			},
 			metrics1: &KubeletPodMetrics{Containers: map[string]*KubeletContainerMetrics{
 				"main":    {CPUUsageSeconds: floatPtr(10.0), Timestamp: intPtr(1000000000)},
 				"sidecar": {CPUUsageSeconds: floatPtr(5.0), Timestamp: intPtr(1000000000)},
 			}},
 			metrics2: &KubeletPodMetrics{Containers: map[string]*KubeletContainerMetrics{
+				// Main: +10s in 10s -> 1 core. Sidecar: +0.1s in 10s -> 0.01 cores.
 				"main":    {CPUUsageSeconds: floatPtr(20.0), Timestamp: intPtr(1000010000)},
 				"sidecar": {CPUUsageSeconds: floatPtr(5.1), Timestamp: intPtr(1000010000)},
 			}},
-			want: []*pb.MetricBatch{{
-				EntityKey: "test-pod",
-				Samples:   []*pb.MetricSample{{Name: "sidecar_cpu", Value: 0.01, Timestamp: 1000010}},
-			}},
+			want: []*pb.MetricBatch{
+				{
+					PodName:       "test-pod",
+					ContainerName: "main",
+					Samples:       []*pb.MetricSample{{Name: "cpu_per_container", Value: 1.0, Timestamp: 1000010}},
+				},
+				{
+					PodName:       "test-pod",
+					ContainerName: "sidecar",
+					Samples:       []*pb.MetricSample{{Name: "cpu_per_container", Value: 0.01, Timestamp: 1000010}},
+				},
+			},
 		},
 	}
 

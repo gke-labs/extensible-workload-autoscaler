@@ -267,7 +267,7 @@ func ingestWithLabels(s *store.MemoryStore, ts int64, ns, pol, pod, metric strin
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: pol,
 			Batches: []*pb.MetricBatch{{
-				EntityKey: pod,
+				PodName: pod,
 				Samples: []*pb.MetricSample{{
 					Name:      metric,
 					Value:     val,
@@ -286,7 +286,7 @@ func ingestHist(s *store.MemoryStore, ts int64, ns, pol, pod, metric string, buc
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: pol,
 			Batches: []*pb.MetricBatch{{
-				EntityKey: pod,
+				PodName: pod,
 				Samples: []*pb.MetricSample{{
 					Name:             metric,
 					HistogramBuckets: buckets,
@@ -392,7 +392,7 @@ func TestDump(t *testing.T) {
 		Policies: []*pb.PolicyBatch{{
 			Namespace: "default", Name: "dump-pol",
 			Batches: []*pb.MetricBatch{{
-				EntityKey: "p1",
+				PodName: "p1",
 				Samples: []*pb.MetricSample{{
 					Name: "cpu", Value: 1.0, Timestamp: 1000,
 				}},
@@ -459,8 +459,9 @@ func TestDump(t *testing.T) {
     },
     "Series": {
       "cpu": {
-        "p1|": {
+        "p1||": {
           "PodName": "p1",
+          "ContainerName": "",
           "Labels": null,
           "LastRaw": {
             "Timestamp": 1000,
@@ -716,14 +717,14 @@ func TestMultiTenantIsolation(t *testing.T) {
 		ClusterName: "cluster-A", Timestamp: 1000,
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: name,
-			Batches: []*pb.MetricBatch{{EntityKey: "pod-a", Samples: []*pb.MetricSample{{Name: "m", Value: 100, Timestamp: 1000}}}},
+			Batches: []*pb.MetricBatch{{PodName: "pod-a", Samples: []*pb.MetricSample{{Name: "m", Value: 100, Timestamp: 1000}}}},
 		}},
 	})
 	s.AddBatch(&pb.IngestMetricsRequest{
 		ClusterName: "cluster-B", Timestamp: 1000,
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: name,
-			Batches: []*pb.MetricBatch{{EntityKey: "pod-b", Samples: []*pb.MetricSample{{Name: "m", Value: 200, Timestamp: 1000}}}},
+			Batches: []*pb.MetricBatch{{PodName: "pod-b", Samples: []*pb.MetricSample{{Name: "m", Value: 200, Timestamp: 1000}}}},
 		}},
 	})
 
@@ -892,11 +893,11 @@ func TestPodScopedDecayingHistogram(t *testing.T) {
 		t.Fatalf("PodMetrics is nil")
 	}
 
-	if p1Val := cm.PodMetrics["p1"].Values["cpu"]; p1Val < 0.5 {
+	if p1Val := cm.PodMetrics["p1"].Values.Values["cpu"]; p1Val < 0.5 {
 		t.Errorf("Pod 1 scoped metric: Want >= 0.5, Got %f", p1Val)
 	}
 
-	if p2Val := cm.PodMetrics["p2"].Values["cpu"]; p2Val < 1.5 {
+	if p2Val := cm.PodMetrics["p2"].Values.Values["cpu"]; p2Val < 1.5 {
 		t.Errorf("Pod 2 scoped metric: Want >= 1.5, Got %f", p2Val)
 	}
 }

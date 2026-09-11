@@ -112,7 +112,11 @@ type MetricDefinition struct {
 	// DecayingDistribution builds a temporal distribution of scalar samples.
 	DecayingDistribution *DecayingDistribution `json:"decayingDistribution,omitempty"`
 
-	// Scope defines the granularity of the metric. "Global" (default) or "Pod".
+	// Scope defines the granularity of the metric.
+	// "Global" (default) reports a single aggregated value for the whole workload.
+	// "Pod" reports one value per pod; samples from individual containers are
+	// summed into their pod's value.
+	// "Container" reports one value per container, plus the pod-level rollup.
 	Scope string `json:"scope,omitempty"`
 }
 
@@ -201,8 +205,11 @@ type DecisionStatus struct {
 }
 
 type ResourceRecommendation struct {
-	Requests map[string]string `json:"requests,omitempty"`
-	Limits   map[string]string `json:"limits,omitempty"`
+	// ContainerName is the container this recommendation applies to.
+	// Empty means the first container of the pod.
+	ContainerName string            `json:"containerName,omitempty"`
+	Requests      map[string]string `json:"requests,omitempty"`
+	Limits        map[string]string `json:"limits,omitempty"`
 }
 
 type PodResourceRecommendation struct {

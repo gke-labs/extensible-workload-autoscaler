@@ -146,7 +146,7 @@ message MetricDefinition {
   Distribution distribution = 12;
   DecayingDistribution decaying_distribution = 13;
 
-  // The scope of the metric: "Global" (default) or "Pod".
+  // The scope of the metric: "Global" (default), "Pod", or "Container".
   string scope = 14;
 }
 
@@ -229,10 +229,18 @@ message GetControlMetricsRequest {
   PolicyId id = 1; 
 }
 
-// PodMetrics contains metrics for a specific pod.
-message PodMetrics {
-  // Map of MetricName -> Value.
+// A set of control metric values.
+message MetricValues {
+  // Maps metric names to their values.
   map<string, double> values = 1;
+}
+
+// PodMetrics contains control metrics for a specific pod.
+message PodMetrics {
+  // Metrics sourced from the pod.
+  MetricValues values = 1;
+  // Metrics sourced from specific containers.
+  map<string, MetricValues> container_metrics = 2;
 }
 
 // ControlMetrics contains the aggregated values calculated by the Control Plane.
@@ -262,6 +270,9 @@ message UpdateRecommenderStateRequest {
 
 // ResourceRecommendation defines CPU and Memory requests/limits for a workload.
 message ResourceRecommendation {
+  // The container this recommendation applies to.
+  // Empty string means the first container of the pod.
+  string container_name = 3;
   map<string, string> requests = 1;
   map<string, string> limits = 2;
 }
@@ -378,15 +389,18 @@ message PolicyBatch {
   // The name of the policy.
   string name = 2;
   
-  // Batches of metrics, usually grouped by Entity (Pod).
+  // Batches of metrics, usually grouped by Pod.
   repeated MetricBatch batches = 3;
 }
 
-// MetricBatch contains metrics for a specific entity.
+// MetricBatch contains metrics for a specific pod.
 message MetricBatch {
-  // Identifies the source entity (e.g. Pod Name).
+  // Identifies the source pod.
   // Empty string means the metric applies to the Policy as a whole (Global).
-  string entity_key = 1;
+  string pod_name = 1;
+  // Identifies the source container within the pod.
+  // Empty string means the metric applies to the pod as a whole.
+  string container_name = 3;
   // The list of metric samples.
   repeated MetricSample samples = 2;
 }
