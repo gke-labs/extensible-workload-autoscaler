@@ -64,6 +64,13 @@ metadata:
 spec:
   type: AddonResizer
 ---
+apiVersion: xas.io/v1
+kind: RecommenderClass
+metadata:
+  name: per-pod-vertical
+spec:
+  type: PerPodVertical
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:

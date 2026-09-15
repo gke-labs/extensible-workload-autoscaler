@@ -240,9 +240,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 
 	// 1. Get Target Deployment
 	deploymentName := policy.Spec.ScaleTargetRef.Name
-	var deployment *appsv1.Deployment
-	var err error
-	deployment, err = c.kubeclientset.AppsV1().Deployments(policy.Namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+	deployment, err := c.kubeclientset.AppsV1().Deployments(policy.Namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -279,14 +277,16 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	slog.Info("Recommendation", "deployment", deploymentName, "targetReplicas", rec.TargetReplicas, "currentReplicas", currentReplicas)
 
 	// 5. Actuate
-	var workloadRes *pb.ResourceRecommendation
-	var podRes []*pb.PodResourceRecommendation
-	for _, exp := range rec.Explanation {
-		if exp.WorkloadResources != nil {
-			workloadRes = exp.WorkloadResources
-		}
-		if len(exp.PodResources) > 0 {
-			podRes = append(podRes, exp.PodResources...)
+	workloadRes := rec.WorkloadResources
+	podRes := rec.PodResources
+	if workloadRes == nil && len(podRes) == 0 {
+		for _, exp := range rec.Explanation {
+			if workloadRes == nil && exp.WorkloadResources != nil {
+				workloadRes = exp.WorkloadResources
+			}
+			if len(podRes) == 0 && len(exp.PodResources) > 0 {
+				podRes = append(podRes, exp.PodResources...)
+			}
 		}
 	}
 
@@ -378,7 +378,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	}
 
 	// Actuate Workload Resources via /resize subresource on all matching pods
-	if workloadRes != nil {
+	if workloadRes != nil && deployment.Spec.Selector != nil {
 		selector := labels.Set(deployment.Spec.Selector.MatchLabels).String()
 		pods, err := c.kubeclientset.CoreV1().Pods(policy.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector})
 		if err == nil {
@@ -395,12 +395,16 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	for _, pr := range podRes {
 		pod, err := c.kubeclientset.CoreV1().Pods(policy.Namespace).Get(context.TODO(), pr.PodName, metav1.GetOptions{})
 		if err == nil && len(pod.Spec.Containers) > 0 {
-			patchPodResize(pod, pod.Spec.Containers[0].Name, pr.Requests, pr.Limits)
+			targetContainer := pr.ContainerName
+			if targetContainer == "" {
+				targetContainer = pod.Spec.Containers[0].Name
+			}
+			patchPodResize(pod, targetContainer, pr.Requests, pr.Limits)
 		}
 	}
 
 	// Actuation Policy & Fallback
-	if policy.Spec.ActuationPolicy != nil && policy.Spec.ActuationPolicy.InPlaceFallback == "EvictOnFailure" {
+	if policy.Spec.ActuationPolicy != nil && policy.Spec.ActuationPolicy.InPlaceFallback == "EvictOnFailure" && deployment.Spec.Selector != nil {
 		selector := labels.Set(deployment.Spec.Selector.MatchLabels).String()
 		pods, err := c.kubeclientset.CoreV1().Pods(policy.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector})
 		if err == nil {
@@ -445,9 +449,10 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		var prr []xasv1.PodResourceRecommendation
 		for _, pr := range d.PodResources {
 			prr = append(prr, xasv1.PodResourceRecommendation{
-				PodName:  pr.PodName,
-				Requests: pr.Requests,
-				Limits:   pr.Limits,
+				PodName:       pr.PodName,
+				ContainerName: pr.ContainerName,
+				Requests:      pr.Requests,
+				Limits:        pr.Limits,
 			})
 		}
 

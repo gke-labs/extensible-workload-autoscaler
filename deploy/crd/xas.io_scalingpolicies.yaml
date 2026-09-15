@@ -260,6 +260,8 @@ spec:
                     podResources:
                       items:
                         properties:
+                          containerName:
+                            type: string
                           limits:
                             additionalProperties:
                               type: string

@@ -1335,8 +1335,9 @@ func (x *ResourceRecommendation) GetLimits() map[string]string {
 type PodResourceRecommendation struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PodName       string                 `protobuf:"bytes,1,opt,name=pod_name,json=podName,proto3" json:"pod_name,omitempty"`
-	Requests      map[string]string      `protobuf:"bytes,2,rep,name=requests,proto3" json:"requests,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Limits        map[string]string      `protobuf:"bytes,3,rep,name=limits,proto3" json:"limits,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ContainerName string                 `protobuf:"bytes,2,opt,name=container_name,json=containerName,proto3" json:"container_name,omitempty"`
+	Requests      map[string]string      `protobuf:"bytes,3,rep,name=requests,proto3" json:"requests,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Limits        map[string]string      `protobuf:"bytes,4,rep,name=limits,proto3" json:"limits,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1374,6 +1375,13 @@ func (*PodResourceRecommendation) Descriptor() ([]byte, []int) {
 func (x *PodResourceRecommendation) GetPodName() string {
 	if x != nil {
 		return x.PodName
+	}
+	return ""
+}
+
+func (x *PodResourceRecommendation) GetContainerName() string {
+	if x != nil {
+		return x.ContainerName
 	}
 	return ""
 }
@@ -1772,7 +1780,11 @@ type Recommendation struct {
 	// The calculated target replica count.
 	TargetReplicas *int32 `protobuf:"varint,1,opt,name=target_replicas,json=targetReplicas,proto3,oneof" json:"target_replicas,omitempty"`
 	// Explains the decision by listing the status of all recommenders.
-	Explanation   []*RecommenderStatus `protobuf:"bytes,2,rep,name=explanation,proto3" json:"explanation,omitempty"`
+	Explanation []*RecommenderStatus `protobuf:"bytes,2,rep,name=explanation,proto3" json:"explanation,omitempty"`
+	// Arbitrated workload-level resource recommendation.
+	WorkloadResources *ResourceRecommendation `protobuf:"bytes,3,opt,name=workload_resources,json=workloadResources,proto3" json:"workload_resources,omitempty"`
+	// Arbitrated pod-level resource recommendations.
+	PodResources  []*PodResourceRecommendation `protobuf:"bytes,4,rep,name=pod_resources,json=podResources,proto3" json:"pod_resources,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1817,6 +1829,20 @@ func (x *Recommendation) GetTargetReplicas() int32 {
 func (x *Recommendation) GetExplanation() []*RecommenderStatus {
 	if x != nil {
 		return x.Explanation
+	}
+	return nil
+}
+
+func (x *Recommendation) GetWorkloadResources() *ResourceRecommendation {
+	if x != nil {
+		return x.WorkloadResources
+	}
+	return nil
+}
+
+func (x *Recommendation) GetPodResources() []*PodResourceRecommendation {
+	if x != nil {
+		return x.PodResources
 	}
 	return nil
 }
@@ -2343,11 +2369,12 @@ const file_xas_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a9\n" +
 	"\vLimitsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xcc\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xf3\x02\n" +
 	"\x19PodResourceRecommendation\x12\x19\n" +
-	"\bpod_name\x18\x01 \x01(\tR\apodName\x12P\n" +
-	"\brequests\x18\x02 \x03(\v24.xas.v1alpha.PodResourceRecommendation.RequestsEntryR\brequests\x12J\n" +
-	"\x06limits\x18\x03 \x03(\v22.xas.v1alpha.PodResourceRecommendation.LimitsEntryR\x06limits\x1a;\n" +
+	"\bpod_name\x18\x01 \x01(\tR\apodName\x12%\n" +
+	"\x0econtainer_name\x18\x02 \x01(\tR\rcontainerName\x12P\n" +
+	"\brequests\x18\x03 \x03(\v24.xas.v1alpha.PodResourceRecommendation.RequestsEntryR\brequests\x12J\n" +
+	"\x06limits\x18\x04 \x03(\v22.xas.v1alpha.PodResourceRecommendation.LimitsEntryR\x06limits\x1a;\n" +
 	"\rRequestsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a9\n" +
@@ -2385,10 +2412,12 @@ const file_xas_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\v2\x15.xas.v1alpha.PolicyIdR\x02id\"\xa4\x01\n" +
 	"\x19GetRecommendationResponse\x12C\n" +
 	"\x0erecommendation\x18\x01 \x01(\v2\x1b.xas.v1alpha.RecommendationR\x0erecommendation\x12B\n" +
-	"\x0fmetric_statuses\x18\x02 \x03(\v2\x19.xas.v1alpha.MetricStatusR\x0emetricStatuses\"\x94\x01\n" +
+	"\x0fmetric_statuses\x18\x02 \x03(\v2\x19.xas.v1alpha.MetricStatusR\x0emetricStatuses\"\xb5\x02\n" +
 	"\x0eRecommendation\x12,\n" +
 	"\x0ftarget_replicas\x18\x01 \x01(\x05H\x00R\x0etargetReplicas\x88\x01\x01\x12@\n" +
-	"\vexplanation\x18\x02 \x03(\v2\x1e.xas.v1alpha.RecommenderStatusR\vexplanationB\x12\n" +
+	"\vexplanation\x18\x02 \x03(\v2\x1e.xas.v1alpha.RecommenderStatusR\vexplanation\x12R\n" +
+	"\x12workload_resources\x18\x03 \x01(\v2#.xas.v1alpha.ResourceRecommendationR\x11workloadResources\x12K\n" +
+	"\rpod_resources\x18\x04 \x03(\v2&.xas.v1alpha.PodResourceRecommendationR\fpodResourcesB\x12\n" +
 	"\x10_target_replicas\"l\n" +
 	"\fMetricStatus\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
@@ -2537,33 +2566,35 @@ var file_xas_proto_depIdxs = []int32{
 	27, // 36: xas.v1alpha.GetRecommendationResponse.recommendation:type_name -> xas.v1alpha.Recommendation
 	28, // 37: xas.v1alpha.GetRecommendationResponse.metric_statuses:type_name -> xas.v1alpha.MetricStatus
 	24, // 38: xas.v1alpha.Recommendation.explanation:type_name -> xas.v1alpha.RecommenderStatus
-	30, // 39: xas.v1alpha.IngestMetricsRequest.policies:type_name -> xas.v1alpha.PolicyBatch
-	31, // 40: xas.v1alpha.PolicyBatch.batches:type_name -> xas.v1alpha.MetricBatch
-	32, // 41: xas.v1alpha.MetricBatch.samples:type_name -> xas.v1alpha.MetricSample
-	45, // 42: xas.v1alpha.MetricSample.labels:type_name -> xas.v1alpha.MetricSample.LabelsEntry
-	46, // 43: xas.v1alpha.MetricSample.histogram_buckets:type_name -> xas.v1alpha.MetricSample.HistogramBucketsEntry
-	17, // 44: xas.v1alpha.ControlMetrics.PodMetricsEntry.value:type_name -> xas.v1alpha.PodMetrics
-	1,  // 45: xas.v1alpha.XASControlPlane.UpdatePolicy:input_type -> xas.v1alpha.UpdatePolicyRequest
-	2,  // 46: xas.v1alpha.XASControlPlane.DeletePolicy:input_type -> xas.v1alpha.DeletePolicyRequest
-	3,  // 47: xas.v1alpha.XASControlPlane.ListPolicies:input_type -> xas.v1alpha.ListPoliciesRequest
-	13, // 48: xas.v1alpha.XASControlPlane.UpdateWorkload:input_type -> xas.v1alpha.UpdateWorkloadRequest
-	16, // 49: xas.v1alpha.XASControlPlane.GetControlMetrics:input_type -> xas.v1alpha.GetControlMetricsRequest
-	19, // 50: xas.v1alpha.XASControlPlane.UpdateRecommenderState:input_type -> xas.v1alpha.UpdateRecommenderStateRequest
-	25, // 51: xas.v1alpha.XASControlPlane.GetRecommendation:input_type -> xas.v1alpha.GetRecommendationRequest
-	29, // 52: xas.v1alpha.XASControlPlane.IngestMetrics:input_type -> xas.v1alpha.IngestMetricsRequest
-	5,  // 53: xas.v1alpha.XASControlPlane.UpdatePolicy:output_type -> xas.v1alpha.Policy
-	48, // 54: xas.v1alpha.XASControlPlane.DeletePolicy:output_type -> google.protobuf.Empty
-	4,  // 55: xas.v1alpha.XASControlPlane.ListPolicies:output_type -> xas.v1alpha.ListPoliciesResponse
-	14, // 56: xas.v1alpha.XASControlPlane.UpdateWorkload:output_type -> xas.v1alpha.Workload
-	18, // 57: xas.v1alpha.XASControlPlane.GetControlMetrics:output_type -> xas.v1alpha.ControlMetrics
-	23, // 58: xas.v1alpha.XASControlPlane.UpdateRecommenderState:output_type -> xas.v1alpha.RecommenderState
-	26, // 59: xas.v1alpha.XASControlPlane.GetRecommendation:output_type -> xas.v1alpha.GetRecommendationResponse
-	33, // 60: xas.v1alpha.XASControlPlane.IngestMetrics:output_type -> xas.v1alpha.IngestMetricsResponse
-	53, // [53:61] is the sub-list for method output_type
-	45, // [45:53] is the sub-list for method input_type
-	45, // [45:45] is the sub-list for extension type_name
-	45, // [45:45] is the sub-list for extension extendee
-	0,  // [0:45] is the sub-list for field type_name
+	20, // 39: xas.v1alpha.Recommendation.workload_resources:type_name -> xas.v1alpha.ResourceRecommendation
+	21, // 40: xas.v1alpha.Recommendation.pod_resources:type_name -> xas.v1alpha.PodResourceRecommendation
+	30, // 41: xas.v1alpha.IngestMetricsRequest.policies:type_name -> xas.v1alpha.PolicyBatch
+	31, // 42: xas.v1alpha.PolicyBatch.batches:type_name -> xas.v1alpha.MetricBatch
+	32, // 43: xas.v1alpha.MetricBatch.samples:type_name -> xas.v1alpha.MetricSample
+	45, // 44: xas.v1alpha.MetricSample.labels:type_name -> xas.v1alpha.MetricSample.LabelsEntry
+	46, // 45: xas.v1alpha.MetricSample.histogram_buckets:type_name -> xas.v1alpha.MetricSample.HistogramBucketsEntry
+	17, // 46: xas.v1alpha.ControlMetrics.PodMetricsEntry.value:type_name -> xas.v1alpha.PodMetrics
+	1,  // 47: xas.v1alpha.XASControlPlane.UpdatePolicy:input_type -> xas.v1alpha.UpdatePolicyRequest
+	2,  // 48: xas.v1alpha.XASControlPlane.DeletePolicy:input_type -> xas.v1alpha.DeletePolicyRequest
+	3,  // 49: xas.v1alpha.XASControlPlane.ListPolicies:input_type -> xas.v1alpha.ListPoliciesRequest
+	13, // 50: xas.v1alpha.XASControlPlane.UpdateWorkload:input_type -> xas.v1alpha.UpdateWorkloadRequest
+	16, // 51: xas.v1alpha.XASControlPlane.GetControlMetrics:input_type -> xas.v1alpha.GetControlMetricsRequest
+	19, // 52: xas.v1alpha.XASControlPlane.UpdateRecommenderState:input_type -> xas.v1alpha.UpdateRecommenderStateRequest
+	25, // 53: xas.v1alpha.XASControlPlane.GetRecommendation:input_type -> xas.v1alpha.GetRecommendationRequest
+	29, // 54: xas.v1alpha.XASControlPlane.IngestMetrics:input_type -> xas.v1alpha.IngestMetricsRequest
+	5,  // 55: xas.v1alpha.XASControlPlane.UpdatePolicy:output_type -> xas.v1alpha.Policy
+	48, // 56: xas.v1alpha.XASControlPlane.DeletePolicy:output_type -> google.protobuf.Empty
+	4,  // 57: xas.v1alpha.XASControlPlane.ListPolicies:output_type -> xas.v1alpha.ListPoliciesResponse
+	14, // 58: xas.v1alpha.XASControlPlane.UpdateWorkload:output_type -> xas.v1alpha.Workload
+	18, // 59: xas.v1alpha.XASControlPlane.GetControlMetrics:output_type -> xas.v1alpha.ControlMetrics
+	23, // 60: xas.v1alpha.XASControlPlane.UpdateRecommenderState:output_type -> xas.v1alpha.RecommenderState
+	26, // 61: xas.v1alpha.XASControlPlane.GetRecommendation:output_type -> xas.v1alpha.GetRecommendationResponse
+	33, // 62: xas.v1alpha.XASControlPlane.IngestMetrics:output_type -> xas.v1alpha.IngestMetricsResponse
+	55, // [55:63] is the sub-list for method output_type
+	47, // [47:55] is the sub-list for method input_type
+	47, // [47:47] is the sub-list for extension type_name
+	47, // [47:47] is the sub-list for extension extendee
+	0,  // [0:47] is the sub-list for field type_name
 }
 
 func init() { file_xas_proto_init() }

@@ -269,8 +269,9 @@ message ResourceRecommendation {
 // PodResourceRecommendation defines CPU and Memory requests/limits for a specific pod.
 message PodResourceRecommendation {
   string pod_name = 1;
-  map<string, string> requests = 2;
-  map<string, string> limits = 3;
+  string container_name = 2;
+  map<string, string> requests = 3;
+  map<string, string> limits = 4;
 }
 
 // RecommenderVote represents the input/decision from a recommender.
@@ -344,6 +345,10 @@ message Recommendation {
   optional int32 target_replicas = 1;
   // Explains the decision by listing the status of all recommenders.
   repeated RecommenderStatus explanation = 2;
+  // Arbitrated workload-level resource recommendation.
+  ResourceRecommendation workload_resources = 3;
+  // Arbitrated pod-level resource recommendations.
+  repeated PodResourceRecommendation pod_resources = 4;
 }
 
 // MetricStatus represents the state of a single input metric.
