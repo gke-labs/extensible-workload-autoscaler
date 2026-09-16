@@ -26,6 +26,7 @@ Every requirement is assigned a priority. *Mandatory* ones make up the core feat
 | Utilization-based load-balancing (UBB) | Medium | Both standard and per-pod. See the [documentation][ubb]. |
 | Interface with various metrics sources and autoscalers | Medium | Integrate with various metric sources or existing autoscalers, e.g. Azure, Datadog,.... |
 | Cluster-proportional autoscaler & bootstrapping | Low | Vertical and horizontal autoscaling based on cluster size. See [cluster-proportional-vertical-autoscaler][cpva], [cluster-proportional-autoscaler][cpa] and [addon-resizer][addon-resizer]. This is typically useful for autoscaling core K8s components, e.g. Kube-DNS. This may require starting xAS in a simplified mode (to ensure it doesn't require a dependency that it's itself autoscaling). |
+| Pod-level resources | Medium | Support more recent Kubernetes features such as Pod-level resources and CPU boost. |
 | Event-based scaling | Low | Support events, e.g. fast scale-up following OOMs, or for SFZ (scaling from 0 to 1). |
 | Predictive autoscaling | Low | It should be possible to make use of a timeseries prediction models. |
 
