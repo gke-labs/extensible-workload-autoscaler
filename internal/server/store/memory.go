@@ -13,6 +13,7 @@ import (
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/metrics"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // DataPoint represents a single calculated value (ControlMetric)
@@ -450,6 +451,20 @@ func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationR
 			}
 			if val, ok := ps.ControlMetrics.Values[def.Name]; ok {
 				status.Value = val
+			} else if len(ps.ControlMetrics.PodMetrics) > 0 {
+				var sum float64
+				var count int
+				for _, pm := range ps.ControlMetrics.PodMetrics {
+					if v, ok := pm.Values[def.Name]; ok {
+						sum += v
+						count++
+					}
+				}
+				if count > 0 {
+					status.Value = sum / float64(count)
+				} else {
+					status.Error = "No data available"
+				}
 			} else {
 				status.Error = "No data available"
 			}
@@ -776,16 +791,19 @@ func (s *MemoryStore) processDecisions(ps *PolicyState, now int64) {
 	// number of replicas: workload is inactive (0 replicas), or active and a
 	// recommender has decided on a positive number of replicas.
 	replicas, scalingStatuses := s.calculateTargetReplicas(ps, isActive)
+	workloadRes, podRes := s.calculateArbitratedResources(ps, isActive)
 
-	if replicas == nil && scalingStatuses == nil {
+	if replicas == nil && workloadRes == nil && len(podRes) == 0 && len(scalingStatuses) == 0 {
 		ps.Recommendation = nil
 		return
 	}
 
 	explanation := append(activationStatuses, scalingStatuses...)
 	ps.Recommendation = &pb.Recommendation{
-		TargetReplicas: replicas,
-		Explanation:    explanation,
+		TargetReplicas:    replicas,
+		WorkloadResources: workloadRes,
+		PodResources:      podRes,
+		Explanation:       explanation,
 	}
 
 	if policy.Workload != nil {
@@ -793,6 +811,88 @@ func (s *MemoryStore) processDecisions(ps *PolicyState, now int64) {
 			metrics.RecordRecommendation(policy.Id.ClusterName, policy.Id.Namespace, policy.Id.Name, policy.Workload.Group, policy.Workload.Version, policy.Workload.Kind, policy.Workload.Name, *replicas)
 		}
 		metrics.RecordActive(policy.Id.ClusterName, policy.Id.Namespace, policy.Id.Name, policy.Workload.Group, policy.Workload.Version, policy.Workload.Kind, policy.Workload.Name, isActive)
+	}
+}
+
+func (s *MemoryStore) calculateArbitratedResources(ps *PolicyState, isActive bool) (*pb.ResourceRecommendation, []*pb.PodResourceRecommendation) {
+	if !isActive {
+		return nil, nil
+	}
+
+	var arbitratedWorkload *pb.ResourceRecommendation
+	// Map key: "podName|containerName" -> PodResourceRecommendation
+	podMap := make(map[string]*pb.PodResourceRecommendation)
+	podKeys := []string{} // Maintain insertion order for deterministic outputs
+
+	for _, recDef := range ps.Policy.Scaling {
+		d, ok := ps.Decisions[recDef.Name]
+		if !ok || recDef.Mode == "DryRun" || !d.IsActive {
+			continue
+		}
+
+		if d.WorkloadResources != nil {
+			if arbitratedWorkload == nil {
+				arbitratedWorkload = &pb.ResourceRecommendation{
+					Requests: make(map[string]string),
+					Limits:   make(map[string]string),
+				}
+			}
+			arbitrateResourceMap(arbitratedWorkload.Requests, d.WorkloadResources.Requests)
+			arbitrateResourceMap(arbitratedWorkload.Limits, d.WorkloadResources.Limits)
+		}
+
+		for _, pr := range d.PodResources {
+			key := fmt.Sprintf("%s|%s", pr.PodName, pr.ContainerName)
+			existing, ok := podMap[key]
+			if !ok {
+				reqs := make(map[string]string)
+				lims := make(map[string]string)
+				for k, v := range pr.Requests {
+					reqs[k] = v
+				}
+				for k, v := range pr.Limits {
+					lims[k] = v
+				}
+				podMap[key] = &pb.PodResourceRecommendation{
+					PodName:       pr.PodName,
+					ContainerName: pr.ContainerName,
+					Requests:      reqs,
+					Limits:        lims,
+				}
+				podKeys = append(podKeys, key)
+			} else {
+				arbitrateResourceMap(existing.Requests, pr.Requests)
+				arbitrateResourceMap(existing.Limits, pr.Limits)
+			}
+		}
+	}
+
+	var arbitratedPods []*pb.PodResourceRecommendation
+	for _, key := range podKeys {
+		arbitratedPods = append(arbitratedPods, podMap[key])
+	}
+
+	return arbitratedWorkload, arbitratedPods
+}
+
+func arbitrateResourceMap(dest map[string]string, src map[string]string) {
+	if dest == nil || src == nil {
+		return
+	}
+	for resName, srcVal := range src {
+		destVal, ok := dest[resName]
+		if !ok || destVal == "" {
+			dest[resName] = srcVal
+			continue
+		}
+
+		destQ, err1 := resource.ParseQuantity(destVal)
+		srcQ, err2 := resource.ParseQuantity(srcVal)
+		if err1 == nil && err2 == nil {
+			if destQ.Cmp(srcQ) < 0 {
+				dest[resName] = srcVal
+			}
+		}
 	}
 }
 

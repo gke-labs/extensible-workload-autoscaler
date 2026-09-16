@@ -206,9 +206,10 @@ type ResourceRecommendation struct {
 }
 
 type PodResourceRecommendation struct {
-	PodName  string            `json:"podName"`
-	Requests map[string]string `json:"requests,omitempty"`
-	Limits   map[string]string `json:"limits,omitempty"`
+	PodName       string            `json:"podName"`
+	ContainerName string            `json:"containerName,omitempty"`
+	Requests      map[string]string `json:"requests,omitempty"`
+	Limits        map[string]string `json:"limits,omitempty"`
 }
 
 // +genclient

@@ -900,3 +900,83 @@ func TestPodScopedDecayingHistogram(t *testing.T) {
 		t.Errorf("Pod 2 scoped metric: Want >= 1.5, Got %f", p2Val)
 	}
 }
+
+func TestVerticalResourceArbitration(t *testing.T) {
+	clk := &clock.FakeClock{CurrentTime: time.Unix(1000, 0)}
+	s := store.NewMemoryStoreWithClock(clk)
+
+	pol := "vpa-pol"
+	ns := "default"
+	policy := &pb.Policy{
+		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol},
+		Scaling: []*pb.RecommenderDefinition{
+			{Name: "vpa-1", Recommender: "PerPodVertical", Type: "PerPodVertical", Mode: "Active"},
+			{Name: "vpa-2", Recommender: "PerPodVertical", Type: "PerPodVertical", Mode: "Active"},
+			{Name: "dry-1", Recommender: "PerPodVertical", Type: "PerPodVertical", Mode: "DryRun"},
+		},
+		Workload: &pb.WorkloadRef{Name: "app"},
+	}
+	s.SetPolicy("default", policy)
+
+	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
+		Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol},
+		Workload: &pb.Workload{Pods: []*pb.PodState{{Name: "p1", IsReady: true}}},
+	})
+
+	// vpa-1 recommends 500m CPU for p1
+	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
+		Id:              &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol},
+		RecommenderName: "vpa-1",
+		Vote: &pb.RecommenderVote{
+			IsActive: true,
+			PodResources: []*pb.PodResourceRecommendation{
+				{PodName: "p1", ContainerName: "main", Requests: map[string]string{"cpu": "500m"}},
+			},
+		},
+	})
+
+	// vpa-2 recommends 800m CPU for p1 (higher)
+	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
+		Id:              &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol},
+		RecommenderName: "vpa-2",
+		Vote: &pb.RecommenderVote{
+			IsActive: true,
+			PodResources: []*pb.PodResourceRecommendation{
+				{PodName: "p1", ContainerName: "main", Requests: map[string]string{"cpu": "800m"}},
+			},
+		},
+	})
+
+	// dry-1 recommends 2000m CPU for p1 (DryRun, should be ignored for arbitration)
+	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
+		Id:              &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol},
+		RecommenderName: "dry-1",
+		Vote: &pb.RecommenderVote{
+			IsActive: true,
+			PodResources: []*pb.PodResourceRecommendation{
+				{PodName: "p1", ContainerName: "main", Requests: map[string]string{"cpu": "2000m"}},
+			},
+		},
+	})
+
+	s.CalculateAll()
+
+	resp, ok := s.GetRecommendation(&pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol})
+	if !ok || resp.Recommendation == nil {
+		t.Fatalf("Expected recommendation, got nil")
+	}
+
+	rec := resp.Recommendation
+	if len(rec.PodResources) != 1 {
+		t.Fatalf("Want 1 arbitrated pod resource, got %d", len(rec.PodResources))
+	}
+
+	gotPod := rec.PodResources[0]
+	if gotPod.PodName != "p1" || gotPod.ContainerName != "main" {
+		t.Errorf("Unexpected pod/container: %s/%s", gotPod.PodName, gotPod.ContainerName)
+	}
+
+	if gotCpu := gotPod.Requests["cpu"]; gotCpu != "800m" {
+		t.Errorf("Arbitration want max 800m CPU (ignoring dry-run 2000m), got %s", gotCpu)
+	}
+}

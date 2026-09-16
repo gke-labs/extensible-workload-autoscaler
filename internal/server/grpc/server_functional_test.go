@@ -843,6 +843,8 @@ func TestUpdateRecommenderState_VerticalResources(t *testing.T) {
 
 	wantResp := &pb.GetRecommendationResponse{
 		Recommendation: &pb.Recommendation{
+			WorkloadResources: vote.WorkloadResources,
+			PodResources:      vote.PodResources,
 			Explanation: []*pb.RecommenderStatus{
 				{
 					Name:              "r1",
