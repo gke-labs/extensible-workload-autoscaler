@@ -669,9 +669,10 @@ func (c *Controller) syncWorkload(policy *xasv1.ScalingPolicy, deployment *appsv
 			}
 		}
 		replicas = append(replicas, &pb.PodState{
-			Name:     pod.Name,
-			NodeName: pod.Spec.NodeName,
-			IsReady:  isReady,
+			Name:       pod.Name,
+			NodeName:   pod.Spec.NodeName,
+			IsReady:    isReady,
+			Containers: buildContainerStates(&pod),
 		})
 	}
 
@@ -688,6 +689,23 @@ func (c *Controller) syncWorkload(policy *xasv1.ScalingPolicy, deployment *appsv
 
 	_, err = c.grpcClient.UpdateWorkload(ctx, req)
 	return err
+}
+
+// buildContainerStates reports the resource requests currently declared for each
+// of the pod's containers. Requests are read from the pod spec.
+func buildContainerStates(pod *corev1.Pod) []*pb.ContainerState {
+	containers := make([]*pb.ContainerState, 0, len(pod.Spec.Containers))
+	for _, container := range pod.Spec.Containers {
+		state := &pb.ContainerState{Name: container.Name}
+		if len(container.Resources.Requests) > 0 {
+			state.Requests = make(map[string]string, len(container.Resources.Requests))
+			for name, quantity := range container.Resources.Requests {
+				state.Requests[string(name)] = quantity.String()
+			}
+		}
+		containers = append(containers, state)
+	}
+	return containers
 }
 
 func containsString(slice []string, s string) bool {

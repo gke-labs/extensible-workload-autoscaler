@@ -219,6 +219,16 @@ message PodState {
   string node_name = 2;
   // Whether the pod is ready to serve traffic.
   bool is_ready = 3;
+  // State of all the pod containers.
+  repeated ContainerState containers = 4;
+}
+
+// ContainerState represents the state of a given container instance.
+message ContainerState {
+  // The name of the container.
+  string name = 1;
+  // Maps a resource to its target (i.e. spec) requested value (e.g. 'cpu: 5m', 'memory: 10Mi').
+  map<string, string> requests = 2;
 }
 
 // --- Control Metrics ---
@@ -273,14 +283,18 @@ message ResourceRecommendation {
   // The container this recommendation applies to.
   // Empty string means the first container of the pod.
   string container_name = 3;
+  // Maps a resource to its requested value (e.g. 'memory: 10Mi').
   map<string, string> requests = 1;
+  // Maps a resource to its value limit (e.g. 'cpu: 5m').
   map<string, string> limits = 2;
 }
 
 // PodResourceRecommendation defines CPU and Memory requests/limits for a specific pod.
 message PodResourceRecommendation {
   string pod_name = 1;
+  // Maps a resource to its requested value (e.g. 'memory: 10Mi').
   map<string, string> requests = 2;
+  // Maps a resource to its value limit (e.g. 'cpu: 5m').
   map<string, string> limits = 3;
 }
 

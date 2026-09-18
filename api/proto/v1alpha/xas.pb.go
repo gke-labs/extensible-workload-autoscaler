@@ -993,7 +993,9 @@ type PodState struct {
 	// The node where the pod is running.
 	NodeName string `protobuf:"bytes,2,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
 	// Whether the pod is ready to serve traffic.
-	IsReady       bool `protobuf:"varint,3,opt,name=is_ready,json=isReady,proto3" json:"is_ready,omitempty"`
+	IsReady bool `protobuf:"varint,3,opt,name=is_ready,json=isReady,proto3" json:"is_ready,omitempty"`
+	// State of all the pod containers.
+	Containers    []*ContainerState `protobuf:"bytes,4,rep,name=containers,proto3" json:"containers,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1049,6 +1051,68 @@ func (x *PodState) GetIsReady() bool {
 	return false
 }
 
+func (x *PodState) GetContainers() []*ContainerState {
+	if x != nil {
+		return x.Containers
+	}
+	return nil
+}
+
+// ContainerState represents the state of a given container instance.
+type ContainerState struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The name of the container.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Maps a resource to its target (i.e. spec) requested value (e.g. 'cpu: 5m', 'memory: 10Mi').
+	Requests      map[string]string `protobuf:"bytes,2,rep,name=requests,proto3" json:"requests,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ContainerState) Reset() {
+	*x = ContainerState{}
+	mi := &file_xas_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ContainerState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ContainerState) ProtoMessage() {}
+
+func (x *ContainerState) ProtoReflect() protoreflect.Message {
+	mi := &file_xas_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ContainerState.ProtoReflect.Descriptor instead.
+func (*ContainerState) Descriptor() ([]byte, []int) {
+	return file_xas_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ContainerState) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ContainerState) GetRequests() map[string]string {
+	if x != nil {
+		return x.Requests
+	}
+	return nil
+}
+
 // GetControlMetricsRequest retrieves aggregated metrics for a policy.
 type GetControlMetricsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1060,7 +1124,7 @@ type GetControlMetricsRequest struct {
 
 func (x *GetControlMetricsRequest) Reset() {
 	*x = GetControlMetricsRequest{}
-	mi := &file_xas_proto_msgTypes[16]
+	mi := &file_xas_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1072,7 +1136,7 @@ func (x *GetControlMetricsRequest) String() string {
 func (*GetControlMetricsRequest) ProtoMessage() {}
 
 func (x *GetControlMetricsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[16]
+	mi := &file_xas_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1085,7 +1149,7 @@ func (x *GetControlMetricsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetControlMetricsRequest.ProtoReflect.Descriptor instead.
 func (*GetControlMetricsRequest) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{16}
+	return file_xas_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetControlMetricsRequest) GetId() *PolicyId {
@@ -1106,7 +1170,7 @@ type MetricValues struct {
 
 func (x *MetricValues) Reset() {
 	*x = MetricValues{}
-	mi := &file_xas_proto_msgTypes[17]
+	mi := &file_xas_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1118,7 +1182,7 @@ func (x *MetricValues) String() string {
 func (*MetricValues) ProtoMessage() {}
 
 func (x *MetricValues) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[17]
+	mi := &file_xas_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1131,7 +1195,7 @@ func (x *MetricValues) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetricValues.ProtoReflect.Descriptor instead.
 func (*MetricValues) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{17}
+	return file_xas_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *MetricValues) GetValues() map[string]float64 {
@@ -1154,7 +1218,7 @@ type PodMetrics struct {
 
 func (x *PodMetrics) Reset() {
 	*x = PodMetrics{}
-	mi := &file_xas_proto_msgTypes[18]
+	mi := &file_xas_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1166,7 +1230,7 @@ func (x *PodMetrics) String() string {
 func (*PodMetrics) ProtoMessage() {}
 
 func (x *PodMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[18]
+	mi := &file_xas_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1179,7 +1243,7 @@ func (x *PodMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PodMetrics.ProtoReflect.Descriptor instead.
 func (*PodMetrics) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{18}
+	return file_xas_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *PodMetrics) GetValues() *MetricValues {
@@ -1213,7 +1277,7 @@ type ControlMetrics struct {
 
 func (x *ControlMetrics) Reset() {
 	*x = ControlMetrics{}
-	mi := &file_xas_proto_msgTypes[19]
+	mi := &file_xas_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1225,7 +1289,7 @@ func (x *ControlMetrics) String() string {
 func (*ControlMetrics) ProtoMessage() {}
 
 func (x *ControlMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[19]
+	mi := &file_xas_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1238,7 +1302,7 @@ func (x *ControlMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControlMetrics.ProtoReflect.Descriptor instead.
 func (*ControlMetrics) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{19}
+	return file_xas_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ControlMetrics) GetValues() map[string]float64 {
@@ -1284,7 +1348,7 @@ type UpdateRecommenderStateRequest struct {
 
 func (x *UpdateRecommenderStateRequest) Reset() {
 	*x = UpdateRecommenderStateRequest{}
-	mi := &file_xas_proto_msgTypes[20]
+	mi := &file_xas_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1296,7 +1360,7 @@ func (x *UpdateRecommenderStateRequest) String() string {
 func (*UpdateRecommenderStateRequest) ProtoMessage() {}
 
 func (x *UpdateRecommenderStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[20]
+	mi := &file_xas_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1309,7 +1373,7 @@ func (x *UpdateRecommenderStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRecommenderStateRequest.ProtoReflect.Descriptor instead.
 func (*UpdateRecommenderStateRequest) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{20}
+	return file_xas_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *UpdateRecommenderStateRequest) GetId() *PolicyId {
@@ -1338,8 +1402,10 @@ type ResourceRecommendation struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The container this recommendation applies to.
 	// Empty string means the first container of the pod.
-	ContainerName string            `protobuf:"bytes,3,opt,name=container_name,json=containerName,proto3" json:"container_name,omitempty"`
-	Requests      map[string]string `protobuf:"bytes,1,rep,name=requests,proto3" json:"requests,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ContainerName string `protobuf:"bytes,3,opt,name=container_name,json=containerName,proto3" json:"container_name,omitempty"`
+	// Maps a resource to its requested value (e.g. 'memory: 10Mi').
+	Requests map[string]string `protobuf:"bytes,1,rep,name=requests,proto3" json:"requests,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Maps a resource to its value limit (e.g. 'cpu: 5m').
 	Limits        map[string]string `protobuf:"bytes,2,rep,name=limits,proto3" json:"limits,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1347,7 +1413,7 @@ type ResourceRecommendation struct {
 
 func (x *ResourceRecommendation) Reset() {
 	*x = ResourceRecommendation{}
-	mi := &file_xas_proto_msgTypes[21]
+	mi := &file_xas_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1359,7 +1425,7 @@ func (x *ResourceRecommendation) String() string {
 func (*ResourceRecommendation) ProtoMessage() {}
 
 func (x *ResourceRecommendation) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[21]
+	mi := &file_xas_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1372,7 +1438,7 @@ func (x *ResourceRecommendation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceRecommendation.ProtoReflect.Descriptor instead.
 func (*ResourceRecommendation) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{21}
+	return file_xas_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ResourceRecommendation) GetContainerName() string {
@@ -1398,17 +1464,19 @@ func (x *ResourceRecommendation) GetLimits() map[string]string {
 
 // PodResourceRecommendation defines CPU and Memory requests/limits for a specific pod.
 type PodResourceRecommendation struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PodName       string                 `protobuf:"bytes,1,opt,name=pod_name,json=podName,proto3" json:"pod_name,omitempty"`
-	Requests      map[string]string      `protobuf:"bytes,2,rep,name=requests,proto3" json:"requests,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Limits        map[string]string      `protobuf:"bytes,3,rep,name=limits,proto3" json:"limits,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	PodName string                 `protobuf:"bytes,1,opt,name=pod_name,json=podName,proto3" json:"pod_name,omitempty"`
+	// Maps a resource to its requested value (e.g. 'memory: 10Mi').
+	Requests map[string]string `protobuf:"bytes,2,rep,name=requests,proto3" json:"requests,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Maps a resource to its value limit (e.g. 'cpu: 5m').
+	Limits        map[string]string `protobuf:"bytes,3,rep,name=limits,proto3" json:"limits,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PodResourceRecommendation) Reset() {
 	*x = PodResourceRecommendation{}
-	mi := &file_xas_proto_msgTypes[22]
+	mi := &file_xas_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1420,7 +1488,7 @@ func (x *PodResourceRecommendation) String() string {
 func (*PodResourceRecommendation) ProtoMessage() {}
 
 func (x *PodResourceRecommendation) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[22]
+	mi := &file_xas_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1433,7 +1501,7 @@ func (x *PodResourceRecommendation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PodResourceRecommendation.ProtoReflect.Descriptor instead.
 func (*PodResourceRecommendation) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{22}
+	return file_xas_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *PodResourceRecommendation) GetPodName() string {
@@ -1476,7 +1544,7 @@ type RecommenderVote struct {
 
 func (x *RecommenderVote) Reset() {
 	*x = RecommenderVote{}
-	mi := &file_xas_proto_msgTypes[23]
+	mi := &file_xas_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1488,7 +1556,7 @@ func (x *RecommenderVote) String() string {
 func (*RecommenderVote) ProtoMessage() {}
 
 func (x *RecommenderVote) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[23]
+	mi := &file_xas_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1501,7 +1569,7 @@ func (x *RecommenderVote) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecommenderVote.ProtoReflect.Descriptor instead.
 func (*RecommenderVote) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{23}
+	return file_xas_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *RecommenderVote) GetReplicas() int32 {
@@ -1554,7 +1622,7 @@ type RecommenderState struct {
 
 func (x *RecommenderState) Reset() {
 	*x = RecommenderState{}
-	mi := &file_xas_proto_msgTypes[24]
+	mi := &file_xas_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1566,7 +1634,7 @@ func (x *RecommenderState) String() string {
 func (*RecommenderState) ProtoMessage() {}
 
 func (x *RecommenderState) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[24]
+	mi := &file_xas_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1579,7 +1647,7 @@ func (x *RecommenderState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecommenderState.ProtoReflect.Descriptor instead.
 func (*RecommenderState) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{24}
+	return file_xas_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *RecommenderState) GetName() string {
@@ -1632,7 +1700,7 @@ type RecommenderStatus struct {
 
 func (x *RecommenderStatus) Reset() {
 	*x = RecommenderStatus{}
-	mi := &file_xas_proto_msgTypes[25]
+	mi := &file_xas_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1644,7 +1712,7 @@ func (x *RecommenderStatus) String() string {
 func (*RecommenderStatus) ProtoMessage() {}
 
 func (x *RecommenderStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[25]
+	mi := &file_xas_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1657,7 +1725,7 @@ func (x *RecommenderStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecommenderStatus.ProtoReflect.Descriptor instead.
 func (*RecommenderStatus) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{25}
+	return file_xas_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *RecommenderStatus) GetIsActive() bool {
@@ -1741,7 +1809,7 @@ type GetRecommendationRequest struct {
 
 func (x *GetRecommendationRequest) Reset() {
 	*x = GetRecommendationRequest{}
-	mi := &file_xas_proto_msgTypes[26]
+	mi := &file_xas_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1753,7 +1821,7 @@ func (x *GetRecommendationRequest) String() string {
 func (*GetRecommendationRequest) ProtoMessage() {}
 
 func (x *GetRecommendationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[26]
+	mi := &file_xas_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1766,7 +1834,7 @@ func (x *GetRecommendationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRecommendationRequest.ProtoReflect.Descriptor instead.
 func (*GetRecommendationRequest) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{26}
+	return file_xas_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *GetRecommendationRequest) GetId() *PolicyId {
@@ -1789,7 +1857,7 @@ type GetRecommendationResponse struct {
 
 func (x *GetRecommendationResponse) Reset() {
 	*x = GetRecommendationResponse{}
-	mi := &file_xas_proto_msgTypes[27]
+	mi := &file_xas_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1801,7 +1869,7 @@ func (x *GetRecommendationResponse) String() string {
 func (*GetRecommendationResponse) ProtoMessage() {}
 
 func (x *GetRecommendationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[27]
+	mi := &file_xas_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1814,7 +1882,7 @@ func (x *GetRecommendationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRecommendationResponse.ProtoReflect.Descriptor instead.
 func (*GetRecommendationResponse) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{27}
+	return file_xas_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *GetRecommendationResponse) GetRecommendation() *Recommendation {
@@ -1844,7 +1912,7 @@ type Recommendation struct {
 
 func (x *Recommendation) Reset() {
 	*x = Recommendation{}
-	mi := &file_xas_proto_msgTypes[28]
+	mi := &file_xas_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1856,7 +1924,7 @@ func (x *Recommendation) String() string {
 func (*Recommendation) ProtoMessage() {}
 
 func (x *Recommendation) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[28]
+	mi := &file_xas_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1869,7 +1937,7 @@ func (x *Recommendation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Recommendation.ProtoReflect.Descriptor instead.
 func (*Recommendation) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{28}
+	return file_xas_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Recommendation) GetTargetReplicas() int32 {
@@ -1903,7 +1971,7 @@ type MetricStatus struct {
 
 func (x *MetricStatus) Reset() {
 	*x = MetricStatus{}
-	mi := &file_xas_proto_msgTypes[29]
+	mi := &file_xas_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1915,7 +1983,7 @@ func (x *MetricStatus) String() string {
 func (*MetricStatus) ProtoMessage() {}
 
 func (x *MetricStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[29]
+	mi := &file_xas_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1928,7 +1996,7 @@ func (x *MetricStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetricStatus.ProtoReflect.Descriptor instead.
 func (*MetricStatus) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{29}
+	return file_xas_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *MetricStatus) GetName() string {
@@ -1974,7 +2042,7 @@ type IngestMetricsRequest struct {
 
 func (x *IngestMetricsRequest) Reset() {
 	*x = IngestMetricsRequest{}
-	mi := &file_xas_proto_msgTypes[30]
+	mi := &file_xas_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1986,7 +2054,7 @@ func (x *IngestMetricsRequest) String() string {
 func (*IngestMetricsRequest) ProtoMessage() {}
 
 func (x *IngestMetricsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[30]
+	mi := &file_xas_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1999,7 +2067,7 @@ func (x *IngestMetricsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IngestMetricsRequest.ProtoReflect.Descriptor instead.
 func (*IngestMetricsRequest) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{30}
+	return file_xas_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *IngestMetricsRequest) GetClusterName() string {
@@ -2038,7 +2106,7 @@ type PolicyBatch struct {
 
 func (x *PolicyBatch) Reset() {
 	*x = PolicyBatch{}
-	mi := &file_xas_proto_msgTypes[31]
+	mi := &file_xas_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2050,7 +2118,7 @@ func (x *PolicyBatch) String() string {
 func (*PolicyBatch) ProtoMessage() {}
 
 func (x *PolicyBatch) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[31]
+	mi := &file_xas_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2063,7 +2131,7 @@ func (x *PolicyBatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PolicyBatch.ProtoReflect.Descriptor instead.
 func (*PolicyBatch) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{31}
+	return file_xas_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *PolicyBatch) GetNamespace() string {
@@ -2104,7 +2172,7 @@ type MetricBatch struct {
 
 func (x *MetricBatch) Reset() {
 	*x = MetricBatch{}
-	mi := &file_xas_proto_msgTypes[32]
+	mi := &file_xas_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2116,7 +2184,7 @@ func (x *MetricBatch) String() string {
 func (*MetricBatch) ProtoMessage() {}
 
 func (x *MetricBatch) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[32]
+	mi := &file_xas_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2129,7 +2197,7 @@ func (x *MetricBatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetricBatch.ProtoReflect.Descriptor instead.
 func (*MetricBatch) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{32}
+	return file_xas_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *MetricBatch) GetPodName() string {
@@ -2176,7 +2244,7 @@ type MetricSample struct {
 
 func (x *MetricSample) Reset() {
 	*x = MetricSample{}
-	mi := &file_xas_proto_msgTypes[33]
+	mi := &file_xas_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2188,7 +2256,7 @@ func (x *MetricSample) String() string {
 func (*MetricSample) ProtoMessage() {}
 
 func (x *MetricSample) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[33]
+	mi := &file_xas_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2201,7 +2269,7 @@ func (x *MetricSample) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetricSample.ProtoReflect.Descriptor instead.
 func (*MetricSample) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{33}
+	return file_xas_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *MetricSample) GetName() string {
@@ -2264,7 +2332,7 @@ type IngestMetricsResponse struct {
 
 func (x *IngestMetricsResponse) Reset() {
 	*x = IngestMetricsResponse{}
-	mi := &file_xas_proto_msgTypes[34]
+	mi := &file_xas_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2276,7 +2344,7 @@ func (x *IngestMetricsResponse) String() string {
 func (*IngestMetricsResponse) ProtoMessage() {}
 
 func (x *IngestMetricsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_xas_proto_msgTypes[34]
+	mi := &file_xas_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2289,7 +2357,7 @@ func (x *IngestMetricsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IngestMetricsResponse.ProtoReflect.Descriptor instead.
 func (*IngestMetricsResponse) Descriptor() ([]byte, []int) {
-	return file_xas_proto_rawDescGZIP(), []int{34}
+	return file_xas_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *IngestMetricsResponse) GetSuccess() bool {
@@ -2381,11 +2449,20 @@ const file_xas_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\v2\x15.xas.v1alpha.PolicyIdR\x02id\x121\n" +
 	"\bworkload\x18\x02 \x01(\v2\x15.xas.v1alpha.WorkloadR\bworkload\"5\n" +
 	"\bWorkload\x12)\n" +
-	"\x04pods\x18\x01 \x03(\v2\x15.xas.v1alpha.PodStateR\x04pods\"V\n" +
+	"\x04pods\x18\x01 \x03(\v2\x15.xas.v1alpha.PodStateR\x04pods\"\x93\x01\n" +
 	"\bPodState\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
 	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12\x19\n" +
-	"\bis_ready\x18\x03 \x01(\bR\aisReady\"A\n" +
+	"\bis_ready\x18\x03 \x01(\bR\aisReady\x12;\n" +
+	"\n" +
+	"containers\x18\x04 \x03(\v2\x1b.xas.v1alpha.ContainerStateR\n" +
+	"containers\"\xa8\x01\n" +
+	"\x0eContainerState\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12E\n" +
+	"\brequests\x18\x02 \x03(\v2).xas.v1alpha.ContainerState.RequestsEntryR\brequests\x1a;\n" +
+	"\rRequestsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"A\n" +
 	"\x18GetControlMetricsRequest\x12%\n" +
 	"\x02id\x18\x01 \x01(\v2\x15.xas.v1alpha.PolicyIdR\x02id\"\x88\x01\n" +
 	"\fMetricValues\x12=\n" +
@@ -2527,7 +2604,7 @@ func file_xas_proto_rawDescGZIP() []byte {
 	return file_xas_proto_rawDescData
 }
 
-var file_xas_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
+var file_xas_proto_msgTypes = make([]protoimpl.MessageInfo, 51)
 var file_xas_proto_goTypes = []any{
 	(*PolicyId)(nil),                      // 0: xas.v1alpha.PolicyId
 	(*UpdatePolicyRequest)(nil),           // 1: xas.v1alpha.UpdatePolicyRequest
@@ -2545,41 +2622,43 @@ var file_xas_proto_goTypes = []any{
 	(*UpdateWorkloadRequest)(nil),         // 13: xas.v1alpha.UpdateWorkloadRequest
 	(*Workload)(nil),                      // 14: xas.v1alpha.Workload
 	(*PodState)(nil),                      // 15: xas.v1alpha.PodState
-	(*GetControlMetricsRequest)(nil),      // 16: xas.v1alpha.GetControlMetricsRequest
-	(*MetricValues)(nil),                  // 17: xas.v1alpha.MetricValues
-	(*PodMetrics)(nil),                    // 18: xas.v1alpha.PodMetrics
-	(*ControlMetrics)(nil),                // 19: xas.v1alpha.ControlMetrics
-	(*UpdateRecommenderStateRequest)(nil), // 20: xas.v1alpha.UpdateRecommenderStateRequest
-	(*ResourceRecommendation)(nil),        // 21: xas.v1alpha.ResourceRecommendation
-	(*PodResourceRecommendation)(nil),     // 22: xas.v1alpha.PodResourceRecommendation
-	(*RecommenderVote)(nil),               // 23: xas.v1alpha.RecommenderVote
-	(*RecommenderState)(nil),              // 24: xas.v1alpha.RecommenderState
-	(*RecommenderStatus)(nil),             // 25: xas.v1alpha.RecommenderStatus
-	(*GetRecommendationRequest)(nil),      // 26: xas.v1alpha.GetRecommendationRequest
-	(*GetRecommendationResponse)(nil),     // 27: xas.v1alpha.GetRecommendationResponse
-	(*Recommendation)(nil),                // 28: xas.v1alpha.Recommendation
-	(*MetricStatus)(nil),                  // 29: xas.v1alpha.MetricStatus
-	(*IngestMetricsRequest)(nil),          // 30: xas.v1alpha.IngestMetricsRequest
-	(*PolicyBatch)(nil),                   // 31: xas.v1alpha.PolicyBatch
-	(*MetricBatch)(nil),                   // 32: xas.v1alpha.MetricBatch
-	(*MetricSample)(nil),                  // 33: xas.v1alpha.MetricSample
-	(*IngestMetricsResponse)(nil),         // 34: xas.v1alpha.IngestMetricsResponse
-	nil,                                   // 35: xas.v1alpha.MetricDefinition.ParamsEntry
-	nil,                                   // 36: xas.v1alpha.MetricDefinition.FilterEntry
-	nil,                                   // 37: xas.v1alpha.RecommenderDefinition.ParamsEntry
-	nil,                                   // 38: xas.v1alpha.MetricValues.ValuesEntry
-	nil,                                   // 39: xas.v1alpha.PodMetrics.ContainerMetricsEntry
-	nil,                                   // 40: xas.v1alpha.ControlMetrics.ValuesEntry
-	nil,                                   // 41: xas.v1alpha.ControlMetrics.PodMetricsEntry
-	nil,                                   // 42: xas.v1alpha.ResourceRecommendation.RequestsEntry
-	nil,                                   // 43: xas.v1alpha.ResourceRecommendation.LimitsEntry
-	nil,                                   // 44: xas.v1alpha.PodResourceRecommendation.RequestsEntry
-	nil,                                   // 45: xas.v1alpha.PodResourceRecommendation.LimitsEntry
-	nil,                                   // 46: xas.v1alpha.RecommenderState.ConfigEntry
-	nil,                                   // 47: xas.v1alpha.MetricSample.LabelsEntry
-	nil,                                   // 48: xas.v1alpha.MetricSample.HistogramBucketsEntry
-	(*timestamppb.Timestamp)(nil),         // 49: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),                 // 50: google.protobuf.Empty
+	(*ContainerState)(nil),                // 16: xas.v1alpha.ContainerState
+	(*GetControlMetricsRequest)(nil),      // 17: xas.v1alpha.GetControlMetricsRequest
+	(*MetricValues)(nil),                  // 18: xas.v1alpha.MetricValues
+	(*PodMetrics)(nil),                    // 19: xas.v1alpha.PodMetrics
+	(*ControlMetrics)(nil),                // 20: xas.v1alpha.ControlMetrics
+	(*UpdateRecommenderStateRequest)(nil), // 21: xas.v1alpha.UpdateRecommenderStateRequest
+	(*ResourceRecommendation)(nil),        // 22: xas.v1alpha.ResourceRecommendation
+	(*PodResourceRecommendation)(nil),     // 23: xas.v1alpha.PodResourceRecommendation
+	(*RecommenderVote)(nil),               // 24: xas.v1alpha.RecommenderVote
+	(*RecommenderState)(nil),              // 25: xas.v1alpha.RecommenderState
+	(*RecommenderStatus)(nil),             // 26: xas.v1alpha.RecommenderStatus
+	(*GetRecommendationRequest)(nil),      // 27: xas.v1alpha.GetRecommendationRequest
+	(*GetRecommendationResponse)(nil),     // 28: xas.v1alpha.GetRecommendationResponse
+	(*Recommendation)(nil),                // 29: xas.v1alpha.Recommendation
+	(*MetricStatus)(nil),                  // 30: xas.v1alpha.MetricStatus
+	(*IngestMetricsRequest)(nil),          // 31: xas.v1alpha.IngestMetricsRequest
+	(*PolicyBatch)(nil),                   // 32: xas.v1alpha.PolicyBatch
+	(*MetricBatch)(nil),                   // 33: xas.v1alpha.MetricBatch
+	(*MetricSample)(nil),                  // 34: xas.v1alpha.MetricSample
+	(*IngestMetricsResponse)(nil),         // 35: xas.v1alpha.IngestMetricsResponse
+	nil,                                   // 36: xas.v1alpha.MetricDefinition.ParamsEntry
+	nil,                                   // 37: xas.v1alpha.MetricDefinition.FilterEntry
+	nil,                                   // 38: xas.v1alpha.RecommenderDefinition.ParamsEntry
+	nil,                                   // 39: xas.v1alpha.ContainerState.RequestsEntry
+	nil,                                   // 40: xas.v1alpha.MetricValues.ValuesEntry
+	nil,                                   // 41: xas.v1alpha.PodMetrics.ContainerMetricsEntry
+	nil,                                   // 42: xas.v1alpha.ControlMetrics.ValuesEntry
+	nil,                                   // 43: xas.v1alpha.ControlMetrics.PodMetricsEntry
+	nil,                                   // 44: xas.v1alpha.ResourceRecommendation.RequestsEntry
+	nil,                                   // 45: xas.v1alpha.ResourceRecommendation.LimitsEntry
+	nil,                                   // 46: xas.v1alpha.PodResourceRecommendation.RequestsEntry
+	nil,                                   // 47: xas.v1alpha.PodResourceRecommendation.LimitsEntry
+	nil,                                   // 48: xas.v1alpha.RecommenderState.ConfigEntry
+	nil,                                   // 49: xas.v1alpha.MetricSample.LabelsEntry
+	nil,                                   // 50: xas.v1alpha.MetricSample.HistogramBucketsEntry
+	(*timestamppb.Timestamp)(nil),         // 51: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),                 // 52: google.protobuf.Empty
 }
 var file_xas_proto_depIdxs = []int32{
 	5,  // 0: xas.v1alpha.UpdatePolicyRequest.policy:type_name -> xas.v1alpha.Policy
@@ -2590,67 +2669,69 @@ var file_xas_proto_depIdxs = []int32{
 	7,  // 5: xas.v1alpha.Policy.metrics:type_name -> xas.v1alpha.MetricDefinition
 	12, // 6: xas.v1alpha.Policy.activation:type_name -> xas.v1alpha.RecommenderDefinition
 	12, // 7: xas.v1alpha.Policy.scaling:type_name -> xas.v1alpha.RecommenderDefinition
-	35, // 8: xas.v1alpha.MetricDefinition.params:type_name -> xas.v1alpha.MetricDefinition.ParamsEntry
-	36, // 9: xas.v1alpha.MetricDefinition.filter:type_name -> xas.v1alpha.MetricDefinition.FilterEntry
+	36, // 8: xas.v1alpha.MetricDefinition.params:type_name -> xas.v1alpha.MetricDefinition.ParamsEntry
+	37, // 9: xas.v1alpha.MetricDefinition.filter:type_name -> xas.v1alpha.MetricDefinition.FilterEntry
 	8,  // 10: xas.v1alpha.MetricDefinition.gauge:type_name -> xas.v1alpha.Gauge
 	9,  // 11: xas.v1alpha.MetricDefinition.rate:type_name -> xas.v1alpha.Rate
 	10, // 12: xas.v1alpha.MetricDefinition.distribution:type_name -> xas.v1alpha.Distribution
 	11, // 13: xas.v1alpha.MetricDefinition.decaying_distribution:type_name -> xas.v1alpha.DecayingDistribution
-	37, // 14: xas.v1alpha.RecommenderDefinition.params:type_name -> xas.v1alpha.RecommenderDefinition.ParamsEntry
+	38, // 14: xas.v1alpha.RecommenderDefinition.params:type_name -> xas.v1alpha.RecommenderDefinition.ParamsEntry
 	0,  // 15: xas.v1alpha.UpdateWorkloadRequest.id:type_name -> xas.v1alpha.PolicyId
 	14, // 16: xas.v1alpha.UpdateWorkloadRequest.workload:type_name -> xas.v1alpha.Workload
 	15, // 17: xas.v1alpha.Workload.pods:type_name -> xas.v1alpha.PodState
-	0,  // 18: xas.v1alpha.GetControlMetricsRequest.id:type_name -> xas.v1alpha.PolicyId
-	38, // 19: xas.v1alpha.MetricValues.values:type_name -> xas.v1alpha.MetricValues.ValuesEntry
-	17, // 20: xas.v1alpha.PodMetrics.values:type_name -> xas.v1alpha.MetricValues
-	39, // 21: xas.v1alpha.PodMetrics.container_metrics:type_name -> xas.v1alpha.PodMetrics.ContainerMetricsEntry
-	40, // 22: xas.v1alpha.ControlMetrics.values:type_name -> xas.v1alpha.ControlMetrics.ValuesEntry
-	41, // 23: xas.v1alpha.ControlMetrics.pod_metrics:type_name -> xas.v1alpha.ControlMetrics.PodMetricsEntry
-	0,  // 24: xas.v1alpha.UpdateRecommenderStateRequest.id:type_name -> xas.v1alpha.PolicyId
-	23, // 25: xas.v1alpha.UpdateRecommenderStateRequest.vote:type_name -> xas.v1alpha.RecommenderVote
-	42, // 26: xas.v1alpha.ResourceRecommendation.requests:type_name -> xas.v1alpha.ResourceRecommendation.RequestsEntry
-	43, // 27: xas.v1alpha.ResourceRecommendation.limits:type_name -> xas.v1alpha.ResourceRecommendation.LimitsEntry
-	44, // 28: xas.v1alpha.PodResourceRecommendation.requests:type_name -> xas.v1alpha.PodResourceRecommendation.RequestsEntry
-	45, // 29: xas.v1alpha.PodResourceRecommendation.limits:type_name -> xas.v1alpha.PodResourceRecommendation.LimitsEntry
-	21, // 30: xas.v1alpha.RecommenderVote.workload_resources:type_name -> xas.v1alpha.ResourceRecommendation
-	22, // 31: xas.v1alpha.RecommenderVote.pod_resources:type_name -> xas.v1alpha.PodResourceRecommendation
-	46, // 32: xas.v1alpha.RecommenderState.config:type_name -> xas.v1alpha.RecommenderState.ConfigEntry
-	25, // 33: xas.v1alpha.RecommenderState.status:type_name -> xas.v1alpha.RecommenderStatus
-	49, // 34: xas.v1alpha.RecommenderStatus.last_updated:type_name -> google.protobuf.Timestamp
-	21, // 35: xas.v1alpha.RecommenderStatus.workload_resources:type_name -> xas.v1alpha.ResourceRecommendation
-	22, // 36: xas.v1alpha.RecommenderStatus.pod_resources:type_name -> xas.v1alpha.PodResourceRecommendation
-	0,  // 37: xas.v1alpha.GetRecommendationRequest.id:type_name -> xas.v1alpha.PolicyId
-	28, // 38: xas.v1alpha.GetRecommendationResponse.recommendation:type_name -> xas.v1alpha.Recommendation
-	29, // 39: xas.v1alpha.GetRecommendationResponse.metric_statuses:type_name -> xas.v1alpha.MetricStatus
-	25, // 40: xas.v1alpha.Recommendation.explanation:type_name -> xas.v1alpha.RecommenderStatus
-	31, // 41: xas.v1alpha.IngestMetricsRequest.policies:type_name -> xas.v1alpha.PolicyBatch
-	32, // 42: xas.v1alpha.PolicyBatch.batches:type_name -> xas.v1alpha.MetricBatch
-	33, // 43: xas.v1alpha.MetricBatch.samples:type_name -> xas.v1alpha.MetricSample
-	47, // 44: xas.v1alpha.MetricSample.labels:type_name -> xas.v1alpha.MetricSample.LabelsEntry
-	48, // 45: xas.v1alpha.MetricSample.histogram_buckets:type_name -> xas.v1alpha.MetricSample.HistogramBucketsEntry
-	17, // 46: xas.v1alpha.PodMetrics.ContainerMetricsEntry.value:type_name -> xas.v1alpha.MetricValues
-	18, // 47: xas.v1alpha.ControlMetrics.PodMetricsEntry.value:type_name -> xas.v1alpha.PodMetrics
-	1,  // 48: xas.v1alpha.XASControlPlane.UpdatePolicy:input_type -> xas.v1alpha.UpdatePolicyRequest
-	2,  // 49: xas.v1alpha.XASControlPlane.DeletePolicy:input_type -> xas.v1alpha.DeletePolicyRequest
-	3,  // 50: xas.v1alpha.XASControlPlane.ListPolicies:input_type -> xas.v1alpha.ListPoliciesRequest
-	13, // 51: xas.v1alpha.XASControlPlane.UpdateWorkload:input_type -> xas.v1alpha.UpdateWorkloadRequest
-	16, // 52: xas.v1alpha.XASControlPlane.GetControlMetrics:input_type -> xas.v1alpha.GetControlMetricsRequest
-	20, // 53: xas.v1alpha.XASControlPlane.UpdateRecommenderState:input_type -> xas.v1alpha.UpdateRecommenderStateRequest
-	26, // 54: xas.v1alpha.XASControlPlane.GetRecommendation:input_type -> xas.v1alpha.GetRecommendationRequest
-	30, // 55: xas.v1alpha.XASControlPlane.IngestMetrics:input_type -> xas.v1alpha.IngestMetricsRequest
-	5,  // 56: xas.v1alpha.XASControlPlane.UpdatePolicy:output_type -> xas.v1alpha.Policy
-	50, // 57: xas.v1alpha.XASControlPlane.DeletePolicy:output_type -> google.protobuf.Empty
-	4,  // 58: xas.v1alpha.XASControlPlane.ListPolicies:output_type -> xas.v1alpha.ListPoliciesResponse
-	14, // 59: xas.v1alpha.XASControlPlane.UpdateWorkload:output_type -> xas.v1alpha.Workload
-	19, // 60: xas.v1alpha.XASControlPlane.GetControlMetrics:output_type -> xas.v1alpha.ControlMetrics
-	24, // 61: xas.v1alpha.XASControlPlane.UpdateRecommenderState:output_type -> xas.v1alpha.RecommenderState
-	27, // 62: xas.v1alpha.XASControlPlane.GetRecommendation:output_type -> xas.v1alpha.GetRecommendationResponse
-	34, // 63: xas.v1alpha.XASControlPlane.IngestMetrics:output_type -> xas.v1alpha.IngestMetricsResponse
-	56, // [56:64] is the sub-list for method output_type
-	48, // [48:56] is the sub-list for method input_type
-	48, // [48:48] is the sub-list for extension type_name
-	48, // [48:48] is the sub-list for extension extendee
-	0,  // [0:48] is the sub-list for field type_name
+	16, // 18: xas.v1alpha.PodState.containers:type_name -> xas.v1alpha.ContainerState
+	39, // 19: xas.v1alpha.ContainerState.requests:type_name -> xas.v1alpha.ContainerState.RequestsEntry
+	0,  // 20: xas.v1alpha.GetControlMetricsRequest.id:type_name -> xas.v1alpha.PolicyId
+	40, // 21: xas.v1alpha.MetricValues.values:type_name -> xas.v1alpha.MetricValues.ValuesEntry
+	18, // 22: xas.v1alpha.PodMetrics.values:type_name -> xas.v1alpha.MetricValues
+	41, // 23: xas.v1alpha.PodMetrics.container_metrics:type_name -> xas.v1alpha.PodMetrics.ContainerMetricsEntry
+	42, // 24: xas.v1alpha.ControlMetrics.values:type_name -> xas.v1alpha.ControlMetrics.ValuesEntry
+	43, // 25: xas.v1alpha.ControlMetrics.pod_metrics:type_name -> xas.v1alpha.ControlMetrics.PodMetricsEntry
+	0,  // 26: xas.v1alpha.UpdateRecommenderStateRequest.id:type_name -> xas.v1alpha.PolicyId
+	24, // 27: xas.v1alpha.UpdateRecommenderStateRequest.vote:type_name -> xas.v1alpha.RecommenderVote
+	44, // 28: xas.v1alpha.ResourceRecommendation.requests:type_name -> xas.v1alpha.ResourceRecommendation.RequestsEntry
+	45, // 29: xas.v1alpha.ResourceRecommendation.limits:type_name -> xas.v1alpha.ResourceRecommendation.LimitsEntry
+	46, // 30: xas.v1alpha.PodResourceRecommendation.requests:type_name -> xas.v1alpha.PodResourceRecommendation.RequestsEntry
+	47, // 31: xas.v1alpha.PodResourceRecommendation.limits:type_name -> xas.v1alpha.PodResourceRecommendation.LimitsEntry
+	22, // 32: xas.v1alpha.RecommenderVote.workload_resources:type_name -> xas.v1alpha.ResourceRecommendation
+	23, // 33: xas.v1alpha.RecommenderVote.pod_resources:type_name -> xas.v1alpha.PodResourceRecommendation
+	48, // 34: xas.v1alpha.RecommenderState.config:type_name -> xas.v1alpha.RecommenderState.ConfigEntry
+	26, // 35: xas.v1alpha.RecommenderState.status:type_name -> xas.v1alpha.RecommenderStatus
+	51, // 36: xas.v1alpha.RecommenderStatus.last_updated:type_name -> google.protobuf.Timestamp
+	22, // 37: xas.v1alpha.RecommenderStatus.workload_resources:type_name -> xas.v1alpha.ResourceRecommendation
+	23, // 38: xas.v1alpha.RecommenderStatus.pod_resources:type_name -> xas.v1alpha.PodResourceRecommendation
+	0,  // 39: xas.v1alpha.GetRecommendationRequest.id:type_name -> xas.v1alpha.PolicyId
+	29, // 40: xas.v1alpha.GetRecommendationResponse.recommendation:type_name -> xas.v1alpha.Recommendation
+	30, // 41: xas.v1alpha.GetRecommendationResponse.metric_statuses:type_name -> xas.v1alpha.MetricStatus
+	26, // 42: xas.v1alpha.Recommendation.explanation:type_name -> xas.v1alpha.RecommenderStatus
+	32, // 43: xas.v1alpha.IngestMetricsRequest.policies:type_name -> xas.v1alpha.PolicyBatch
+	33, // 44: xas.v1alpha.PolicyBatch.batches:type_name -> xas.v1alpha.MetricBatch
+	34, // 45: xas.v1alpha.MetricBatch.samples:type_name -> xas.v1alpha.MetricSample
+	49, // 46: xas.v1alpha.MetricSample.labels:type_name -> xas.v1alpha.MetricSample.LabelsEntry
+	50, // 47: xas.v1alpha.MetricSample.histogram_buckets:type_name -> xas.v1alpha.MetricSample.HistogramBucketsEntry
+	18, // 48: xas.v1alpha.PodMetrics.ContainerMetricsEntry.value:type_name -> xas.v1alpha.MetricValues
+	19, // 49: xas.v1alpha.ControlMetrics.PodMetricsEntry.value:type_name -> xas.v1alpha.PodMetrics
+	1,  // 50: xas.v1alpha.XASControlPlane.UpdatePolicy:input_type -> xas.v1alpha.UpdatePolicyRequest
+	2,  // 51: xas.v1alpha.XASControlPlane.DeletePolicy:input_type -> xas.v1alpha.DeletePolicyRequest
+	3,  // 52: xas.v1alpha.XASControlPlane.ListPolicies:input_type -> xas.v1alpha.ListPoliciesRequest
+	13, // 53: xas.v1alpha.XASControlPlane.UpdateWorkload:input_type -> xas.v1alpha.UpdateWorkloadRequest
+	17, // 54: xas.v1alpha.XASControlPlane.GetControlMetrics:input_type -> xas.v1alpha.GetControlMetricsRequest
+	21, // 55: xas.v1alpha.XASControlPlane.UpdateRecommenderState:input_type -> xas.v1alpha.UpdateRecommenderStateRequest
+	27, // 56: xas.v1alpha.XASControlPlane.GetRecommendation:input_type -> xas.v1alpha.GetRecommendationRequest
+	31, // 57: xas.v1alpha.XASControlPlane.IngestMetrics:input_type -> xas.v1alpha.IngestMetricsRequest
+	5,  // 58: xas.v1alpha.XASControlPlane.UpdatePolicy:output_type -> xas.v1alpha.Policy
+	52, // 59: xas.v1alpha.XASControlPlane.DeletePolicy:output_type -> google.protobuf.Empty
+	4,  // 60: xas.v1alpha.XASControlPlane.ListPolicies:output_type -> xas.v1alpha.ListPoliciesResponse
+	14, // 61: xas.v1alpha.XASControlPlane.UpdateWorkload:output_type -> xas.v1alpha.Workload
+	20, // 62: xas.v1alpha.XASControlPlane.GetControlMetrics:output_type -> xas.v1alpha.ControlMetrics
+	25, // 63: xas.v1alpha.XASControlPlane.UpdateRecommenderState:output_type -> xas.v1alpha.RecommenderState
+	28, // 64: xas.v1alpha.XASControlPlane.GetRecommendation:output_type -> xas.v1alpha.GetRecommendationResponse
+	35, // 65: xas.v1alpha.XASControlPlane.IngestMetrics:output_type -> xas.v1alpha.IngestMetricsResponse
+	58, // [58:66] is the sub-list for method output_type
+	50, // [50:58] is the sub-list for method input_type
+	50, // [50:50] is the sub-list for extension type_name
+	50, // [50:50] is the sub-list for extension extendee
+	0,  // [0:50] is the sub-list for field type_name
 }
 
 func init() { file_xas_proto_init() }
@@ -2658,16 +2739,16 @@ func file_xas_proto_init() {
 	if File_xas_proto != nil {
 		return
 	}
-	file_xas_proto_msgTypes[23].OneofWrappers = []any{}
-	file_xas_proto_msgTypes[25].OneofWrappers = []any{}
-	file_xas_proto_msgTypes[28].OneofWrappers = []any{}
+	file_xas_proto_msgTypes[24].OneofWrappers = []any{}
+	file_xas_proto_msgTypes[26].OneofWrappers = []any{}
+	file_xas_proto_msgTypes[29].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_xas_proto_rawDesc), len(file_xas_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   49,
+			NumMessages:   51,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
