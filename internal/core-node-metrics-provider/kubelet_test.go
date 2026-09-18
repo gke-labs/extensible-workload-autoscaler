@@ -74,12 +74,12 @@ func TestProcessKubeletMetric(t *testing.T) {
 				{
 					PodName:       "test-pod",
 					ContainerName: "main",
-					Samples:       []*pb.MetricSample{{Name: "cpu_cores", Value: 0.1, Timestamp: 1000010}},
+					Samples:       []*pb.MetricSample{{Name: "cpu_cores", ResourceName: "cpu", Value: 0.1, Timestamp: 1000010}},
 				},
 				{
 					PodName:       "test-pod",
 					ContainerName: "sidecar",
-					Samples:       []*pb.MetricSample{{Name: "cpu_cores", Value: 0.05, Timestamp: 1000010}},
+					Samples:       []*pb.MetricSample{{Name: "cpu_cores", ResourceName: "cpu", Value: 0.05, Timestamp: 1000010}},
 				},
 			},
 		},
@@ -110,12 +110,12 @@ func TestProcessKubeletMetric(t *testing.T) {
 				{
 					PodName:       "test-pod",
 					ContainerName: "main",
-					Samples:       []*pb.MetricSample{{Name: "cpu_util", Value: 1.0, Timestamp: 1000010}},
+					Samples:       []*pb.MetricSample{{Name: "cpu_util", ResourceName: "cpu", Value: 1.0, Timestamp: 1000010}},
 				},
 				{
 					PodName:       "test-pod",
 					ContainerName: "sidecar",
-					Samples:       []*pb.MetricSample{{Name: "cpu_util", Value: 1.0, Timestamp: 1000010}},
+					Samples:       []*pb.MetricSample{{Name: "cpu_util", ResourceName: "cpu", Value: 1.0, Timestamp: 1000010}},
 				},
 			},
 		},
@@ -132,7 +132,7 @@ func TestProcessKubeletMetric(t *testing.T) {
 			want: []*pb.MetricBatch{{
 				PodName:       "test-pod",
 				ContainerName: "main",
-				Samples:       []*pb.MetricSample{{Name: "mem_bytes", Value: 1048576, Timestamp: 1000000}},
+				Samples:       []*pb.MetricSample{{Name: "mem_bytes", ResourceName: "memory", Value: 1048576, Timestamp: 1000000}},
 			}},
 		},
 		{
@@ -149,7 +149,7 @@ func TestProcessKubeletMetric(t *testing.T) {
 			want: []*pb.MetricBatch{{
 				PodName:       "test-pod",
 				ContainerName: "main",
-				Samples:       []*pb.MetricSample{{Name: "mem_util", Value: 0.5, Timestamp: 1000000}},
+				Samples:       []*pb.MetricSample{{Name: "mem_util", ResourceName: "memory", Value: 0.5, Timestamp: 1000000}},
 			}},
 		},
 		{
@@ -172,12 +172,12 @@ func TestProcessKubeletMetric(t *testing.T) {
 				{
 					PodName:       "test-pod",
 					ContainerName: "main",
-					Samples:       []*pb.MetricSample{{Name: "cpu_per_container", Value: 1.0, Timestamp: 1000010}},
+					Samples:       []*pb.MetricSample{{Name: "cpu_per_container", ResourceName: "cpu", Value: 1.0, Timestamp: 1000010}},
 				},
 				{
 					PodName:       "test-pod",
 					ContainerName: "sidecar",
-					Samples:       []*pb.MetricSample{{Name: "cpu_per_container", Value: 0.01, Timestamp: 1000010}},
+					Samples:       []*pb.MetricSample{{Name: "cpu_per_container", ResourceName: "cpu", Value: 0.01, Timestamp: 1000010}},
 				},
 			},
 		},

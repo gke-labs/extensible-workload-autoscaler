@@ -425,6 +425,8 @@ message MetricSample {
   string name = 1;
   // Labels associated with the sample.
   map<string, string> labels = 2;
+  // For resource metrics (e.g. "cpu" or "memory"), the resource name.
+  string resource_name = 8;
   // The scalar value of the sample.
   double value = 3;
   // Timestamp of the sample (Unix seconds).

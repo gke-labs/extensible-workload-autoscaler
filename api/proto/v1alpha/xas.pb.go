@@ -2228,6 +2228,8 @@ type MetricSample struct {
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Labels associated with the sample.
 	Labels map[string]string `protobuf:"bytes,2,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// For resource metrics (e.g. "cpu" or "memory"), the resource name.
+	ResourceName string `protobuf:"bytes,8,opt,name=resource_name,json=resourceName,proto3" json:"resource_name,omitempty"`
 	// The scalar value of the sample.
 	Value float64 `protobuf:"fixed64,3,opt,name=value,proto3" json:"value,omitempty"`
 	// Timestamp of the sample (Unix seconds).
@@ -2284,6 +2286,13 @@ func (x *MetricSample) GetLabels() map[string]string {
 		return x.Labels
 	}
 	return nil
+}
+
+func (x *MetricSample) GetResourceName() string {
+	if x != nil {
+		return x.ResourceName
+	}
+	return ""
 }
 
 func (x *MetricSample) GetValue() float64 {
@@ -2565,10 +2574,11 @@ const file_xas_proto_rawDesc = "" +
 	"\vMetricBatch\x12\x19\n" +
 	"\bpod_name\x18\x01 \x01(\tR\apodName\x12%\n" +
 	"\x0econtainer_name\x18\x03 \x01(\tR\rcontainerName\x123\n" +
-	"\asamples\x18\x02 \x03(\v2\x19.xas.v1alpha.MetricSampleR\asamples\"\xc1\x03\n" +
+	"\asamples\x18\x02 \x03(\v2\x19.xas.v1alpha.MetricSampleR\asamples\"\xe6\x03\n" +
 	"\fMetricSample\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12=\n" +
-	"\x06labels\x18\x02 \x03(\v2%.xas.v1alpha.MetricSample.LabelsEntryR\x06labels\x12\x14\n" +
+	"\x06labels\x18\x02 \x03(\v2%.xas.v1alpha.MetricSample.LabelsEntryR\x06labels\x12#\n" +
+	"\rresource_name\x18\b \x01(\tR\fresourceName\x12\x14\n" +
 	"\x05value\x18\x03 \x01(\x01R\x05value\x12\x1c\n" +
 	"\ttimestamp\x18\x04 \x01(\x03R\ttimestamp\x12\\\n" +
 	"\x11histogram_buckets\x18\x05 \x03(\v2/.xas.v1alpha.MetricSample.HistogramBucketsEntryR\x10histogramBuckets\x12#\n" +
