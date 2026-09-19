@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
@@ -462,6 +463,7 @@ func TestDump(t *testing.T) {
         "p1||": {
           "PodName": "p1",
           "ContainerName": "",
+          "ResourceName": "",
           "Labels": null,
           "LastRaw": {
             "Timestamp": 1000,
@@ -900,4 +902,97 @@ func TestPodScopedDecayingHistogram(t *testing.T) {
 	if p2Val := cm.PodMetrics["p2"].Values.Values["cpu"]; p2Val < 1.5 {
 		t.Errorf("Pod 2 scoped metric: Want >= 1.5, Got %f", p2Val)
 	}
+}
+
+func TestContainerResourceRequestWeighting(t *testing.T) {
+	start := time.Unix(1000, 0)
+	clk := &clock.FakeClock{CurrentTime: start}
+	s := store.NewMemoryStoreWithClock(clk)
+	ns, pol := "default", "weighted-pol"
+	id := &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol}
+
+	policy := &pb.Policy{
+		Id: id,
+		Metrics: []*pb.MetricDefinition{
+			{
+				Name:  "cpu_util",
+				Scope: "Container",
+				Gauge: &pb.Gauge{Aggregation: "Avg"},
+			},
+		},
+		Workload: &pb.WorkloadRef{Name: "app"},
+	}
+	s.SetPolicy("default", policy)
+
+	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
+		Id: id,
+		Workload: &pb.Workload{Pods: []*pb.PodState{
+			{
+				Name:    "p1",
+				IsReady: true,
+				Containers: []*pb.ContainerState{
+					{Name: "c1", Requests: map[string]string{"cpu": "100m"}},
+					{Name: "c2", Requests: map[string]string{"cpu": "300m"}},
+				},
+			},
+			{
+				Name:    "p2",
+				IsReady: true,
+				Containers: []*pb.ContainerState{
+					{Name: "c1", Requests: map[string]string{"cpu": "200m"}},
+					// c2 has no cpu request: its samples must be dropped.
+					{Name: "c2", Requests: map[string]string{"memory": "100Mi"}},
+				},
+			},
+		}},
+	})
+
+	ts := clk.Now().Unix()
+	ingestResource(s, ts, ns, pol, "p1", "c1", "cpu_util", "cpu", 0.5)
+	ingestResource(s, ts, ns, pol, "p1", "c2", "cpu_util", "cpu", 0.1)
+	ingestResource(s, ts, ns, pol, "p2", "c1", "cpu_util", "cpu", 0.4)
+	ingestResource(s, ts, ns, pol, "p2", "c2", "cpu_util", "cpu", 0.9)
+
+	s.CalculateAll()
+	cm, ok := s.GetControlMetrics(id)
+	if !ok {
+		t.Fatalf("No control metrics")
+	}
+
+	// p1: 0.5*(100/400) + 0.1*(300/400) = 0.2
+	if got, want := cm.PodMetrics["p1"].Values.Values["cpu_util"], 0.2; math.Abs(got-want) > 1e-9 {
+		t.Errorf("Pod p1 weighted value: Want %f, Got %f", want, got)
+	}
+	// p2: c2 is dropped, so c1 carries the full weight: 0.4*(200/200) = 0.4
+	if got, want := cm.PodMetrics["p2"].Values.Values["cpu_util"], 0.4; math.Abs(got-want) > 1e-9 {
+		t.Errorf("Pod p2 weighted value: Want %f, Got %f", want, got)
+	}
+
+	// The per-container breakdown keeps the raw (unweighted) values.
+	if got, want := cm.PodMetrics["p1"].ContainerMetrics["c2"].Values["cpu_util"], 0.1; math.Abs(got-want) > 1e-9 {
+		t.Errorf("Container p1/c2 value: Want %f, Got %f", want, got)
+	}
+	if _, exists := cm.PodMetrics["p2"].ContainerMetrics["c2"]; exists {
+		t.Errorf("Container p2/c2 has no cpu request, it should have been dropped")
+	}
+}
+
+func ingestResource(s *store.MemoryStore, ts int64, ns, pol, pod, container, metric, resourceName string, val float64) {
+	s.AddBatch(&pb.IngestMetricsRequest{
+		ClusterName: "default",
+		Timestamp:   ts,
+		Policies: []*pb.PolicyBatch{{
+			Namespace: ns, Name: pol,
+			Batches: []*pb.MetricBatch{{
+				PodName:       pod,
+				ContainerName: container,
+				Samples: []*pb.MetricSample{{
+					Name:         metric,
+					ResourceName: resourceName,
+					Value:        val,
+					Timestamp:    ts,
+				}},
+			}},
+		}},
+	})
 }

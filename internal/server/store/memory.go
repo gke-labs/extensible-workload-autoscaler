@@ -13,6 +13,7 @@ import (
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/metrics"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // Metric scopes define the granularity at which a metric is reported.
@@ -60,7 +61,9 @@ type Series struct {
 	// ContainerName is the container the samples originate from.
 	// Empty means the samples apply to the pod (or the policy) as a whole.
 	ContainerName string
-	Labels        map[string]string
+	// The name of the resource this metric describes (e.g. "cpu or "memory").
+	ResourceName string
+	Labels       map[string]string
 
 	// State
 	LastRaw       Sample
@@ -261,6 +264,7 @@ func (s *MemoryStore) processSample(ps *PolicyState, podName, containerName stri
 		ser = &Series{
 			PodName:       podName,
 			ContainerName: containerName,
+			ResourceName:  m.ResourceName,
 			Labels:        m.Labels,
 		}
 
@@ -657,6 +661,8 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, def *pb.MetricDefinition,
 	podFound := make(map[string]bool)
 	// PodName -> ContainerName -> value
 	containerSums := make(map[string]map[string]float64)
+	// Lazily computed weights of the containers' resource requests.
+	requestWeights := newRequestWeightCache()
 
 	// Determine effective type & aggregation
 	defType := "Gauge"
@@ -754,7 +760,19 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, def *pb.MetricDefinition,
 				val = ser.DecayingHistogram.Percentile(p, time.Unix(now, 0))
 			}
 
-			podSums[ser.PodName] += val
+			// When aggregating accross containers, resource metrics (e.g. "cpu") are weighted by the
+			// container's relative resource request. A container that does not declare a request
+			// for the resource has no meaningful weight, so its sample is dropped.
+			weightedVal := val
+			if ser.ResourceName != "" && ser.ContainerName != "" {
+				w, ok := requestWeights.weight(workload[ser.PodName], ser.ContainerName, ser.ResourceName)
+				if !ok {
+					continue
+				}
+				weightedVal = val * w
+			}
+
+			podSums[ser.PodName] += weightedVal
 			podFound[ser.PodName] = true
 
 			// The per-container breakdown is only reported for Container scope.
@@ -808,6 +826,67 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, def *pb.MetricDefinition,
 		}
 	}
 	return 0, nil, nil, false
+}
+
+// requestWeightCache memoizes the per-container request weights of a pod, keyed
+// by pod and resource name, so that the requests are only parsed once per
+// calculation cycle.
+type requestWeightCache map[string]map[string]float64
+
+func newRequestWeightCache() requestWeightCache {
+	return make(requestWeightCache)
+}
+
+// weight returns the share of the pod's total request for the given resource
+// that belongs to the given container. It reports false if the container does
+// not declare a usable request for the resource, in which case the caller
+// should drop the sample.
+func (c requestWeightCache) weight(pod *pb.PodState, containerName, resourceName string) (float64, bool) {
+	key := pod.GetName() + "|" + resourceName
+	weights, ok := c[key]
+	if !ok {
+		weights = containerRequestWeights(pod, resourceName)
+		c[key] = weights
+	}
+	w, ok := weights[containerName]
+	return w, ok
+}
+
+// containerRequestWeights returns, for every container of the pod declaring a
+// request for the given resource, the container's request relative to the sum
+// of the requests of all the pod's containers. Containers without a valid
+// (parseable, positive) request are absent from the result.
+func containerRequestWeights(pod *pb.PodState, resourceName string) map[string]float64 {
+	if pod == nil || resourceName == "" {
+		return nil
+	}
+
+	requests := make(map[string]float64, len(pod.Containers))
+	total := 0.0
+	for _, c := range pod.Containers {
+		raw, ok := c.Requests[resourceName]
+		if !ok {
+			continue
+		}
+		q, err := resource.ParseQuantity(raw)
+		if err != nil {
+			continue
+		}
+		v := q.AsApproximateFloat64()
+		if v <= 0 {
+			continue
+		}
+		requests[c.Name] = v
+		total += v
+	}
+
+	if total <= 0 {
+		return nil
+	}
+	for name, v := range requests {
+		requests[name] = v / total
+	}
+	return requests
 }
 
 func parsePercentile(s string) float64 {
