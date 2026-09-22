@@ -20,6 +20,7 @@ type VPARecommender struct{}
 
 // config holds the parsed configuration for this recommender instance
 type config struct {
+	containerName   string
 	cpuMetric       string
 	memMetric       string
 	cpuSafetyMargin float64
@@ -41,21 +42,29 @@ func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.C
 		}
 	}
 
-	if state == nil || state.Values == nil {
+	if state == nil {
 		return &pb.RecommenderVote{
 			IsActive: false,
 			Message:  "ControlMetrics is missing",
 		}
 	}
+	if len(state.PodContainerMetrics) == 0 {
+		return &pb.RecommenderVote{
+			IsActive: false,
+			Message:  "PodMetrics is empty (ensure metrics are configured with scope: Container)",
+		}
+	}
+
+	cpuMetricFound := false
+	memMetricFound := false
 
 	requests := make(map[string]string, 2)
 	limits := make(map[string]string, 2)
 
-	cpuMetricFound := false
-
 	// If cpuMetric is configured (is not empty):
 	if cfg.cpuMetric != "" {
-		val, found := state.Values[cfg.cpuMetric]
+		// Getting the max CPU usage value of that container across all pods
+		val, found := getMaxCPUVal(state.PodContainerMetrics, cfg)
 		if found {
 			// Convert CPU from fractional cores (e.g., 0.15) to millicores (e.g., 150m)
 			// with the safety margin, rounding up to the nearest whole millicore.
@@ -71,11 +80,8 @@ func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.C
 		}
 	}
 
-	// Setting default Mem MiB value
-	memMetricFound := false
-
 	if cfg.memMetric != "" {
-		val, found := state.Values[cfg.memMetric]
+		val, found := getMaxMemVal(state.PodContainerMetrics, cfg)
 		if found {
 			// Convert Memory from bytes (e.g., 268435456) to MiB (e.g., 256MiB)
 			// with the safety margin, rounding up to the nearest whole MiB.
@@ -103,8 +109,9 @@ func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.C
 		return &pb.RecommenderVote{
 			IsActive: true,
 			WorkloadResources: &pb.ResourceRecommendation{
-				Requests: requests,
-				Limits:   limits,
+				ContainerName: cfg.containerName,
+				Requests:      requests,
+				Limits:        limits,
 			},
 			Message: func() string {
 				if len(warnings) > 0 {
@@ -117,17 +124,64 @@ func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.C
 	}
 }
 
+func getMaxCPUVal(podMetrics map[string]*pb.ContainerMetrics, cfg *config) (float64, bool) {
+	var maxCPU float64
+	found := false
+
+	for _, podMetric := range podMetrics {
+		containerMetric, ok := podMetric.GetContainerMetrics()[cfg.containerName]
+		if !ok || containerMetric == nil {
+			continue
+		}
+		val, ok := containerMetric.Values[cfg.cpuMetric]
+		if ok {
+			if !found || val > maxCPU {
+				maxCPU = val
+			}
+			found = true
+		}
+	}
+	return maxCPU, found
+}
+
+func getMaxMemVal(podMetrics map[string]*pb.ContainerMetrics, cfg *config) (float64, bool) {
+	var maxMem float64
+	found := false
+
+	for _, podMetric := range podMetrics {
+		containerMetric, ok := podMetric.GetContainerMetrics()[cfg.containerName]
+		if !ok || containerMetric == nil {
+			continue
+		}
+		val, ok := containerMetric.Values[cfg.memMetric]
+		if ok {
+			if !found || val > maxMem {
+				maxMem = val
+			}
+			found = true
+		}
+	}
+	return maxMem, found
+}
+
 // parseConfig extracts and validates parameters from the recommender definition
 func parseConfig(def *pb.RecommenderDefinition) (*config, error) {
 	cpuMetric := def.Params["cpu-metric"]
 	memMetric := def.Params["mem-metric"]
+	container := def.Params["container"]
 
 	if cpuMetric == "" && memMetric == "" {
 		return nil, fmt.Errorf("cpu-metric and mem-metric are undefined. For VPA to work at least one of them needs to be defined.")
 	}
+	container = strings.TrimSpace(container)
+	if container == "" {
+		return nil, fmt.Errorf("container is undefined. For VPA to work, one container needs to be defined.")
+	}
+
 	config := &config{
 		cpuMetric:       cpuMetric,
 		memMetric:       memMetric,
+		containerName:   container,
 		cpuSafetyMargin: defaultCPUSafetyMarginFloat,
 		memSafetyMargin: defaultMemSafetyMarginFloat,
 	}
@@ -152,5 +206,6 @@ func parseConfig(def *pb.RecommenderDefinition) (*config, error) {
 			config.memSafetyMargin = memSafetyMarginFloat
 		}
 	}
+
 	return config, nil
 }

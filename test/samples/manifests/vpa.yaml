@@ -58,6 +58,7 @@ spec:
 
   metrics:
     - name: "cpu_p95"
+      scope: PodContainer
       provider: "kubelet"
       params:
         type: "cpu"
@@ -66,6 +67,7 @@ spec:
         halfLife: "24h"
         bucketSize: "0.05"
     - name: "mem_p95"
+      scope: PodContainer
       provider: "kubelet"
       params:
         type: "memory"
@@ -78,6 +80,7 @@ spec:
     - recommender: "vpa"
       name: "vpa-sizing"
       params:
+        container: "stress"
         cpu-metric: "cpu_p95"
         mem-metric: "mem_p95"
         cpu-safety-margin: "1.10"

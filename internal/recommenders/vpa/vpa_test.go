@@ -32,9 +32,72 @@ func TestRecommend(t *testing.T) {
 			wantMsgContains: "Unable to parse recommender configuration",
 		},
 		{
+			name: "Missing container name in params should return with error message in Message",
+			def: &pb.RecommenderDefinition{
+				Params: map[string]string{
+					"cpu-metric": "cpu_p95",
+					"mem-metric": "mem_p95",
+				},
+			},
+			state: &pb.ControlMetrics{},
+			want: &pb.RecommenderVote{
+				IsActive: false,
+			},
+			wantMsgContains: "container is undefined",
+		},
+		{
+			name: "Wrong container name (typo) not present in ContainerMetrics should return inactive vote",
+			def: &pb.RecommenderDefinition{
+				Params: map[string]string{
+					"container":  "wrong-container-name",
+					"cpu-metric": "cpu_p95",
+					"mem-metric": "mem_p95",
+				},
+			},
+			state: &pb.ControlMetrics{
+				PodContainerMetrics: map[string]*pb.ContainerMetrics{
+					"pod-1": {
+						ContainerMetrics: map[string]*pb.MetricValues{
+							"app": {
+								Values: map[string]float64{
+									"mem_p95": 268435456,
+									"cpu_p95": 0.5,
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &pb.RecommenderVote{
+				IsActive: false,
+			},
+			wantMsgContains: "No Recommendations generated",
+		},
+		{
+			name: "Missed scope: Container (metrics in Global Values instead of PodMetrics) should return PodMetrics is empty",
+			def: &pb.RecommenderDefinition{
+				Params: map[string]string{
+					"container":  "app",
+					"cpu-metric": "cpu_p95",
+					"mem-metric": "mem_p95",
+				},
+			},
+			state: &pb.ControlMetrics{
+				Values: map[string]float64{
+					"mem_p95": 268435456,
+					"cpu_p95": 0.5,
+				},
+			},
+			want: &pb.RecommenderVote{
+				IsActive: false,
+			},
+			wantMsgContains: "PodMetrics is empty",
+		},
+		{
 			name: "Missing state should return with error message in Message",
 			def: &pb.RecommenderDefinition{
 				Params: map[string]string{
+					"container":  "app",
 					"cpu-metric": "cpu_p95",
 					"mem-metric": "mem_p95",
 				},
@@ -46,9 +109,10 @@ func TestRecommend(t *testing.T) {
 			wantMsgContains: "ControlMetrics is missing",
 		},
 		{
-			name: "Missing state.Values should return with error message in Message",
+			name: "Missing state.PodMetrics should return with error message in Message",
 			def: &pb.RecommenderDefinition{
 				Params: map[string]string{
+					"container":  "app",
 					"cpu-metric": "cpu_p95",
 					"mem-metric": "mem_p95",
 				},
@@ -57,26 +121,36 @@ func TestRecommend(t *testing.T) {
 			want: &pb.RecommenderVote{
 				IsActive: false,
 			},
-			wantMsgContains: "ControlMetrics is missing",
+			wantMsgContains: "PodMetrics is empty",
 		},
 		{
 			name: "Missing cpu metric definition, present mem metric definition should result in message with warnings, request limit with no cpu values",
 			def: &pb.RecommenderDefinition{
 				Params: map[string]string{
+					"container":         "app",
 					"cpu-metric":        "cpup95", // bad metric name, not in state
 					"mem-metric":        "mem_p95",
 					"mem-safety-margin": "1.10",
 				},
 			},
 			state: &pb.ControlMetrics{
-				Values: map[string]float64{
-					"mem_p95": 268435456,
-					"cpu_p95": 0.5,
+				PodContainerMetrics: map[string]*pb.ContainerMetrics{
+					"pod-1": {
+						ContainerMetrics: map[string]*pb.MetricValues{
+							"app": {
+								Values: map[string]float64{
+									"mem_p95": 268435456,
+									"cpu_p95": 0.5,
+								},
+							},
+						},
+					},
 				},
 			},
 			want: &pb.RecommenderVote{
 				IsActive: true,
 				WorkloadResources: &pb.ResourceRecommendation{
+					ContainerName: "app",
 					Requests: map[string]string{
 						"memory": "282Mi",
 					},
@@ -91,6 +165,7 @@ func TestRecommend(t *testing.T) {
 			name: "Missing mem metric definition, present cpu metric definition should result in message with warnings, request limit with no mem values",
 			def: &pb.RecommenderDefinition{
 				Params: map[string]string{
+					"container":         "app",
 					"cpu-metric":        "cpu_p95",
 					"mem-metric":        "memp95", // bad metric name, not in state
 					"mem-safety-margin": "1.10",
@@ -98,14 +173,23 @@ func TestRecommend(t *testing.T) {
 				},
 			},
 			state: &pb.ControlMetrics{
-				Values: map[string]float64{
-					"mem_p95": 268435456,
-					"cpu_p95": 0.5,
+				PodContainerMetrics: map[string]*pb.ContainerMetrics{
+					"pod-1": {
+						ContainerMetrics: map[string]*pb.MetricValues{
+							"app": {
+								Values: map[string]float64{
+									"mem_p95": 268435456,
+									"cpu_p95": 0.5,
+								},
+							},
+						},
+					},
 				},
 			},
 			want: &pb.RecommenderVote{
 				IsActive: true,
 				WorkloadResources: &pb.ResourceRecommendation{
+					ContainerName: "app",
 					Requests: map[string]string{
 						"cpu": "550m",
 					},
@@ -120,6 +204,7 @@ func TestRecommend(t *testing.T) {
 			name: "Missing both cpu and mem metric definition should result in warning and nil WorkloadRecommendation",
 			def: &pb.RecommenderDefinition{
 				Params: map[string]string{
+					"container":         "app",
 					"cpu-metric":        "cpup95", // bad metric name, not in state
 					"mem-metric":        "memp95", // bad metric name, not in state
 					"mem-safety-margin": "1.10",
@@ -127,9 +212,17 @@ func TestRecommend(t *testing.T) {
 				},
 			},
 			state: &pb.ControlMetrics{
-				Values: map[string]float64{
-					"mem_p95": 268435456,
-					"cpu_p95": 0.5,
+				PodContainerMetrics: map[string]*pb.ContainerMetrics{
+					"pod-1": {
+						ContainerMetrics: map[string]*pb.MetricValues{
+							"app": {
+								Values: map[string]float64{
+									"mem_p95": 268435456,
+									"cpu_p95": 0.5,
+								},
+							},
+						},
+					},
 				},
 			},
 			want: &pb.RecommenderVote{
@@ -139,9 +232,10 @@ func TestRecommend(t *testing.T) {
 			wantMsgContains: "Unable to create recommendation as no value memory or cpu values were found",
 		},
 		{
-			name: "verify CPU and Mem fractional core math",
+			name: "verify CPU and Mem fractional core math and max aggregation across multiple pods",
 			def: &pb.RecommenderDefinition{
 				Params: map[string]string{
+					"container":         "app",
 					"cpu-metric":        "cpu_p95",
 					"mem-metric":        "mem_p95",
 					"mem-safety-margin": "1.10",
@@ -149,14 +243,39 @@ func TestRecommend(t *testing.T) {
 				},
 			},
 			state: &pb.ControlMetrics{
-				Values: map[string]float64{
-					"mem_p95": 268435456,
-					"cpu_p95": 0.5,
+				PodContainerMetrics: map[string]*pb.ContainerMetrics{
+					"pod-1": {
+						ContainerMetrics: map[string]*pb.MetricValues{
+							"app": {
+								Values: map[string]float64{
+									"mem_p95": 134217728, // 128 MiB (lower)
+									"cpu_p95": 0.5,       // 500m (higher)
+								},
+							},
+							"sidecar": {
+								Values: map[string]float64{
+									"mem_p95": 999999999, // ignored because container is "sidecar"
+									"cpu_p95": 4.0,
+								},
+							},
+						},
+					},
+					"pod-2": {
+						ContainerMetrics: map[string]*pb.MetricValues{
+							"app": {
+								Values: map[string]float64{
+									"mem_p95": 268435456, // 256 MiB (higher)
+									"cpu_p95": 0.2,       // 200m (lower)
+								},
+							},
+						},
+					},
 				},
 			},
 			want: &pb.RecommenderVote{
 				IsActive: true,
 				WorkloadResources: &pb.ResourceRecommendation{
+					ContainerName: "app",
 					Requests: map[string]string{
 						"cpu":    "550m",
 						"memory": "282Mi",
@@ -173,6 +292,7 @@ func TestRecommend(t *testing.T) {
 			name: "verify that low cpu and mem values are clamped by the floors",
 			def: &pb.RecommenderDefinition{
 				Params: map[string]string{
+					"container":         "app",
 					"cpu-metric":        "cpu_p95",
 					"mem-metric":        "mem_p95",
 					"mem-safety-margin": "1.10",
@@ -180,14 +300,23 @@ func TestRecommend(t *testing.T) {
 				},
 			},
 			state: &pb.ControlMetrics{
-				Values: map[string]float64{
-					"mem_p95": 1048576, // value too low, should get clamped at minMEMMiB
-					"cpu_p95": 0.005,   // value too low, should get clamped at minCPUMilli
+				PodContainerMetrics: map[string]*pb.ContainerMetrics{
+					"pod-1": {
+						ContainerMetrics: map[string]*pb.MetricValues{
+							"app": {
+								Values: map[string]float64{
+									"mem_p95": 1048576, // value too low, should get clamped at minMEMMiB
+									"cpu_p95": 0.005,   // value too low, should get clamped at minCPUMilli
+								},
+							},
+						},
+					},
 				},
 			},
 			want: &pb.RecommenderVote{
 				IsActive: true,
 				WorkloadResources: &pb.ResourceRecommendation{
+					ContainerName: "app",
 					Requests: map[string]string{
 						"cpu":    "10m",
 						"memory": "10Mi",
@@ -236,6 +365,7 @@ func TestParseConfig(t *testing.T) {
 			name: "valid config with both metrics and custom margins",
 			def: &pb.RecommenderDefinition{
 				Params: map[string]string{
+					"container":         "app",
 					"cpu-metric":        "cpu_p95",
 					"mem-metric":        "mem_p95",
 					"cpu-safety-margin": "1.25",
@@ -243,6 +373,7 @@ func TestParseConfig(t *testing.T) {
 				},
 			},
 			want: &config{
+				containerName:   "app",
 				cpuMetric:       "cpu_p95",
 				memMetric:       "mem_p95",
 				cpuSafetyMargin: 1.25,
@@ -254,11 +385,13 @@ func TestParseConfig(t *testing.T) {
 			name: "valid config with only mem metrics",
 			def: &pb.RecommenderDefinition{
 				Params: map[string]string{
+					"container":         "app",
 					"mem-metric":        "mem_p95",
 					"mem-safety-margin": "1.10",
 				},
 			},
 			want: &config{
+				containerName:   "app",
 				memMetric:       "mem_p95",
 				cpuSafetyMargin: 1.15,
 				memSafetyMargin: 1.10,
@@ -269,11 +402,13 @@ func TestParseConfig(t *testing.T) {
 			name: "valid config with only cpu metrics",
 			def: &pb.RecommenderDefinition{
 				Params: map[string]string{
+					"container":         "app",
 					"cpu-metric":        "cpu_p95",
 					"cpu-safety-margin": "1.10",
 				},
 			},
 			want: &config{
+				containerName:   "app",
 				cpuMetric:       "cpu_p95",
 				cpuSafetyMargin: 1.10,
 				memSafetyMargin: 1.15,
@@ -281,10 +416,21 @@ func TestParseConfig(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "invalid config with missing container",
+			def: &pb.RecommenderDefinition{
+				Params: map[string]string{
+					"cpu-metric": "cpu_p95",
+					"mem-metric": "mem_p95",
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
 			name: "invalid config with only no metrics",
 			def: &pb.RecommenderDefinition{
 				Params: map[string]string{
-					// missing cpu-metric and mem-metric
+					"container":         "app",
 					"mem-safety-margin": "1.25",
 					"cpu-safety-margin": "1.10",
 				},
