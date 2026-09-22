@@ -237,7 +237,7 @@ func TestMetricCalculations(t *testing.T) {
 
 			s.CalculateAll()
 
-			cm, _ := s.GetControlMetrics(&pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName})
+			cm, _ := s.GetControlMetrics(&pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, "")
 			got := make(map[string]float64)
 			if cm != nil {
 				got = cm.Values
@@ -516,7 +516,8 @@ func TestDump(t *testing.T) {
       },
       "timestamp": 1000,
       "ready_replicas": 1
-    }
+    },
+    "RecommenderControlMetrics": null
   }
 }`
 
@@ -573,7 +574,7 @@ func TestWindowedMetrics(t *testing.T) {
 	ingest(s, clk.Now().Unix(), ns, pol, "p1", "cpu_slide", 0.1)
 
 	s.CalculateAll()
-	cm, _ := s.GetControlMetrics(&pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol})
+	cm, _ := s.GetControlMetrics(&pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol}, "")
 
 	// Histogram should remember the 1.0 spike (approx 1.0 bucket upper bound -> 1.1)
 	// Sliding Window (Max) should see 1.0.
@@ -598,7 +599,7 @@ func TestWindowedMetrics(t *testing.T) {
 	ingest(s, clk.Now().Unix(), ns, pol, "p1", "cpu_slide", 0.2)
 
 	s.CalculateAll()
-	cm, _ = s.GetControlMetrics(&pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol})
+	cm, _ = s.GetControlMetrics(&pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol}, "")
 
 	// Gauge should see 0.2.
 	if cm.Values["cpu_slide"] != 0.2 {
@@ -648,7 +649,7 @@ func TestAggregatedDecayingHistogram(t *testing.T) {
 	ingest(s, clk.Now().Unix(), ns, pol, "p2", "cpu", 1.5)
 
 	s.CalculateAll()
-	cm, _ := s.GetControlMetrics(&pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol})
+	cm, _ := s.GetControlMetrics(&pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol}, "")
 	val := cm.Values["cpu"]
 
 	// If it's 1.1, it's per-pod aggregation (Avg of p95s).
@@ -733,12 +734,12 @@ func TestMultiTenantIsolation(t *testing.T) {
 	s.CalculateAll()
 
 	// 4. Verify Isolation
-	cmA, okA := s.GetControlMetrics(&pb.PolicyId{ClusterName: "cluster-A", Namespace: ns, Name: name})
+	cmA, okA := s.GetControlMetrics(&pb.PolicyId{ClusterName: "cluster-A", Namespace: ns, Name: name}, "")
 	if !okA || cmA.Values["m"] != 100 {
 		t.Errorf("Cluster A: Want 100, Got %v", cmA)
 	}
 
-	cmB, okB := s.GetControlMetrics(&pb.PolicyId{ClusterName: "cluster-B", Namespace: ns, Name: name})
+	cmB, okB := s.GetControlMetrics(&pb.PolicyId{ClusterName: "cluster-B", Namespace: ns, Name: name}, "")
 	if !okB || cmB.Values["m"] != 200 {
 		t.Errorf("Cluster B: Want 200, Got %v", cmB)
 	}
@@ -885,7 +886,7 @@ func TestPodScopedDecayingHistogram(t *testing.T) {
 	ingest(s, clk.Now().Unix(), ns, pol, "p2", "cpu", 1.5)
 
 	s.CalculateAll()
-	cm, _ := s.GetControlMetrics(&pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol})
+	cm, _ := s.GetControlMetrics(&pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol}, "")
 
 	if cm.Values["cpu"] != 0 {
 		t.Errorf("Pod scoped metric should not have a global value, got %f", cm.Values["cpu"])
@@ -954,7 +955,7 @@ func TestContainerResourceRequestWeighting(t *testing.T) {
 	ingestResource(s, ts, ns, pol, "p2", "c2", "cpu_util", "cpu", 0.9)
 
 	s.CalculateAll()
-	cm, ok := s.GetControlMetrics(id)
+	cm, ok := s.GetControlMetrics(id, "")
 	if !ok {
 		t.Fatalf("No control metrics")
 	}
@@ -995,4 +996,133 @@ func ingestResource(s *store.MemoryStore, ts int64, ns, pol, pod, container, met
 			}},
 		}},
 	})
+}
+
+// ingestOwned ingests a sample of a metric owned by a recommender.
+func ingestOwned(s *store.MemoryStore, ts int64, ns, pol, pod, owner, metric string, val float64) {
+	s.AddBatch(&pb.IngestMetricsRequest{
+		ClusterName: "default",
+		Timestamp:   ts,
+		Policies: []*pb.PolicyBatch{{
+			Namespace: ns, Name: pol,
+			Batches: []*pb.MetricBatch{{
+				PodName: pod,
+				Samples: []*pb.MetricSample{{
+					Name:            metric,
+					RecommenderName: owner,
+					Value:           val,
+					Timestamp:       ts,
+				}},
+			}},
+		}},
+	})
+}
+
+// TestRecommenderOwnedMetrics checks that metrics owned by a recommender are
+// aggregated like policy-wide ones, but only reported to their owner. A metric
+// is identified by the <name, recommender> pair, so the same name can be used
+// by several owners without them colliding.
+func TestRecommenderOwnedMetrics(t *testing.T) {
+	s := store.NewMemoryStore()
+	ns, name := "default", "pol"
+	id := &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: name}
+
+	pol := &pb.Policy{
+		Id: id,
+		Metrics: []*pb.MetricDefinition{
+			{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}},
+		},
+		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+			"vpa": {Definitions: []*pb.MetricDefinition{
+				{Name: "cpu", RecommenderName: "vpa", Gauge: &pb.Gauge{Aggregation: "Max"}},
+				{Name: "memory", RecommenderName: "vpa", Gauge: &pb.Gauge{Aggregation: "Avg"}},
+			}},
+			"hpa": {Definitions: []*pb.MetricDefinition{
+				{Name: "cpu", RecommenderName: "hpa", Gauge: &pb.Gauge{Aggregation: "Avg"}},
+			}},
+		},
+	}
+	s.SetPolicy("default", pol)
+	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
+		Id:       id,
+		Workload: &pb.Workload{Pods: []*pb.PodState{{Name: "p1", IsReady: true}, {Name: "p2", IsReady: true}}},
+	})
+
+	now := time.Now().Unix()
+	ingest(s, now, ns, name, "p1", "cpu", 1)
+	ingest(s, now, ns, name, "p2", "cpu", 3)
+	ingestOwned(s, now, ns, name, "p1", "vpa", "cpu", 10)
+	ingestOwned(s, now, ns, name, "p2", "vpa", "cpu", 30)
+	ingestOwned(s, now, ns, name, "p1", "vpa", "memory", 100)
+	ingestOwned(s, now, ns, name, "p1", "hpa", "cpu", 7)
+
+	s.CalculateAll()
+
+	tests := []struct {
+		recommender string
+		want        map[string]float64
+	}{
+		// Policy-wide metrics are unaffected by the owned ones: Avg(1, 3).
+		{recommender: "", want: map[string]float64{"cpu": 2}},
+		// Max(10, 30) with the owner's own aggregation, plus its own metric.
+		{recommender: "vpa", want: map[string]float64{"cpu": 30, "memory": 100}},
+		{recommender: "hpa", want: map[string]float64{"cpu": 7}},
+		// A recommender owning no metric still observes the workload.
+		{recommender: "other", want: map[string]float64{}},
+	}
+	for _, tc := range tests {
+		cm, ok := s.GetControlMetrics(id, tc.recommender)
+		if !ok {
+			t.Fatalf("GetControlMetrics(%q) not found", tc.recommender)
+		}
+		if diff := cmp.Diff(tc.want, cm.Values, cmpopts.EquateEmpty()); diff != "" {
+			t.Errorf("GetControlMetrics(%q) values mismatch (-want +got):\n%s", tc.recommender, diff)
+		}
+		if cm.ReadyReplicas != 2 {
+			t.Errorf("GetControlMetrics(%q) ready replicas = %d, want 2", tc.recommender, cm.ReadyReplicas)
+		}
+	}
+}
+
+// TestRecommenderOwnedMetricsCleanup checks that the series of a metric are
+// dropped once its owner stops declaring it.
+func TestRecommenderOwnedMetricsCleanup(t *testing.T) {
+	s := store.NewMemoryStore()
+	ns, name := "default", "pol"
+	id := &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: name}
+
+	pol := &pb.Policy{
+		Id: id,
+		Metrics: []*pb.MetricDefinition{
+			{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}},
+		},
+		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+			"vpa": {Definitions: []*pb.MetricDefinition{
+				{Name: "cpu", RecommenderName: "vpa", Gauge: &pb.Gauge{Aggregation: "Avg"}},
+			}},
+		},
+	}
+	s.SetPolicy("default", pol)
+
+	now := time.Now().Unix()
+	ingest(s, now, ns, name, "p1", "cpu", 1)
+	ingestOwned(s, now, ns, name, "p1", "vpa", "cpu", 10)
+
+	dump := s.Dump().(map[string]*store.PolicyState)
+	if _, ok := dump["default/default/pol"].Series["vpa/cpu"]; !ok {
+		t.Fatal("Owned metric series was not tracked under its metric key")
+	}
+
+	// The recommender no longer owns any metric.
+	pol.RecommenderMetrics = nil
+	s.SetPolicy("default", pol)
+	s.CalculateAll()
+
+	series := s.Dump().(map[string]*store.PolicyState)["default/default/pol"].Series
+	if _, ok := series["vpa/cpu"]; ok {
+		t.Error("Orphaned owned metric still exists in series map")
+	}
+	if _, ok := series["cpu"]; !ok {
+		t.Error("Policy-wide metric was incorrectly deleted")
+	}
 }

@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	"github.com/gke-labs/extensible-workload-autoscaler/internal/policy"
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 )
 
@@ -111,7 +112,7 @@ func (a *CoreNodeMetricsProvider) scrapeAndSend() {
 
 	for _, pol := range resp.Policies {
 		var relevantMetrics []*pb.MetricDefinition
-		for _, m := range pol.Metrics {
+		for _, m := range policy.MetricDefinitions(pol) {
 			class, err := a.providerLister.Get(m.Provider)
 			if err != nil {
 				slog.Warn("MetricProviderClass not found for metric", "class", m.Provider, "metric", m.Name)

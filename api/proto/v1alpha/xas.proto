@@ -4,6 +4,7 @@ package xas.v1alpha;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
 
 option go_package = "github.com/gke-labs/extensible-workload-autoscaler/api/v1alpha";
 
@@ -69,7 +70,15 @@ message PolicyId {
 // UpdatePolicyRequest is used to create or update a policy definition.
 message UpdatePolicyRequest { 
   // The policy definition.
-  Policy policy = 1; 
+  Policy policy = 1;
+
+  // The list of fields to update. Supports '*' to update only the fields provided in the policy,
+  // a field name, nested or not (e.g. `max_replicas`, `workload.name`), to replace that field
+  // with the value provided,
+  // or `recommender_metrics.my_recommender` to update only the metrics for that recommender.
+  // A field, or map entry, selected by the mask but left unset in the policy is cleared.
+  // Optional: if unset, the whole resource is replaced.
+  google.protobuf.FieldMask update_mask = 2;
 }
 
 // DeletePolicyRequest identifies a policy to delete.
@@ -113,6 +122,19 @@ message Policy {
   
   // The label selector used to identify pods (e.g. "app=my-app").
   string selector = 9;
+  
+  // Definitions of the metrics owned by individual recommenders, keyed by
+  // recommender name.
+  //
+  // Metric names only need to be unique within their owner. The
+  // `recommender_name` field in the metric definition must match.
+  map<string, MetricDefinitionList> recommender_metrics = 10;
+}
+
+// MetricDefinitionList is a list of metric definitions.
+message MetricDefinitionList {
+  // The metric definitions.
+  repeated MetricDefinition definitions = 1;
 }
 
 // WorkloadRef identifies the Kubernetes resource to scale.
@@ -133,6 +155,9 @@ message WorkloadRef {
 message MetricDefinition {
   // The name of the metric (used as key in ControlMetrics).
   string name = 1;
+  // The name of the recommender that owns this metric. Empty for policy-wide metrics.
+  // The metric name is only unique within its recommender.
+  string recommender_name = 15;
   // The provider class to use (e.g., "kubelet", "prometheus").
   string provider = 2;
   // Provider-specific parameters (e.g., "type": "cpu").
@@ -237,6 +262,12 @@ message ContainerState {
 message GetControlMetricsRequest { 
   // The policy to fetch metrics for.
   PolicyId id = 1; 
+
+  // Returns only the metrics owned by the specified recommender, as defined in
+  // Policy.recommender_metrics. If omitted, returns only the policy-wide
+  // metrics, i.e. those not owned by a specific recommender.
+  // Workload-level information (ready replicas, timestamp) is always reported.
+  string recommender_name = 2;
 }
 
 // A set of control metric values.
@@ -423,6 +454,8 @@ message MetricBatch {
 message MetricSample {
   // The name of the metric.
   string name = 1;
+  // The metric owning recommender (if any).
+  string recommender_name = 9;
   // Labels associated with the sample.
   map<string, string> labels = 2;
   // For resource metrics (e.g. "cpu" or "memory"), the resource name.

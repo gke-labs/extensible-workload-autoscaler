@@ -24,6 +24,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
@@ -33,6 +34,20 @@ import (
 )
 
 const xasFinalizer = "xas.io/finalizer"
+
+// crdOwnedPolicyFields lists the Policy fields defined by the ScalingPolicy CRD,
+// i.e. the fields this controller is the source of truth for. It is used as the
+// update mask of the policy sync; the fields left out (notably
+// `recommender_metrics`, owned by the recommenders) are preserved by the Server.
+var crdOwnedPolicyFields = []string{
+	"workload",
+	"min_replicas",
+	"max_replicas",
+	"metrics",
+	"activation",
+	"scaling",
+	"selector",
+}
 
 type Controller struct {
 	kubeclientset        kubernetes.Interface
@@ -616,6 +631,11 @@ func (c *Controller) pushPolicy(p *xasv1.ScalingPolicy, deployment *appsv1.Deplo
 
 	req := &pb.UpdatePolicyRequest{
 		Policy: pol,
+		// Only the fields the ScalingPolicy CRD owns are synced. Listing them
+		// explicitly (rather than relying on '*') keeps clearing a field, e.g.
+		// dropping the last metric, meaningful, while leaving the metrics
+		// registered by the recommenders themselves untouched.
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: crdOwnedPolicyFields},
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

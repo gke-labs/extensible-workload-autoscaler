@@ -13,6 +13,7 @@ import (
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	"github.com/gke-labs/extensible-workload-autoscaler/internal/policy"
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 )
 
@@ -87,19 +88,20 @@ func (p *CoreClusterMetricsProvider) scrapeAndSend() {
 	for _, pol := range resp.Policies {
 		var policyMetrics []*pb.MetricBatch
 
-		for _, m := range pol.Metrics {
+		for _, m := range policy.MetricDefinitions(pol) {
 			class, err := p.providerLister.Get(m.Provider)
 			if err != nil {
 				slog.Warn("MetricProviderClass not found for metric", "class", m.Provider, "metric", m.Name)
 				continue
 			}
 
-			if class.Spec.Type == "ExternalMetrics" {
+			switch class.Spec.Type {
+			case "ExternalMetrics":
 				batches := p.processExternalMetric(pol.Id.Namespace, m, class)
 				if len(batches) > 0 {
 					policyMetrics = append(policyMetrics, batches...)
 				}
-			} else if class.Spec.Type == "CustomMetrics" {
+			case "CustomMetrics":
 				batches := p.processCustomMetric(pol.Id.Namespace, pol, m, class)
 				if len(batches) > 0 {
 					policyMetrics = append(policyMetrics, batches...)

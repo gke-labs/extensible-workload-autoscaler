@@ -61,10 +61,11 @@ func (p *CoreClusterMetricsProvider) processExternalMetric(namespace string, m *
 		}
 
 		samples = append(samples, &pb.MetricSample{
-			Name:      m.Name,
-			Labels:    item.MetricLabels,
-			Value:     val,
-			Timestamp: ts,
+			Name:            m.Name,
+			RecommenderName: m.RecommenderName,
+			Labels:          item.MetricLabels,
+			Value:           val,
+			Timestamp:       ts,
 		})
 	}
 

@@ -21,7 +21,7 @@ type config struct {
 	replicas *int32
 }
 
-func (r *Recommender) Recommend(def *pb.RecommenderDefinition, _ *pb.ControlMetrics) *pb.RecommenderVote {
+func (r *Recommender) Recommend(def *pb.RecommenderDefinition, _, _ *pb.ControlMetrics) *pb.RecommenderVote {
 	cfg, err := parseConfig(def)
 	if err != nil {
 		return &pb.RecommenderVote{

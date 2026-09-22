@@ -113,9 +113,10 @@ func (p *CoreClusterMetricsProvider) processCustomMetric(
 				PodName: podName,
 				Samples: []*pb.MetricSample{
 					{
-						Name:      m.Name,
-						Value:     val,
-						Timestamp: ts,
+						Name:            m.Name,
+						RecommenderName: m.RecommenderName,
+						Value:           val,
+						Timestamp:       ts,
 					},
 				},
 			})

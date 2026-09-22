@@ -11,7 +11,9 @@ import (
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
+	"github.com/gke-labs/extensible-workload-autoscaler/internal/policy"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/metrics"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -77,26 +79,52 @@ type Series struct {
 type MetricStore interface {
 	AddBatch(req *pb.IngestMetricsRequest) error
 	UpdateRecommenderState(req *pb.UpdateRecommenderStateRequest) error
-	SetPolicy(clusterName string, policy *pb.Policy) error
+	// SetPolicy stores p as the full definition of the policy, replacing any
+	// previous one.
+	SetPolicy(clusterName string, p *pb.Policy) error
+	// UpdatePolicy applies p to the stored policy, restricted to the fields
+	// selected by updateMask, and returns the stored result. An empty mask
+	// replaces the whole policy. See policy.ApplyUpdateMask for the supported
+	// mask paths.
+	UpdatePolicy(clusterName string, p *pb.Policy, updateMask *fieldmaskpb.FieldMask) (*pb.Policy, error)
 	DeletePolicy(id *pb.PolicyId) error
 	GetPolicy(id *pb.PolicyId) (*pb.Policy, bool)
 	ListPolicies(clusterName string) []*pb.Policy
 	UpdateWorkload(req *pb.UpdateWorkloadRequest) error
 	GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationResponse, bool)
-	GetControlMetrics(id *pb.PolicyId) (*pb.ControlMetrics, bool)
+	// GetControlMetrics returns the aggregated metrics of a policy. An empty
+	// recommenderName returns the policy-wide metrics, otherwise only the
+	// metrics owned by that recommender are reported.
+	GetControlMetrics(id *pb.PolicyId, recommenderName string) (*pb.ControlMetrics, bool)
 	CalculateAll()
 	Dump() interface{}
 }
 
 type PolicyState struct {
-	Policy           *pb.Policy
-	Workload         map[string]*pb.PodState
-	Series           map[string]map[string]*Series // MetricName -> SeriesID -> Series
-	GlobalHistograms map[string]*DecayingHistogram // MetricName -> Histogram
+	Policy   *pb.Policy
+	Workload map[string]*pb.PodState
+	// Series and GlobalHistograms are keyed by the metric key returned by
+	// metricKey, which identifies a metric by name and owner.
+	Series           map[string]map[string]*Series // MetricKey -> SeriesID -> Series
+	GlobalHistograms map[string]*DecayingHistogram // MetricKey -> Histogram
 	Recommendation   *pb.Recommendation
 	LastActive       int64
 	Decisions        map[string]*pb.RecommenderStatus
 	ControlMetrics   *pb.ControlMetrics
+	// RecommenderControlMetrics holds the values of the metrics owned by each
+	// recommender, keyed by recommender name.
+	RecommenderControlMetrics map[string]*pb.ControlMetrics
+}
+
+// metricKey returns the key under which the state of a metric is tracked. A
+// metric is identified by the <name, recommender_name> pair: its name is only
+// unique within its owner. Policy-wide metrics have no owner and keep their
+// bare name as key.
+func metricKey(def *pb.MetricDefinition) string {
+	if def.GetRecommenderName() == "" {
+		return def.GetName()
+	}
+	return def.GetRecommenderName() + "/" + def.GetName()
 }
 
 type MemoryStore struct {
@@ -122,13 +150,28 @@ func (s *MemoryStore) genPolicyKey(id *pb.PolicyId) string {
 	return id.ClusterName + "/" + id.Namespace + "/" + id.Name
 }
 
-func (s *MemoryStore) SetPolicy(clusterName string, policy *pb.Policy) error {
+func (s *MemoryStore) SetPolicy(clusterName string, p *pb.Policy) error {
+	_, err := s.UpdatePolicy(clusterName, p, nil)
+	return err
+}
+
+func (s *MemoryStore) UpdatePolicy(clusterName string, p *pb.Policy, updateMask *fieldmaskpb.FieldMask) (*pb.Policy, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	key := s.genPolicyKey(&pb.PolicyId{ClusterName: clusterName, Namespace: policy.Id.Namespace, Name: policy.Id.Name})
+	key := s.genPolicyKey(&pb.PolicyId{ClusterName: clusterName, Namespace: p.Id.Namespace, Name: p.Id.Name})
 
-	ps, ok := s.state[key]
-	if !ok {
+	ps := s.state[key]
+	var current *pb.Policy
+	if ps != nil {
+		current = ps.Policy
+	}
+	// Merge before touching the state: an invalid mask must leave the store as is.
+	updated, err := policy.ApplyUpdateMask(current, p, updateMask)
+	if err != nil {
+		return nil, err
+	}
+
+	if ps == nil {
 		ps = &PolicyState{
 			Workload:         make(map[string]*pb.PodState),
 			Series:           make(map[string]map[string]*Series),
@@ -137,15 +180,16 @@ func (s *MemoryStore) SetPolicy(clusterName string, policy *pb.Policy) error {
 		}
 		s.state[key] = ps
 	}
-	ps.Policy = policy
+	ps.Policy = updated
 	ps.Recommendation = nil
 	ps.ControlMetrics = nil
+	ps.RecommenderControlMetrics = nil
 
 	s.cleanupOrphanedSeries(ps)
 	s.cleanupOrphanedHistograms(ps)
 	s.cleanupOrphanedDecisions(ps)
 
-	return nil
+	return updated, nil
 }
 
 func (s *MemoryStore) DeletePolicy(id *pb.PolicyId) error {
@@ -227,11 +271,18 @@ func (s *MemoryStore) AddBatch(req *pb.IngestMetricsRequest) error {
 	return nil
 }
 
-func (ps *PolicyState) FindMetricDefinition(name string) *pb.MetricDefinition {
+// FindMetricDefinition returns the definition of the metric identified by the
+// <name, owner> pair. An empty owner looks the metric up among the policy-wide
+// metrics, otherwise among the metrics that recommender owns.
+func (ps *PolicyState) FindMetricDefinition(owner, name string) *pb.MetricDefinition {
 	if ps.Policy == nil {
 		return nil
 	}
-	for _, d := range ps.Policy.Metrics {
+	defs := ps.Policy.Metrics
+	if owner != "" {
+		defs = ps.Policy.RecommenderMetrics[owner].GetDefinitions()
+	}
+	for _, d := range defs {
 		if d.Name == name {
 			return d
 		}
@@ -240,8 +291,12 @@ func (ps *PolicyState) FindMetricDefinition(name string) *pb.MetricDefinition {
 }
 
 func (s *MemoryStore) processSample(ps *PolicyState, podName, containerName string, m *pb.MetricSample, ingestTime int64) error {
-	def := ps.FindMetricDefinition(m.Name)
+	owner := m.GetRecommenderName()
+	def := ps.FindMetricDefinition(owner, m.Name)
 	if def == nil {
+		if owner != "" {
+			return fmt.Errorf("metric %s not defined in policy for recommender %s", m.Name, owner)
+		}
 		return fmt.Errorf("metric %s not defined in policy", m.Name)
 	}
 
@@ -250,8 +305,9 @@ func (s *MemoryStore) processSample(ps *PolicyState, podName, containerName stri
 		return nil
 	}
 
-	if _, ok := ps.Series[def.Name]; !ok {
-		ps.Series[def.Name] = make(map[string]*Series)
+	key := metricKey(def)
+	if _, ok := ps.Series[key]; !ok {
+		ps.Series[key] = make(map[string]*Series)
 	}
 
 	labelHash := hashLabels(m.Labels)
@@ -259,7 +315,7 @@ func (s *MemoryStore) processSample(ps *PolicyState, podName, containerName stri
 	// from different containers of the same pod are tracked independently.
 	seriesID := fmt.Sprintf("%s|%s|%s", podName, containerName, labelHash)
 
-	ser, ok := ps.Series[def.Name][seriesID]
+	ser, ok := ps.Series[key][seriesID]
 	if !ok {
 		ser = &Series{
 			PodName:       podName,
@@ -280,7 +336,7 @@ func (s *MemoryStore) processSample(ps *PolicyState, podName, containerName stri
 			ser.Window = NewSlidingWindow(d, "Avg")
 		}
 
-		ps.Series[def.Name][seriesID] = ser
+		ps.Series[key][seriesID] = ser
 	}
 
 	var gh *DecayingHistogram
@@ -295,11 +351,11 @@ func (s *MemoryStore) processSample(ps *PolicyState, podName, containerName stri
 				ps.GlobalHistograms = make(map[string]*DecayingHistogram)
 			}
 			var ok bool
-			gh, ok = ps.GlobalHistograms[def.Name]
+			gh, ok = ps.GlobalHistograms[key]
 			if !ok {
 				hl, _ := time.ParseDuration(def.DecayingDistribution.HalfLife)
 				gh, _ = NewDecayingHistogram(time.Unix(ingestTime, 0), hl, def.DecayingDistribution.BucketSize)
-				ps.GlobalHistograms[def.Name] = gh
+				ps.GlobalHistograms[key] = gh
 			}
 		}
 	}
@@ -496,7 +552,12 @@ func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationR
 	}, true
 }
 
-func (s *MemoryStore) GetControlMetrics(id *pb.PolicyId) (*pb.ControlMetrics, bool) {
+// GetControlMetrics returns the aggregated metrics of a policy. An empty
+// recommenderName reports the policy-wide metrics, otherwise only the metrics
+// owned by that recommender are reported. Workload-level information (ready
+// replicas, timestamp) is reported in both cases, so a recommender that owns no
+// metric still observes the state of the workload.
+func (s *MemoryStore) GetControlMetrics(id *pb.PolicyId, recommenderName string) (*pb.ControlMetrics, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	key := s.genPolicyKey(id)
@@ -504,7 +565,19 @@ func (s *MemoryStore) GetControlMetrics(id *pb.PolicyId) (*pb.ControlMetrics, bo
 	if !ok || ps.ControlMetrics == nil {
 		return nil, false
 	}
-	return ps.ControlMetrics, true
+	if recommenderName == "" {
+		return ps.ControlMetrics, true
+	}
+	if cm, ok := ps.RecommenderControlMetrics[recommenderName]; ok {
+		return cm, true
+	}
+	// The recommender owns no metric: report the workload state only.
+	return &pb.ControlMetrics{
+		Values:        make(map[string]float64),
+		PodMetrics:    make(map[string]*pb.PodMetrics),
+		ReadyReplicas: ps.ControlMetrics.ReadyReplicas,
+		Timestamp:     ps.ControlMetrics.Timestamp,
+	}, true
 }
 
 func (s *MemoryStore) CalculateAll() {
@@ -521,8 +594,6 @@ func (s *MemoryStore) CalculateAll() {
 			continue
 		}
 
-		currentControlMetrics := make(map[string]float64)
-		currentPodMetrics := make(map[string]*pb.PodMetrics)
 		workload := ps.Workload
 		readyReplicas := 0
 		for _, p := range workload {
@@ -534,40 +605,66 @@ func (s *MemoryStore) CalculateAll() {
 			readyReplicas = 1
 		}
 
-		for _, def := range policy.Metrics {
-			val, podVals, containerVals, ok := s.calculateMetric(ps, def, ps.Series[def.Name], workload, readyReplicas, now, cutoff, gcCutoff)
-			if ok {
-				if podVals != nil {
-					for podName, podVal := range podVals {
-						podMetrics(currentPodMetrics, podName).Values.Values[def.Name] = podVal
-					}
-					for podName, byContainer := range containerVals {
-						pm := podMetrics(currentPodMetrics, podName)
-						for containerName, containerVal := range byContainer {
-							cm, exists := pm.ContainerMetrics[containerName]
-							if !exists {
-								cm = &pb.MetricValues{Values: make(map[string]float64)}
-								pm.ContainerMetrics[containerName] = cm
-							}
-							cm.Values[def.Name] = containerVal
-						}
-					}
-				} else {
-					currentControlMetrics[def.Name] = val
-					if policy.Workload != nil {
-						metrics.RecordControlMetric(policy.Id.ClusterName, policy.Id.Namespace, policy.Id.Name, policy.Workload.Group, policy.Workload.Version, policy.Workload.Kind, policy.Workload.Name, def.Name, val)
-					}
-				}
+		ps.ControlMetrics = s.calculateControlMetrics(ps, policy.Metrics, workload, readyReplicas, now, cutoff, gcCutoff)
+
+		// Metrics owned by a recommender are aggregated the same way, but kept
+		// in a snapshot of their own so that they are only reported to their
+		// owner.
+		ps.RecommenderControlMetrics = nil
+		if len(policy.RecommenderMetrics) > 0 {
+			ps.RecommenderControlMetrics = make(map[string]*pb.ControlMetrics, len(policy.RecommenderMetrics))
+			for name, defs := range policy.RecommenderMetrics {
+				ps.RecommenderControlMetrics[name] = s.calculateControlMetrics(ps, defs.GetDefinitions(), workload, readyReplicas, now, cutoff, gcCutoff)
 			}
 		}
 
-		ps.ControlMetrics = &pb.ControlMetrics{
-			Values:        currentControlMetrics,
-			PodMetrics:    currentPodMetrics,
-			ReadyReplicas: int32(readyReplicas),
-			Timestamp:     now,
-		}
 		s.processDecisions(ps, now)
+	}
+}
+
+// calculateControlMetrics aggregates the given metric definitions into a single
+// snapshot. All the definitions are expected to share the same owner.
+func (s *MemoryStore) calculateControlMetrics(ps *PolicyState, defs []*pb.MetricDefinition, workload map[string]*pb.PodState, readyReplicas int, now, cutoff, gcCutoff int64) *pb.ControlMetrics {
+	policy := ps.Policy
+	currentControlMetrics := make(map[string]float64)
+	currentPodMetrics := make(map[string]*pb.PodMetrics)
+
+	for _, def := range defs {
+		key := metricKey(def)
+		val, podVals, containerVals, ok := s.calculateMetric(ps, key, def, ps.Series[key], workload, readyReplicas, now, cutoff, gcCutoff)
+		if ok {
+			if podVals != nil {
+				for podName, podVal := range podVals {
+					podMetrics(currentPodMetrics, podName).Values.Values[def.Name] = podVal
+				}
+				for podName, byContainer := range containerVals {
+					pm := podMetrics(currentPodMetrics, podName)
+					for containerName, containerVal := range byContainer {
+						cm, exists := pm.ContainerMetrics[containerName]
+						if !exists {
+							cm = &pb.MetricValues{Values: make(map[string]float64)}
+							pm.ContainerMetrics[containerName] = cm
+						}
+						cm.Values[def.Name] = containerVal
+					}
+				}
+			} else {
+				currentControlMetrics[def.Name] = val
+				if policy.Workload != nil {
+					// Metrics owned by a recommender are exported under their
+					// metric key, as their name is only unique within their
+					// owner.
+					metrics.RecordControlMetric(policy.Id.ClusterName, policy.Id.Namespace, policy.Id.Name, policy.Workload.Group, policy.Workload.Version, policy.Workload.Kind, policy.Workload.Name, key, val)
+				}
+			}
+		}
+	}
+
+	return &pb.ControlMetrics{
+		Values:        currentControlMetrics,
+		PodMetrics:    currentPodMetrics,
+		ReadyReplicas: int32(readyReplicas),
+		Timestamp:     now,
 	}
 }
 
@@ -585,26 +682,35 @@ func podMetrics(all map[string]*pb.PodMetrics, podName string) *pb.PodMetrics {
 	return pm
 }
 
-func (s *MemoryStore) cleanupOrphanedSeries(ps *PolicyState) {
-	metricDefs := make(map[string]bool)
-	for _, m := range ps.Policy.Metrics {
-		metricDefs[m.Name] = true
+// definedMetricKeys returns the keys of all the metrics a policy defines,
+// including the ones owned by its recommenders.
+func definedMetricKeys(policy *pb.Policy) map[string]bool {
+	keys := make(map[string]bool)
+	for _, m := range policy.Metrics {
+		keys[metricKey(m)] = true
 	}
-	for mName := range ps.Series {
-		if !metricDefs[mName] {
-			delete(ps.Series, mName)
+	for _, defs := range policy.RecommenderMetrics {
+		for _, m := range defs.GetDefinitions() {
+			keys[metricKey(m)] = true
+		}
+	}
+	return keys
+}
+
+func (s *MemoryStore) cleanupOrphanedSeries(ps *PolicyState) {
+	metricDefs := definedMetricKeys(ps.Policy)
+	for key := range ps.Series {
+		if !metricDefs[key] {
+			delete(ps.Series, key)
 		}
 	}
 }
 
 func (s *MemoryStore) cleanupOrphanedHistograms(ps *PolicyState) {
-	metricDefs := make(map[string]bool)
-	for _, m := range ps.Policy.Metrics {
-		metricDefs[m.Name] = true
-	}
-	for mName := range ps.GlobalHistograms {
-		if !metricDefs[mName] {
-			delete(ps.GlobalHistograms, mName)
+	metricDefs := definedMetricKeys(ps.Policy)
+	for key := range ps.GlobalHistograms {
+		if !metricDefs[key] {
+			delete(ps.GlobalHistograms, key)
 		}
 	}
 }
@@ -628,15 +734,17 @@ func (s *MemoryStore) cleanupOrphanedDecisions(ps *PolicyState) {
 // It returns, in order: the policy-wide (Global) value, the per-pod values, the
 // per-pod/per-container values, and whether any value could be computed.
 //
+// key is the key the metric state is tracked under (see metricKey).
+//
 // The returned values depend on def.Scope:
 //   - "Global" (default): only the policy-wide value is returned.
 //   - "Pod": only per-pod values are returned. Samples reported by individual
 //     containers are summed into their pod's value.
 //   - "Container": per-pod values are returned along with the per-container
 //     breakdown that rolls up into them.
-func (s *MemoryStore) calculateMetric(ps *PolicyState, def *pb.MetricDefinition, seriesMap map[string]*Series, workload map[string]*pb.PodState, readyReplicas int, now, cutoff, gcCutoff int64) (float64, map[string]float64, map[string]map[string]float64, bool) {
+func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.MetricDefinition, seriesMap map[string]*Series, workload map[string]*pb.PodState, readyReplicas int, now, cutoff, gcCutoff int64) (float64, map[string]float64, map[string]map[string]float64, bool) {
 	if !isPodScoped(def.Scope) {
-		if gh, ok := ps.GlobalHistograms[def.Name]; ok {
+		if gh, ok := ps.GlobalHistograms[key]; ok {
 			percentile := "p95"
 			if def.DecayingDistribution != nil {
 				percentile = def.DecayingDistribution.Percentile

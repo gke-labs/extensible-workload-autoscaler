@@ -29,11 +29,12 @@ func (s *Server) UpdatePolicy(ctx context.Context, req *pb.UpdatePolicyRequest) 
 	if err := validateUpdatePolicyRequest(req); err != nil {
 		return nil, err
 	}
-	if err := s.store.SetPolicy(req.Policy.Id.ClusterName, req.Policy); err != nil {
+	updated, err := s.store.UpdatePolicy(req.Policy.Id.ClusterName, req.Policy, req.GetUpdateMask())
+	if err != nil {
 		return nil, err
 	}
 	s.store.CalculateAll()
-	return req.Policy, nil
+	return updated, nil
 }
 
 func (s *Server) DeletePolicy(ctx context.Context, req *pb.DeletePolicyRequest) (*emptypb.Empty, error) {
@@ -69,7 +70,7 @@ func (s *Server) GetControlMetrics(ctx context.Context, req *pb.GetControlMetric
 	if err := validateGetControlMetricsRequest(req); err != nil {
 		return nil, err
 	}
-	metrics, ok := s.store.GetControlMetrics(req.Id)
+	metrics, ok := s.store.GetControlMetrics(req.Id, req.GetRecommenderName())
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "policy not found")
 	}

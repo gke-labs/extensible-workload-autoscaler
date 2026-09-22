@@ -2,6 +2,7 @@ package grpc
 
 import (
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	"github.com/gke-labs/extensible-workload-autoscaler/internal/policy"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -16,43 +17,77 @@ func validateUpdatePolicyRequest(req *pb.UpdatePolicyRequest) error {
 	if err := validatePolicyId(req.Policy.Id); err != nil {
 		return err
 	}
+	if err := policy.ValidateUpdateMask(req.GetUpdateMask()); err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid update_mask: %v", err)
+	}
 	for _, m := range req.Policy.Metrics {
-		// INTENT VALIDATION
-		intents := 0
-		if m.Gauge != nil {
-			intents++
+		if m.GetRecommenderName() != "" {
+			return status.Errorf(codes.InvalidArgument, "metric %s: recommender_name must be empty for policy-wide metrics", m.GetName())
 		}
-		if m.Rate != nil {
-			intents++
-			if m.Rate.Window == "" {
-				return status.Errorf(codes.InvalidArgument, "metric %s: window is required for rate intent", m.Name)
-			}
+		if err := validateMetricDefinition(m); err != nil {
+			return err
 		}
-		if m.Distribution != nil {
-			intents++
-			if m.Distribution.Percentile == "" {
-				return status.Errorf(codes.InvalidArgument, "metric %s: percentile is required for distribution intent", m.Name)
-			}
+	}
+	for owner, list := range req.Policy.RecommenderMetrics {
+		if owner == "" {
+			return status.Errorf(codes.InvalidArgument, "recommender_metrics: recommender name is required")
 		}
-		if m.DecayingDistribution != nil {
-			intents++
-			if m.DecayingDistribution.HalfLife == "" {
-				return status.Errorf(codes.InvalidArgument, "metric %s: half_life is required for decaying_distribution intent", m.Name)
+		for _, m := range list.GetDefinitions() {
+			if m.GetRecommenderName() != owner {
+				return status.Errorf(codes.InvalidArgument, "metric %s: recommender_name %q must match its owner %q", m.GetName(), m.GetRecommenderName(), owner)
 			}
-			if m.DecayingDistribution.BucketSize == "" {
-				return status.Errorf(codes.InvalidArgument, "metric %s: bucket_size is required for decaying_distribution intent", m.Name)
-			}
-			if m.DecayingDistribution.Percentile == "" {
-				return status.Errorf(codes.InvalidArgument, "metric %s: percentile is required for decaying_distribution intent", m.Name)
+			if err := validateMetricDefinition(m); err != nil {
+				return err
 			}
 		}
+	}
+	return nil
+}
 
-		if intents == 0 {
-			return status.Errorf(codes.InvalidArgument, "metric %s: exactly one intent must be specified", m.Name)
+// validateMetricDefinition enforces that a metric definition is named and
+// carries exactly one fully specified intent.
+func validateMetricDefinition(m *pb.MetricDefinition) error {
+	if m == nil {
+		return status.Errorf(codes.InvalidArgument, "metric definition is required")
+	}
+	if m.Name == "" {
+		return status.Errorf(codes.InvalidArgument, "metric name is required")
+	}
+	// INTENT VALIDATION
+	intents := 0
+	if m.Gauge != nil {
+		intents++
+	}
+	if m.Rate != nil {
+		intents++
+		if m.Rate.Window == "" {
+			return status.Errorf(codes.InvalidArgument, "metric %s: window is required for rate intent", m.Name)
 		}
-		if intents > 1 {
-			return status.Errorf(codes.InvalidArgument, "metric %s: only one intent can be specified", m.Name)
+	}
+	if m.Distribution != nil {
+		intents++
+		if m.Distribution.Percentile == "" {
+			return status.Errorf(codes.InvalidArgument, "metric %s: percentile is required for distribution intent", m.Name)
 		}
+	}
+	if m.DecayingDistribution != nil {
+		intents++
+		if m.DecayingDistribution.HalfLife == "" {
+			return status.Errorf(codes.InvalidArgument, "metric %s: half_life is required for decaying_distribution intent", m.Name)
+		}
+		if m.DecayingDistribution.BucketSize == "" {
+			return status.Errorf(codes.InvalidArgument, "metric %s: bucket_size is required for decaying_distribution intent", m.Name)
+		}
+		if m.DecayingDistribution.Percentile == "" {
+			return status.Errorf(codes.InvalidArgument, "metric %s: percentile is required for decaying_distribution intent", m.Name)
+		}
+	}
+
+	if intents == 0 {
+		return status.Errorf(codes.InvalidArgument, "metric %s: exactly one intent must be specified", m.Name)
+	}
+	if intents > 1 {
+		return status.Errorf(codes.InvalidArgument, "metric %s: only one intent can be specified", m.Name)
 	}
 	return nil
 }

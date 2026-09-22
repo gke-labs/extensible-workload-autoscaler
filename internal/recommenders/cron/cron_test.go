@@ -94,7 +94,7 @@ func TestCronRecommend(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := rec.Recommend(tc.def, nil)
+			got := rec.Recommend(tc.def, nil, nil)
 			// Message varies slightly by library version, check prefix or simple diff
 			if diff := cmp.Diff(tc.want, got, protocmp.Transform()); diff != "" {
 				t.Errorf("Recommend() mismatch (-want +got):\n%s", diff)

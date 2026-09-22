@@ -193,10 +193,11 @@ func (a *CoreNodeMetricsProvider) processKubeletMetric(pod corev1.Pod, m *pb.Met
 			ContainerName: cName,
 			Samples: []*pb.MetricSample{
 				{
-					Name:         m.Name,
-					ResourceName: metricType,
-					Value:        val,
-					Timestamp:    ts,
+					Name:            m.Name,
+					RecommenderName: m.RecommenderName,
+					ResourceName:    metricType,
+					Value:           val,
+					Timestamp:       ts,
 				},
 			},
 		})

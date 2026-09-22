@@ -160,6 +160,7 @@ func (a *CoreNodeMetricsProvider) processPrometheusMetric(pod corev1.Pod, m *pb.
 
 	for i := range samples {
 		samples[i].Name = m.Name
+		samples[i].RecommenderName = m.RecommenderName
 	}
 
 	if len(samples) > 0 {

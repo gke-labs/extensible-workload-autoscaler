@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
@@ -1769,5 +1770,401 @@ func checkCM(t *testing.T, got *pb.ControlMetrics, wantVals map[string]float64, 
 		if got.Values[k] != v {
 			t.Errorf("Value mismatch for %s: want %f, got %f", k, v, got.Values[k])
 		}
+	}
+}
+
+// TestRecommenderOwnedMetricsGRPC validates the lifecycle of a metric owned by
+// a recommender, end to end.
+// Scenario: a "vpa" recommender registers its own "cpu" metric on a policy that
+// already collects a policy-wide "cpu".
+// Steps:
+//  1. Create the policy with both a policy-wide and a recommender-owned metric.
+//  2. Ingest samples for both, the owned ones stamped with their owner.
+//  3. Verify GetControlMetrics reports the policy-wide value by default, and the
+//     owned value when scoped to the recommender.
+func TestRecommenderOwnedMetricsGRPC(t *testing.T) {
+	start := time.Unix(1000, 0)
+	clk := &clock.FakeClock{CurrentTime: start}
+	memStore, client, cleanup := setupGRPCServer(t, clk)
+	defer cleanup()
+	ctx := context.Background()
+
+	id := &pb.PolicyId{ClusterName: "default", Namespace: "prod", Name: "web"}
+	_, err := client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+		Policy: &pb.Policy{
+			Id: id,
+			Metrics: []*pb.MetricDefinition{
+				{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}},
+			},
+			RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+				"vpa": {Definitions: []*pb.MetricDefinition{
+					{Name: "cpu", RecommenderName: "vpa", Gauge: &pb.Gauge{Aggregation: "Max"}},
+				}},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("UpdatePolicy failed: %v", err)
+	}
+
+	_, err = client.UpdateWorkload(ctx, &pb.UpdateWorkloadRequest{
+		Id: id,
+		Workload: &pb.Workload{Pods: []*pb.PodState{
+			{Name: "p1", IsReady: true},
+			{Name: "p2", IsReady: true},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("UpdateWorkload failed: %v", err)
+	}
+
+	_, err = client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
+		ClusterName: "default",
+		Timestamp:   start.Unix(),
+		Policies: []*pb.PolicyBatch{{
+			Namespace: "prod", Name: "web",
+			Batches: []*pb.MetricBatch{{
+				PodName: "p1",
+				Samples: []*pb.MetricSample{
+					{Name: "cpu", Value: 2, Timestamp: start.Unix()},
+					{Name: "cpu", RecommenderName: "vpa", Value: 20, Timestamp: start.Unix()},
+				},
+			}, {
+				PodName: "p2",
+				Samples: []*pb.MetricSample{
+					{Name: "cpu", Value: 4, Timestamp: start.Unix()},
+					{Name: "cpu", RecommenderName: "vpa", Value: 40, Timestamp: start.Unix()},
+				},
+			}},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("IngestMetrics failed: %v", err)
+	}
+
+	memStore.CalculateAll()
+
+	// Policy-wide scope: Avg(2, 4).
+	cm, err := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: id})
+	if err != nil {
+		t.Fatalf("GetControlMetrics failed: %v", err)
+	}
+	checkCM(t, cm, map[string]float64{"cpu": 3}, start.Unix())
+
+	// Recommender scope: only its own metric, with its own aggregation Max(20, 40).
+	cm, err = client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{
+		Id:              id,
+		RecommenderName: "vpa",
+	})
+	if err != nil {
+		t.Fatalf("GetControlMetrics(vpa) failed: %v", err)
+	}
+	checkCM(t, cm, map[string]float64{"cpu": 40}, start.Unix())
+}
+
+// TestRecommenderMetricsValidationGRPC checks that owned metric definitions have
+// to be consistent with the recommender they are registered under.
+func TestRecommenderMetricsValidationGRPC(t *testing.T) {
+	start := time.Unix(1000, 0)
+	clk := &clock.FakeClock{CurrentTime: start}
+	_, client, cleanup := setupGRPCServer(t, clk)
+	defer cleanup()
+	ctx := context.Background()
+
+	id := &pb.PolicyId{ClusterName: "default", Namespace: "prod", Name: "web"}
+
+	tests := []struct {
+		name     string
+		policy   *pb.Policy
+		wantCode codes.Code
+	}{
+		{
+			name: "Owned metric with a mismatched owner",
+			policy: &pb.Policy{
+				Id: id,
+				RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+					"vpa": {Definitions: []*pb.MetricDefinition{
+						{Name: "cpu", RecommenderName: "hpa", Gauge: &pb.Gauge{}},
+					}},
+				},
+			},
+			wantCode: codes.InvalidArgument,
+		},
+		{
+			name: "Owned metric without an owner",
+			policy: &pb.Policy{
+				Id: id,
+				RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+					"vpa": {Definitions: []*pb.MetricDefinition{
+						{Name: "cpu", Gauge: &pb.Gauge{}},
+					}},
+				},
+			},
+			wantCode: codes.InvalidArgument,
+		},
+		{
+			name: "Owned metric without an intent",
+			policy: &pb.Policy{
+				Id: id,
+				RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+					"vpa": {Definitions: []*pb.MetricDefinition{
+						{Name: "cpu", RecommenderName: "vpa"},
+					}},
+				},
+			},
+			wantCode: codes.InvalidArgument,
+		},
+		{
+			name: "Policy-wide metric claiming an owner",
+			policy: &pb.Policy{
+				Id: id,
+				Metrics: []*pb.MetricDefinition{
+					{Name: "cpu", RecommenderName: "vpa", Gauge: &pb.Gauge{}},
+				},
+			},
+			wantCode: codes.InvalidArgument,
+		},
+		{
+			name: "Valid owned metric",
+			policy: &pb.Policy{
+				Id: id,
+				RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+					"vpa": {Definitions: []*pb.MetricDefinition{
+						{Name: "cpu", RecommenderName: "vpa", Gauge: &pb.Gauge{}},
+					}},
+				},
+			},
+			wantCode: codes.OK,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{Policy: tc.policy})
+			st, _ := status.FromError(err)
+			if st.Code() != tc.wantCode {
+				t.Errorf("Want code %v, got %v (err: %v)", tc.wantCode, st.Code(), err)
+			}
+		})
+	}
+}
+
+// TestUpdatePolicyFieldMaskGRPC validates partial policy updates.
+// Scenario: the Controller owns the policy definition while two recommenders
+// each register their own metrics, all of them writing to the same policy.
+// Steps:
+//  1. Register the owned metrics of two recommenders, one key at a time.
+//  2. Sync the Controller-owned fields and verify the owned metrics, and the
+//     samples already collected for them, survive the update.
+//  3. Update a single recommender entry and verify the other one is untouched.
+//  4. Remove an entry by leaving it out of a masked update.
+func TestUpdatePolicyFieldMaskGRPC(t *testing.T) {
+	start := time.Unix(1000, 0)
+	clk := &clock.FakeClock{CurrentTime: start}
+	memStore, client, cleanup := setupGRPCServer(t, clk)
+	defer cleanup()
+	ctx := context.Background()
+
+	id := &pb.PolicyId{ClusterName: "default", Namespace: "prod", Name: "web"}
+	vpaMetrics := &pb.MetricDefinitionList{Definitions: []*pb.MetricDefinition{
+		{Name: "cpu", RecommenderName: "vpa", Gauge: &pb.Gauge{Aggregation: "Max"}},
+	}}
+	cronMetrics := &pb.MetricDefinitionList{Definitions: []*pb.MetricDefinition{
+		{Name: "rps", RecommenderName: "cron", Gauge: &pb.Gauge{Aggregation: "Avg"}},
+	}}
+
+	// 1. The Controller creates the policy, then each recommender registers its
+	// own metrics, touching only its own key.
+	if _, err := client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+		Policy: &pb.Policy{
+			Id:          id,
+			Metrics:     []*pb.MetricDefinition{{Name: "latency", Gauge: &pb.Gauge{Aggregation: "Avg"}}},
+			MinReplicas: 1, MaxReplicas: 10,
+		},
+	}); err != nil {
+		t.Fatalf("UpdatePolicy failed: %v", err)
+	}
+	for owner, defs := range map[string]*pb.MetricDefinitionList{"vpa": vpaMetrics, "cron": cronMetrics} {
+		if _, err := client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+			Policy: &pb.Policy{
+				Id:                 id,
+				RecommenderMetrics: map[string]*pb.MetricDefinitionList{owner: defs},
+			},
+			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"recommender_metrics." + owner}},
+		}); err != nil {
+			t.Fatalf("UpdatePolicy(%s) failed: %v", owner, err)
+		}
+	}
+
+	got, ok := memStore.GetPolicy(id)
+	if !ok {
+		t.Fatalf("GetPolicy() did not find the policy")
+	}
+	wantMetrics := map[string]*pb.MetricDefinitionList{"vpa": vpaMetrics, "cron": cronMetrics}
+	if diff := cmp.Diff(wantMetrics, got.RecommenderMetrics, protocmp.Transform()); diff != "" {
+		t.Errorf("RecommenderMetrics mismatch after registration (-want +got):\n%s", diff)
+	}
+	// The masked updates must leave the fields they do not select alone.
+	if got.MaxReplicas != 10 || len(got.Metrics) != 1 {
+		t.Errorf("Masked update changed unselected fields: %v", got)
+	}
+
+	if _, err := client.UpdateWorkload(ctx, &pb.UpdateWorkloadRequest{
+		Id:       id,
+		Workload: &pb.Workload{Pods: []*pb.PodState{{Name: "p1", IsReady: true}}},
+	}); err != nil {
+		t.Fatalf("UpdateWorkload failed: %v", err)
+	}
+
+	if _, err := client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
+		ClusterName: "default",
+		Timestamp:   start.Unix(),
+		Policies: []*pb.PolicyBatch{{
+			Namespace: "prod", Name: "web",
+			Batches: []*pb.MetricBatch{{
+				PodName: "p1",
+				Samples: []*pb.MetricSample{
+					{Name: "cpu", RecommenderName: "vpa", Value: 7, Timestamp: start.Unix()},
+				},
+			}},
+		}},
+	}); err != nil {
+		t.Fatalf("IngestMetrics failed: %v", err)
+	}
+
+	// 2. A Controller resync must not drop what the recommenders registered, nor
+	// the samples already collected for those metrics.
+	if _, err := client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+		Policy: &pb.Policy{
+			Id:          id,
+			Metrics:     []*pb.MetricDefinition{{Name: "latency", Gauge: &pb.Gauge{Aggregation: "Avg"}}},
+			MinReplicas: 2, MaxReplicas: 20,
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"metrics", "min_replicas", "max_replicas"}},
+	}); err != nil {
+		t.Fatalf("UpdatePolicy(controller resync) failed: %v", err)
+	}
+
+	memStore.CalculateAll()
+	cm, err := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: id, RecommenderName: "vpa"})
+	if err != nil {
+		t.Fatalf("GetControlMetrics(vpa) failed: %v", err)
+	}
+	checkCM(t, cm, map[string]float64{"cpu": 7}, start.Unix())
+
+	// 3. Updating one entry leaves the other one untouched.
+	newVPAMetrics := &pb.MetricDefinitionList{Definitions: []*pb.MetricDefinition{
+		{Name: "cpu", RecommenderName: "vpa", Gauge: &pb.Gauge{Aggregation: "Max"}},
+		{Name: "memory", RecommenderName: "vpa", Gauge: &pb.Gauge{Aggregation: "Max"}},
+	}}
+	updated, err := client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+		Policy: &pb.Policy{
+			Id:                 id,
+			RecommenderMetrics: map[string]*pb.MetricDefinitionList{"vpa": newVPAMetrics},
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"recommender_metrics.vpa"}},
+	})
+	if err != nil {
+		t.Fatalf("UpdatePolicy(vpa) failed: %v", err)
+	}
+	wantMetrics = map[string]*pb.MetricDefinitionList{"vpa": newVPAMetrics, "cron": cronMetrics}
+	if diff := cmp.Diff(wantMetrics, updated.RecommenderMetrics, protocmp.Transform()); diff != "" {
+		t.Errorf("RecommenderMetrics mismatch after update (-want +got):\n%s", diff)
+	}
+	if updated.MaxReplicas != 20 {
+		t.Errorf("MaxReplicas = %d, want 20", updated.MaxReplicas)
+	}
+
+	// 4. An entry the mask selects but the request omits is removed.
+	updated, err = client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+		Policy:     &pb.Policy{Id: id},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"recommender_metrics.cron"}},
+	})
+	if err != nil {
+		t.Fatalf("UpdatePolicy(cron removal) failed: %v", err)
+	}
+	wantMetrics = map[string]*pb.MetricDefinitionList{"vpa": newVPAMetrics}
+	if diff := cmp.Diff(wantMetrics, updated.RecommenderMetrics, protocmp.Transform()); diff != "" {
+		t.Errorf("RecommenderMetrics mismatch after removal (-want +got):\n%s", diff)
+	}
+}
+
+// TestUpdatePolicyFieldMaskWildcardGRPC checks that '*' only applies the fields
+// the request sets.
+func TestUpdatePolicyFieldMaskWildcardGRPC(t *testing.T) {
+	start := time.Unix(1000, 0)
+	clk := &clock.FakeClock{CurrentTime: start}
+	_, client, cleanup := setupGRPCServer(t, clk)
+	defer cleanup()
+	ctx := context.Background()
+
+	id := &pb.PolicyId{ClusterName: "default", Namespace: "prod", Name: "web"}
+	if _, err := client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+		Policy: &pb.Policy{
+			Id:          id,
+			Selector:    "app=web",
+			Metrics:     []*pb.MetricDefinition{{Name: "latency", Gauge: &pb.Gauge{}}},
+			MinReplicas: 1, MaxReplicas: 10,
+		},
+	}); err != nil {
+		t.Fatalf("UpdatePolicy failed: %v", err)
+	}
+
+	updated, err := client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+		Policy:     &pb.Policy{Id: id, MaxReplicas: 42},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"*"}},
+	})
+	if err != nil {
+		t.Fatalf("UpdatePolicy(wildcard) failed: %v", err)
+	}
+	want := &pb.Policy{
+		Id:          id,
+		Selector:    "app=web",
+		Metrics:     []*pb.MetricDefinition{{Name: "latency", Gauge: &pb.Gauge{}}},
+		MinReplicas: 1, MaxReplicas: 42,
+	}
+	if diff := cmp.Diff(want, updated, protocmp.Transform()); diff != "" {
+		t.Errorf("UpdatePolicy(wildcard) mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// TestUpdatePolicyFieldMaskValidationGRPC checks that unsupported mask paths are
+// rejected and leave the stored policy alone.
+func TestUpdatePolicyFieldMaskValidationGRPC(t *testing.T) {
+	start := time.Unix(1000, 0)
+	clk := &clock.FakeClock{CurrentTime: start}
+	memStore, client, cleanup := setupGRPCServer(t, clk)
+	defer cleanup()
+	ctx := context.Background()
+
+	tests := []struct {
+		name     string
+		paths    []string
+		wantCode codes.Code
+	}{
+		{name: "Wildcard", paths: []string{"*"}, wantCode: codes.OK},
+		{name: "Known field", paths: []string{"max_replicas"}, wantCode: codes.OK},
+		{name: "Map entry", paths: []string{"recommender_metrics.vpa"}, wantCode: codes.OK},
+		{name: "Unknown field", paths: []string{"replicas"}, wantCode: codes.InvalidArgument},
+		{name: "Key on a non-map field", paths: []string{"metrics.cpu"}, wantCode: codes.InvalidArgument},
+		{name: "Missing map key", paths: []string{"recommender_metrics."}, wantCode: codes.InvalidArgument},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// One policy per case: a rejected update must not leave any trace.
+			id := &pb.PolicyId{ClusterName: "default", Namespace: "prod", Name: tc.name}
+			_, err := client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+				Policy:     &pb.Policy{Id: id, MaxReplicas: 5},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: tc.paths},
+			})
+			st, _ := status.FromError(err)
+			if st.Code() != tc.wantCode {
+				t.Errorf("Want code %v, got %v (err: %v)", tc.wantCode, st.Code(), err)
+			}
+			if _, ok := memStore.GetPolicy(id); ok != (tc.wantCode == codes.OK) {
+				t.Errorf("Policy exists: %t, want %t", ok, tc.wantCode == codes.OK)
+			}
+		})
 	}
 }

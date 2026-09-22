@@ -187,6 +187,7 @@ const pageTemplate = `
         .tag-inactive { background: #f1f5f9; color: var(--muted); }
         .tag-ready { background: #dcfce7; color: #166534; }
         .tag-not-ready { background: #fee2e2; color: #991b1b; }
+        .tag-owner { background: #e0e7ff; color: #3730a3; }
     </style>
 </head>
 <body>
@@ -321,69 +322,98 @@ const pageTemplate = `
             }
         }
 
-        function renderMetricsTable(ps) {
-            let rows = '';
-            
-            // Build lookup for metric definitions
-            const metricDefs = {};
-            if (ps.Policy.metrics) {
-                ps.Policy.metrics.forEach(m => metricDefs[m.name] = m);
+        // metricOwners returns every scope holding control metrics: the
+        // policy-wide one first, then one per recommender owning metrics.
+        // Metric names are only unique within their owner.
+        function metricOwners(ps) {
+            const owners = [{
+                name: '',
+                defs: ps.Policy.metrics || [],
+                cm: ps.ControlMetrics,
+            }];
+            const owned = ps.Policy.recommender_metrics || {};
+            Object.keys(owned).sort().forEach(name => {
+                owners.push({
+                    name: name,
+                    defs: (owned[name] && owned[name].definitions) || [],
+                    cm: (ps.RecommenderControlMetrics || {})[name],
+                });
+            });
+            return owners;
+        }
+
+        function ownerCell(owner) {
+            if (!owner) return '<span class="text-muted-small">Policy</span>';
+            return '<span class="tag tag-owner">' + owner + '</span>';
+        }
+
+        // describeMetric extracts the intent of a metric definition for display.
+        function describeMetric(def, defaultScope) {
+            def = def || {};
+            const d = {
+                intent: '-',
+                agg: '-',
+                config: '',
+                scope: def.scope || defaultScope,
+                params: '',
+            };
+
+            if (def.gauge) {
+                d.intent = 'Gauge';
+                d.agg = def.gauge.aggregation || 'Avg';
+            } else if (def.rate) {
+                d.intent = 'Rate';
+                d.agg = def.rate.aggregation || 'Sum';
+                d.config = 'Window: ' + def.rate.window;
+            } else if (def.distribution) {
+                d.intent = 'Distribution';
+                d.agg = def.distribution.percentile;
+                d.config = 'Agg: ' + (def.distribution.aggregation || 'Max');
+            } else if (def.decaying_distribution) {
+                d.intent = 'DecayingDist';
+                d.agg = def.decaying_distribution.percentile;
+                d.config = 'HL: ' + def.decaying_distribution.half_life;
             }
 
-            let hasMetrics = false;
+            if (def.params) {
+                d.params = Object.entries(def.params).map(([k, v]) => k + '=' + v).join(', ');
+            }
+            return d;
+        }
+
+        // renderMetricRows renders the control metrics of a single owner.
+        function renderMetricRows(owner) {
+            const cm = owner.cm;
+            if (!cm) return '';
+
+            const metricDefs = {};
+            owner.defs.forEach(m => metricDefs[m.name] = m);
+
+            let rows = '';
 
             // Render Global/Aggregated Metrics
-            if (ps.ControlMetrics && ps.ControlMetrics.values) {
-                for (const [name, val] of Object.entries(ps.ControlMetrics.values)) {
-                    hasMetrics = true;
-                    const def = metricDefs[name] || {};
-                    
-                    let intent = '-';
-                    let agg = '-';
-                    let config = '';
-                    let scope = def.scope || 'Global';
-                    
-                    if (def.gauge) {
-                        intent = 'Gauge';
-                        agg = def.gauge.aggregation || 'Avg';
-                    } else if (def.rate) {
-                        intent = 'Rate';
-                        agg = def.rate.aggregation || 'Sum';
-                        config = 'Window: ' + def.rate.window;
-                    } else if (def.distribution) {
-                        intent = 'Distribution';
-                        agg = def.distribution.percentile;
-                        config = 'Agg: ' + (def.distribution.aggregation || 'Max');
-                    } else if (def.decaying_distribution) {
-                        intent = 'DecayingDist';
-                        agg = def.decaying_distribution.percentile;
-                        config = 'HL: ' + def.decaying_distribution.half_life;
-                    }
-
-                    let paramsStr = '';
-                    if (def.params) {
-                        paramsStr = Object.entries(def.params)
-                            .map(([k, v]) => k + '=' + v)
-                            .join(', ');
-                    }
+            if (cm.values) {
+                for (const [name, val] of Object.entries(cm.values)) {
+                    const d = describeMetric(metricDefs[name], 'Global');
 
                     rows += '<tr>' +
-                            '<td>' + name + ' <span class="tag tag-inactive">' + scope + '</span></td>' +
-                            '<td class="text-muted-small">' + intent + '</td>' +
-                            '<td class="text-muted-small">' + agg + '</td>' +
-                            '<td class="text-muted-small">' + paramsStr + '</td>' +
-                            '<td class="text-muted-small">' + config + '</td>' +
+                            '<td>' + name + ' <span class="tag tag-inactive">' + d.scope + '</span></td>' +
+                            '<td>' + ownerCell(owner.name) + '</td>' +
+                            '<td class="text-muted-small">' + d.intent + '</td>' +
+                            '<td class="text-muted-small">' + d.agg + '</td>' +
+                            '<td class="text-muted-small">' + d.params + '</td>' +
+                            '<td class="text-muted-small">' + d.config + '</td>' +
                             '<td><strong>' + formatFloat(val) + '</strong></td>' +
-                            '<td>' + formatTime(ps.ControlMetrics.timestamp) + '</td>' +
+                            '<td>' + formatTime(cm.timestamp) + '</td>' +
                         '</tr>';
                 }
             }
 
             // Render Pod- and Container-Scoped Metrics (as distinct rows for clarity or grouped)
-            if (ps.ControlMetrics && ps.ControlMetrics.pod_metrics && Object.keys(ps.ControlMetrics.pod_metrics).length > 0) {
+            if (cm.pod_metrics && Object.keys(cm.pod_metrics).length > 0) {
                 // Collect all pod metrics by metric name first to keep the table organized
                 const podMetricsByName = {};
-                for (const [podName, podData] of Object.entries(ps.ControlMetrics.pod_metrics)) {
+                for (const [podName, podData] of Object.entries(cm.pod_metrics)) {
                     const podValues = (podData.values && podData.values.values) || {};
                     const containerMetrics = podData.container_metrics || {};
 
@@ -405,26 +435,7 @@ const pageTemplate = `
                 }
 
                 for (const [name, pods] of Object.entries(podMetricsByName)) {
-                    hasMetrics = true;
-                    const def = metricDefs[name] || {};
-                    let intent = '-';
-                    let agg = '-';
-                    let config = '';
-                    let scope = def.scope || 'Pod';
-
-                    if (def.gauge) {
-                        intent = 'Gauge';
-                        agg = def.gauge.aggregation || 'Avg';
-                    } else if (def.decaying_distribution) {
-                        intent = 'DecayingDist';
-                        agg = def.decaying_distribution.percentile;
-                        config = 'HL: ' + def.decaying_distribution.half_life;
-                    }
-
-                    let paramsStr = '';
-                    if (def.params) {
-                        paramsStr = Object.entries(def.params).map(([k, v]) => k + '=' + v).join(', ');
-                    }
+                    const d = describeMetric(metricDefs[name], 'Pod');
 
                     // Build a string displaying the pod values, with the
                     // per-container breakdown nested underneath when available.
@@ -438,19 +449,29 @@ const pageTemplate = `
                     podValsHtml += '</div>';
 
                     rows += '<tr>' +
-                            '<td>' + name + ' <span class="tag tag-inactive">' + scope + '</span></td>' +
-                            '<td class="text-muted-small">' + intent + '</td>' +
-                            '<td class="text-muted-small">' + agg + '</td>' +
-                            '<td class="text-muted-small">' + paramsStr + '</td>' +
-                            '<td class="text-muted-small">' + config + '</td>' +
+                            '<td>' + name + ' <span class="tag tag-inactive">' + d.scope + '</span></td>' +
+                            '<td>' + ownerCell(owner.name) + '</td>' +
+                            '<td class="text-muted-small">' + d.intent + '</td>' +
+                            '<td class="text-muted-small">' + d.agg + '</td>' +
+                            '<td class="text-muted-small">' + d.params + '</td>' +
+                            '<td class="text-muted-small">' + d.config + '</td>' +
                             '<td>' + podValsHtml + '</td>' +
-                            '<td>' + formatTime(ps.ControlMetrics.timestamp) + '</td>' +
+                            '<td>' + formatTime(cm.timestamp) + '</td>' +
                         '</tr>';
                 }
             }
 
-            if (!hasMetrics) {
-                rows = '<tr><td colspan="7" style="text-align: center; color: var(--muted);">No metrics collected yet.</td></tr>';
+            return rows;
+        }
+
+        function renderMetricsTable(ps) {
+            // Policy-wide metrics and metrics owned by a recommender are all
+            // reported here, told apart by the Owner column.
+            let rows = '';
+            metricOwners(ps).forEach(owner => { rows += renderMetricRows(owner); });
+
+            if (!rows) {
+                rows = '<tr><td colspan="8" style="text-align: center; color: var(--muted);">No metrics collected yet.</td></tr>';
             }
 
             return '<div class="section">' +
@@ -459,6 +480,7 @@ const pageTemplate = `
                         '<thead>' +
                             '<tr>' +
                                 '<th>Metric Name</th>' +
+                                '<th>Owner</th>' +
                                 '<th>Intent</th>' +
                                 '<th>Resolution</th>' +
                                 '<th>Params</th>' +
@@ -558,10 +580,27 @@ const pageTemplate = `
 
         function renderWorkloadTable(ps) {
             const pods = ps.Workload ? Object.values(ps.Workload).sort((a, b) => a.name.localeCompare(b.name)) : [];
-            const metrics = ps.Policy.metrics || [];
-            
+
+            // One column per metric, policy-wide ones and recommender-owned
+            // ones alike. Series are keyed by <owner>/<name>, matching the
+            // metric key used by the store.
+            const metrics = [];
+            metricOwners(ps).forEach(owner => {
+                owner.defs.forEach(m => {
+                    metrics.push({
+                        name: m.name,
+                        owner: owner.name,
+                        key: owner.name ? owner.name + '/' + m.name : m.name,
+                    });
+                });
+            });
+
             let headerCells = '';
-            metrics.forEach(m => { headerCells += '<th>' + m.name + '</th>'; });
+            metrics.forEach(m => {
+                headerCells += '<th>' + m.name +
+                    (m.owner ? ' <span class="tag tag-owner">' + m.owner + '</span>' : '') +
+                    '</th>';
+            });
 
             let rows = '';
             if (pods.length > 0) {
@@ -572,8 +611,8 @@ const pageTemplate = `
                     let metricCells = '';
                     metrics.forEach(m => {
                          let val = '-';
-                         if (ps.Series && ps.Series[m.name]) {
-                             for (const series of Object.values(ps.Series[m.name])) {
+                         if (ps.Series && ps.Series[m.key]) {
+                             for (const series of Object.values(ps.Series[m.key])) {
                                  // Note: Internal structs (Series) use Capitalized fields
                                  if (series.PodName === pod.name) {
                                      val = formatFloat(series.ControlMetric.Value);
