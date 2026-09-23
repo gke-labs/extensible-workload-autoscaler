@@ -182,6 +182,7 @@ spec:
                         "Pod" reports one value per pod; samples from individual containers are
                         summed into their pod's value.
                         "PodContainer" reports one value per pod and per container.
+                        "Container" reports one value per container.
                       type: string
                   required:
                   - name

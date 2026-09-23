@@ -171,7 +171,7 @@ message MetricDefinition {
   Distribution distribution = 12;
   DecayingDistribution decaying_distribution = 13;
 
-  // The scope of the metric: "Global" (default), "Pod", or "PodContainer".
+  // The scope of the metric: "Global" (default), "Pod", "PodContainer", or "Container".
   string scope = 14;
 }
 
@@ -290,10 +290,12 @@ message ControlMetrics {
   int64 timestamp = 2;
   // The number of ready replicas.
   int32 ready_replicas = 3;
-  // Pod-scoped metric values, keyed by pod name.
+  // Per pod metric values, keyed by pod name.
   map<string, MetricValues> pod_metrics = 4;
-  // Pod container metric values, keyed by pod name.
+  // Per pod, per container metric values, keyed by pod name.
   map<string, ContainerMetrics> pod_container_metrics = 5;
+  // Per container metric values.
+  ContainerMetrics container_metrics = 6;
 }
 
 

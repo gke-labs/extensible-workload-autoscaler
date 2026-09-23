@@ -30,15 +30,31 @@ const (
 	// ControlMetrics.PodContainerMetrics[pod].ContainerMetrics[container], along
 	// with the pod-level rollup in ControlMetrics.PodMetrics[pod].Values.
 	ScopePodContainer = "PodContainer"
+	// ScopeContainer reports one value per container name in
+	// ControlMetrics.ContainerMetrics.ContainerMetrics[container], averaged over
+	// every pod that reports that container.
+	ScopeContainer = "Container"
 )
 
-// isPodScoped reports whether the metric is tracked per pod instead of being
-// aggregated into a single policy-wide value. Both ScopePod and
-// ScopePodContainer keep per-pod state; they differ only in whether the
-// per-container breakdown is reported alongside it. Any unrecognized scope
-// (including the empty string) is treated as ScopeGlobal.
-func isPodScoped(scope string) bool {
+// isPodBreakdown reports whether the metric keeps one value per pod. Both ScopePod
+// and ScopePodContainer keep per-pod state; they differ only in whether the
+// per-container breakdown is reported alongside it.
+func isPodBreakdown(scope string) bool {
 	return scope == ScopePod || scope == ScopePodContainer
+}
+
+// isContainerBreakdown reports whether the metric needs the per-pod,
+// per-container values to be tracked. ScopePodContainer reports them directly,
+// while ScopeContainer averages them across pods.
+func isContainerBreakdown(scope string) bool {
+	return scope == ScopePodContainer || scope == ScopeContainer
+}
+
+// isGlobalScope reports whether the metric is aggregated into a single
+// policy-wide value. Any unrecognized scope (including the empty string) is
+// treated as ScopeGlobal.
+func isGlobalScope(scope string) bool {
+	return !isPodBreakdown(scope) && !isContainerBreakdown(scope)
 }
 
 // DataPoint represents a single calculated value (ControlMetric)
@@ -341,7 +357,7 @@ func (s *MemoryStore) processSample(ps *PolicyState, podName, containerName stri
 
 	var gh *DecayingHistogram
 	if def.DecayingDistribution != nil {
-		if isPodScoped(def.Scope) {
+		if isPodBreakdown(def.Scope) {
 			if ser.DecayingHistogram == nil {
 				hl, _ := time.ParseDuration(def.DecayingDistribution.HalfLife)
 				ser.DecayingHistogram, _ = NewDecayingHistogram(time.Unix(ingestTime, 0), hl, def.DecayingDistribution.BucketSize)
@@ -572,6 +588,7 @@ func (s *MemoryStore) GetControlMetrics(id *pb.PolicyId, recommenderName string)
 		return cm, true
 	}
 	// The recommender owns no metric: report the workload state only.
+	// ContainerMetrics is left unset, matching calculateControlMetrics.
 	return &pb.ControlMetrics{
 		Values:              make(map[string]float64),
 		PodMetrics:          make(map[string]*pb.MetricValues),
@@ -630,55 +647,70 @@ func (s *MemoryStore) calculateControlMetrics(ps *PolicyState, defs []*pb.Metric
 	currentControlMetrics := make(map[string]float64)
 	currentPodMetrics := make(map[string]*pb.MetricValues)
 	currentPodContainerMetrics := make(map[string]*pb.ContainerMetrics)
+	currentContainerMetrics := make(map[string]*pb.MetricValues)
 
 	for _, def := range defs {
 		key := metricKey(def)
-		val, podVals, containerVals, ok := s.calculateMetric(ps, key, def, ps.Series[key], workload, readyReplicas, now, cutoff, gcCutoff)
-		if ok {
-			if podVals != nil {
-				for podName, podVal := range podVals {
-					podMetrics(currentPodMetrics, podName).Values[def.Name] = podVal
+		res, ok := s.calculateMetric(ps, key, def, ps.Series[key], workload, readyReplicas, now, cutoff, gcCutoff)
+		if !ok {
+			continue
+		}
+		switch {
+		case res.container != nil:
+			for containerName, containerVal := range res.container {
+				metricValues(currentContainerMetrics, containerName).Values[def.Name] = containerVal
+			}
+		case res.pod != nil:
+			for podName, podVal := range res.pod {
+				metricValues(currentPodMetrics, podName).Values[def.Name] = podVal
+			}
+			for podName, byContainer := range res.podContainer {
+				for containerName, containerVal := range byContainer {
+					podContainerMetrics(currentPodContainerMetrics, podName, containerName).Values[def.Name] = containerVal
 				}
-				for podName, byContainer := range containerVals {
-					for containerName, containerVal := range byContainer {
-						containerMetrics(currentPodContainerMetrics, podName, containerName).Values[def.Name] = containerVal
-					}
-				}
-			} else {
-				currentControlMetrics[def.Name] = val
-				if policy.Workload != nil {
-					// Metrics owned by a recommender are exported under their
-					// metric key, as their name is only unique within their
-					// owner.
-					metrics.RecordControlMetric(policy.Id.ClusterName, policy.Id.Namespace, policy.Id.Name, policy.Workload.Group, policy.Workload.Version, policy.Workload.Kind, policy.Workload.Name, key, val)
-				}
+			}
+		default:
+			currentControlMetrics[def.Name] = res.global
+			if policy.Workload != nil {
+				// Metrics owned by a recommender are exported under their
+				// metric key, as their name is only unique within their
+				// owner.
+				metrics.RecordControlMetric(policy.Id.ClusterName, policy.Id.Namespace, policy.Id.Name, policy.Workload.Group, policy.Workload.Version, policy.Workload.Kind, policy.Workload.Name, key, res.global)
 			}
 		}
 	}
 
-	return &pb.ControlMetrics{
+	cm := &pb.ControlMetrics{
 		Values:              currentControlMetrics,
 		PodMetrics:          currentPodMetrics,
 		PodContainerMetrics: currentPodContainerMetrics,
 		ReadyReplicas:       int32(readyReplicas),
 		Timestamp:           now,
 	}
-}
-
-// podMetrics returns the MetricValues entry for podName, creating it (and its
-// nested map) if it does not exist yet.
-func podMetrics(all map[string]*pb.MetricValues, podName string) *pb.MetricValues {
-	pm, ok := all[podName]
-	if !ok {
-		pm = &pb.MetricValues{Values: make(map[string]float64)}
-		all[podName] = pm
+	// Left unset when no Container-scoped metric reported a value, so that the
+	// snapshot does not carry an empty message.
+	if len(currentContainerMetrics) > 0 {
+		cm.ContainerMetrics = &pb.ContainerMetrics{ContainerMetrics: currentContainerMetrics}
 	}
-	return pm
+	return cm
 }
 
-// containerMetrics returns the MetricValues entry for containerName within
+// metricValues returns the MetricValues entry stored under key, creating it
+// (and its nested map) if it does not exist yet. The key is a pod name for
+// ControlMetrics.PodMetrics and a container name for
+// ControlMetrics.ContainerMetrics.
+func metricValues(all map[string]*pb.MetricValues, key string) *pb.MetricValues {
+	mv, ok := all[key]
+	if !ok {
+		mv = &pb.MetricValues{Values: make(map[string]float64)}
+		all[key] = mv
+	}
+	return mv
+}
+
+// podContainerMetrics returns the MetricValues entry for containerName within
 // podName, creating the intermediate entries if they do not exist yet.
-func containerMetrics(all map[string]*pb.ContainerMetrics, podName, containerName string) *pb.MetricValues {
+func podContainerMetrics(all map[string]*pb.ContainerMetrics, podName, containerName string) *pb.MetricValues {
 	pcm, ok := all[podName]
 	if !ok {
 		pcm = &pb.ContainerMetrics{ContainerMetrics: make(map[string]*pb.MetricValues)}
@@ -740,32 +772,49 @@ func (s *MemoryStore) cleanupOrphanedDecisions(ps *PolicyState) {
 	}
 }
 
-// calculateMetric aggregates the series of a single metric definition.
-// It returns, in order: the policy-wide (Global) value, the per-pod values, the
-// per-pod/per-container values, and whether any value could be computed.
+// metricResult holds the values calculated for a single metric definition.
+// Which field is populated depends on the metric's scope; the others stay nil.
+type metricResult struct {
+	// global is the policy-wide value, reported for ScopeGlobal.
+	global float64
+	// pod maps a pod name to its value, reported for ScopePod and
+	// ScopePodContainer.
+	pod map[string]float64
+	// podContainer maps a pod name to its per-container values, reported for
+	// ScopePodContainer.
+	podContainer map[string]map[string]float64
+	// container maps a container name to its value averaged over every pod
+	// reporting that container, reported for ScopeContainer.
+	container map[string]float64
+}
+
+// calculateMetric aggregates the series of a single metric definition. It
+// reports false if no value could be computed.
 //
 // key is the key the metric state is tracked under (see metricKey).
 //
-// The returned values depend on def.Scope:
-//   - "Global" (default): only the policy-wide value is returned.
-//   - "Pod": only per-pod values are returned. Samples reported by individual
+// The fields populated on the result depend on def.Scope:
+//   - "Global" (default): only the policy-wide value is set.
+//   - "Pod": only the per-pod values are set. Samples reported by individual
 //     containers are summed into their pod's value.
-//   - "PodContainer": per-pod values are returned along with the per-container
+//   - "PodContainer": the per-pod values are set along with the per-container
 //     breakdown that rolls up into them.
-func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.MetricDefinition, seriesMap map[string]*Series, workload map[string]*pb.PodState, readyReplicas int, now, cutoff, gcCutoff int64) (float64, map[string]float64, map[string]map[string]float64, bool) {
-	if !isPodScoped(def.Scope) {
+//   - "Container": only the per-container values are set, each averaged over
+//     the pods reporting that container.
+func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.MetricDefinition, seriesMap map[string]*Series, workload map[string]*pb.PodState, readyReplicas int, now, cutoff, gcCutoff int64) (metricResult, bool) {
+	if isGlobalScope(def.Scope) {
 		if gh, ok := ps.GlobalHistograms[key]; ok {
 			percentile := "p95"
 			if def.DecayingDistribution != nil {
 				percentile = def.DecayingDistribution.Percentile
 			}
 			p := parsePercentile(percentile)
-			return gh.Percentile(p, time.Unix(now, 0)), nil, nil, true
+			return metricResult{global: gh.Percentile(p, time.Unix(now, 0))}, true
 		}
 	}
 
 	if seriesMap == nil {
-		return 0, nil, nil, false
+		return metricResult{}, false
 	}
 
 	globalSum := 0.0
@@ -839,14 +888,15 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.Metri
 
 		if defType == "Histogram" {
 			if ser.ControlMetric.Buckets != nil {
-				if isPodScoped(def.Scope) {
+				if !isGlobalScope(def.Scope) {
 					if podBuckets[ser.PodName] == nil {
 						podBuckets[ser.PodName] = make(map[string]float64)
 					}
 					sumRateBuckets(podBuckets[ser.PodName], ser.ControlMetric.Buckets)
 
-					// The per-container breakdown is only reported for PodContainer scope.
-					if def.Scope == ScopePodContainer && ser.ContainerName != "" {
+					// The per-container breakdown backs both the PodContainer
+					// scope and the per-container average of the Container scope.
+					if isContainerBreakdown(def.Scope) && ser.ContainerName != "" {
 						if containerBuckets[ser.PodName] == nil {
 							containerBuckets[ser.PodName] = make(map[string]map[string]float64)
 						}
@@ -893,9 +943,10 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.Metri
 			podSums[ser.PodName] += weightedVal
 			podFound[ser.PodName] = true
 
-			// The per-container breakdown is only reported for PodContainer scope.
-			// Pod-scoped metrics keep the summed pod value only.
-			if def.Scope == ScopePodContainer && ser.ContainerName != "" {
+			// The per-container breakdown backs both the PodContainer scope and
+			// the per-container average of the Container scope. Pod-scoped
+			// metrics keep the summed pod value only.
+			if isContainerBreakdown(def.Scope) && ser.ContainerName != "" {
 				if containerSums[ser.PodName] == nil {
 					containerSums[ser.PodName] = make(map[string]float64)
 				}
@@ -905,7 +956,7 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.Metri
 	}
 
 	if defType == "Histogram" {
-		if isPodScoped(def.Scope) {
+		if !isGlobalScope(def.Scope) {
 			if len(podBuckets) > 0 && percentile != "" {
 				for pName, buckets := range podBuckets {
 					podSums[pName] = calculatePercentile(buckets, percentile)
@@ -918,32 +969,63 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.Metri
 						containerSums[pName][cName] = calculatePercentile(buckets, percentile)
 					}
 				}
-				return 0, podSums, containerSums, true
+				if def.Scope == ScopeContainer {
+					if len(containerSums) == 0 {
+						return metricResult{}, false
+					}
+					return metricResult{container: averageByContainer(containerSums)}, true
+				}
+				return metricResult{pod: podSums, podContainer: containerSums}, true
 			}
-			return 0, nil, nil, false
+			return metricResult{}, false
 		}
 		if hasBuckets && percentile != "" {
-			return calculatePercentile(globalBuckets, percentile), nil, nil, true
+			return metricResult{global: calculatePercentile(globalBuckets, percentile)}, true
 		}
 	} else if hasGlobal {
 		val := globalSum
 		if agg == "Avg" {
 			val = val / float64(readyReplicas)
 		}
-		return val, nil, nil, true
+		return metricResult{global: val}, true
 	} else if len(podFound) > 0 {
+		if def.Scope == ScopeContainer {
+			if len(containerSums) == 0 {
+				return metricResult{}, false
+			}
+			return metricResult{container: averageByContainer(containerSums)}, true
+		}
 		values := []float64{}
 		for pName := range podFound {
 			values = append(values, podSums[pName])
 		}
 		if len(values) > 0 {
-			if isPodScoped(def.Scope) {
-				return 0, podSums, containerSums, true
+			if isPodBreakdown(def.Scope) {
+				return metricResult{pod: podSums, podContainer: containerSums}, true
 			}
-			return aggregate(values, agg), nil, nil, true
+			return metricResult{global: aggregate(values, agg)}, true
 		}
 	}
-	return 0, nil, nil, false
+	return metricResult{}, false
+}
+
+// averageByContainer collapses per-pod, per-container values into a single
+// value per container name, averaged over the pods that report that container.
+// A container missing from a pod does not count against its average.
+func averageByContainer(byPod map[string]map[string]float64) map[string]float64 {
+	sums := make(map[string]float64)
+	counts := make(map[string]int)
+	for _, byContainer := range byPod {
+		for cName, val := range byContainer {
+			sums[cName] += val
+			counts[cName]++
+		}
+	}
+	avg := make(map[string]float64, len(sums))
+	for cName, sum := range sums {
+		avg[cName] = sum / float64(counts[cName])
+	}
+	return avg
 }
 
 // requestWeightCache memoizes the per-container request weights of a pod, keyed

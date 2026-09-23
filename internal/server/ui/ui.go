@@ -462,6 +462,43 @@ const pageTemplate = `
                 }
             }
 
+            // Render Container-Scoped Metrics: one value per container name,
+            // averaged over the pods reporting it.
+            const workloadContainers = (cm.container_metrics && cm.container_metrics.container_metrics) || {};
+            if (Object.keys(workloadContainers).length > 0) {
+                // Group by metric name so each metric gets a single row.
+                const containerMetricsByName = {};
+                for (const [containerName, containerData] of Object.entries(workloadContainers)) {
+                    const containerValues = (containerData && containerData.values) || {};
+                    for (const [name, val] of Object.entries(containerValues)) {
+                        if (!containerMetricsByName[name]) containerMetricsByName[name] = [];
+                        containerMetricsByName[name].push({container: containerName, val: val});
+                    }
+                }
+
+                for (const [name, containers] of Object.entries(containerMetricsByName)) {
+                    const d = describeMetric(metricDefs[name], 'Container');
+                    containers.sort((a, b) => a.container.localeCompare(b.container));
+
+                    let containerValsHtml = '<div style="max-height: 80px; overflow-y: auto; font-size: 0.9rem;">';
+                    containers.forEach(c => {
+                        containerValsHtml += '<div><span class="text-muted-small">' + c.container + ':</span> <strong>' + formatFloat(c.val) + '</strong></div>';
+                    });
+                    containerValsHtml += '</div>';
+
+                    rows += '<tr>' +
+                            '<td>' + name + ' <span class="tag tag-inactive">' + d.scope + '</span></td>' +
+                            '<td>' + ownerCell(owner.name) + '</td>' +
+                            '<td class="text-muted-small">' + d.intent + '</td>' +
+                            '<td class="text-muted-small">' + d.agg + '</td>' +
+                            '<td class="text-muted-small">' + d.params + '</td>' +
+                            '<td class="text-muted-small">' + d.config + '</td>' +
+                            '<td>' + containerValsHtml + '</td>' +
+                            '<td>' + formatTime(cm.timestamp) + '</td>' +
+                        '</tr>';
+                }
+            }
+
             return rows;
         }
 
