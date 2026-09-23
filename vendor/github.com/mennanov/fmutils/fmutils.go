@@ -1,0 +1,366 @@
+package fmutils
+
+import (
+	"fmt"
+	"strings"
+
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+)
+
+// Filter keeps the msg fields that are listed in the paths and clears all the rest.
+//
+// This is a handy wrapper for NestedMask.Filter method.
+// If the same paths are used to process multiple proto messages use NestedMask.Filter method directly.
+func Filter(msg proto.Message, paths []string) {
+	NestedMaskFromPaths(paths).Filter(msg)
+}
+
+// Prune clears all the fields listed in paths from the given msg.
+//
+// This is a handy wrapper for NestedMask.Prune method.
+// If the same paths are used to process multiple proto messages use NestedMask.Filter method directly.
+func Prune(msg proto.Message, paths []string) {
+	NestedMaskFromPaths(paths).Prune(msg)
+}
+
+// Overwrite overwrites all the fields listed in paths in the dest msg using values from src msg.
+// Map values are partially merged when the mask addresses nested fields inside the map value.
+//
+// This is a handy wrapper for NestedMask.Overwrite method.
+// If the same paths are used to process multiple proto messages use NestedMask.Overwrite method directly.
+func Overwrite(src, dest proto.Message, paths []string) {
+	NestedMaskFromPaths(paths).Overwrite(src, dest)
+}
+
+// Validate checks if all paths are valid for specified message
+//
+// This is a handy wrapper for NestedMask.Validate method.
+// If the same paths are used to process multiple proto messages use NestedMask.Validate method directly.
+func Validate(validationModel proto.Message, paths []string) error {
+	return NestedMaskFromPaths(paths).Validate(validationModel)
+}
+
+// NestedMask represents a field mask as a recursive map.
+type NestedMask map[string]NestedMask
+
+// NestedMaskFromPaths creates an instance of NestedMask for the given paths.
+//
+// For example ["foo.bar", "foo.baz"] becomes {"foo": {"bar": nil, "baz": nil}}.
+func NestedMaskFromPaths(paths []string) NestedMask {
+	var add func(path string, fm NestedMask)
+	add = func(path string, mask NestedMask) {
+		if len(path) == 0 {
+			// Invalid input.
+			return
+		}
+		dotIdx := strings.IndexRune(path, '.')
+		if dotIdx == -1 {
+			mask[path] = nil
+		} else {
+			field := path[:dotIdx]
+			if len(field) == 0 {
+				// Invalid input.
+				return
+			}
+			rest := path[dotIdx+1:]
+			nested := mask[field]
+			if nested == nil {
+				nested = make(NestedMask)
+				mask[field] = nested
+			}
+			add(rest, nested)
+		}
+	}
+
+	mask := make(NestedMask)
+	for _, p := range paths {
+		add(p, mask)
+	}
+
+	return mask
+}
+
+// Filter keeps the msg fields that are listed in the paths and clears all the rest.
+//
+// If the mask is empty then all the fields are kept.
+// Paths are assumed to be valid and normalized otherwise the function may panic.
+// See google.golang.org/protobuf/types/known/fieldmaskpb for details.
+func (mask NestedMask) Filter(msg proto.Message) {
+	if len(mask) == 0 {
+		return
+	}
+
+	rft := msg.ProtoReflect()
+	rft.Range(func(fd protoreflect.FieldDescriptor, _ protoreflect.Value) bool {
+		m, ok := mask[string(fd.Name())]
+		if ok {
+			if len(m) == 0 {
+				return true
+			}
+
+			if fd.IsMap() {
+				xmap := rft.Get(fd).Map()
+				xmap.Range(func(mk protoreflect.MapKey, mv protoreflect.Value) bool {
+					if mi, ok := m[mk.String()]; ok {
+						if i, ok := mv.Interface().(protoreflect.Message); ok && len(mi) > 0 {
+							mi.Filter(i.Interface())
+						}
+					} else {
+						xmap.Clear(mk)
+					}
+
+					return true
+				})
+			} else if fd.IsList() {
+				list := rft.Get(fd).List()
+				for i := 0; i < list.Len(); i++ {
+					m.Filter(list.Get(i).Message().Interface())
+				}
+			} else if fd.Kind() == protoreflect.MessageKind {
+				m.Filter(rft.Get(fd).Message().Interface())
+			}
+		} else {
+			rft.Clear(fd)
+		}
+		return true
+	})
+}
+
+// Prune clears all the fields listed in paths from the given msg.
+//
+// All other fields are kept untouched. If the mask is empty no fields are cleared.
+// This operation is the opposite of NestedMask.Filter.
+// Paths are assumed to be valid and normalized otherwise the function may panic.
+// See google.golang.org/protobuf/types/known/fieldmaskpb for details.
+func (mask NestedMask) Prune(msg proto.Message) {
+	if len(mask) == 0 {
+		return
+	}
+
+	rft := msg.ProtoReflect()
+	rft.Range(func(fd protoreflect.FieldDescriptor, _ protoreflect.Value) bool {
+		m, ok := mask[string(fd.Name())]
+		if ok {
+			if len(m) == 0 {
+				rft.Clear(fd)
+				return true
+			}
+
+			if fd.IsMap() {
+				xmap := rft.Get(fd).Map()
+				xmap.Range(func(mk protoreflect.MapKey, mv protoreflect.Value) bool {
+					if mi, ok := m[mk.String()]; ok {
+						if i, ok := mv.Interface().(protoreflect.Message); ok && len(mi) > 0 {
+							mi.Prune(i.Interface())
+						} else {
+							xmap.Clear(mk)
+						}
+					}
+
+					return true
+				})
+			} else if fd.IsList() {
+				list := rft.Get(fd).List()
+				for i := 0; i < list.Len(); i++ {
+					m.Prune(list.Get(i).Message().Interface())
+				}
+			} else if fd.Kind() == protoreflect.MessageKind {
+				m.Prune(rft.Get(fd).Message().Interface())
+			}
+		}
+		return true
+	})
+}
+
+// Overwrite overwrites all the fields listed in paths in the dest msg using values from src msg.
+//
+// All other fields are kept untouched. If the mask is empty, no fields are overwritten.
+// Supports scalars, messages, repeated fields, and maps.
+// If the parent of the field is nil message, the parent is initiated before overwriting the field
+// If the field in src is empty value, the field in dest is cleared.
+// A field overwritten as a whole is assigned, not copied, so dest and src end up
+// sharing that message, list or map; clone src first if it is mutated afterwards.
+// Paths are assumed to be valid and normalized otherwise the function may panic.
+func (mask NestedMask) Overwrite(src, dest proto.Message) {
+	mask.overwrite(src.ProtoReflect(), dest.ProtoReflect())
+}
+
+// Validate checks if all paths are valid for specified message.
+//
+// Supports scalars, messages, repeated fields, and maps.
+//
+// A path segment following a map field is treated as a map key, which is
+// always valid since keys are arbitrary. Any deeper segments are validated
+// against the map value message (only possible when the value is a message).
+func (m NestedMask) Validate(validationModel proto.Message) error {
+	err := m.validate("", validationModel.ProtoReflect())
+	if err != nil {
+		return fmt.Errorf("invalid mask: %w", err)
+	}
+
+	return nil
+}
+
+func (mask NestedMask) overwrite(srcRft, destRft protoreflect.Message) {
+	for srcFDName, submask := range mask {
+		srcFD := srcRft.Descriptor().Fields().ByName(protoreflect.Name(srcFDName))
+		srcVal := srcRft.Get(srcFD)
+		if len(submask) == 0 {
+			if srcRft.Has(srcFD) {
+				destRft.Set(srcFD, srcVal)
+			} else {
+				destRft.Clear(srcFD)
+			}
+		} else if srcFD.IsMap() && srcFD.Kind() == protoreflect.MessageKind {
+			srcMap := srcRft.Get(srcFD).Map()
+			// Mutable initializes an unset dest map in place. Setting src's map instead
+			// would alias it into dest, and panic when src's own map is unset.
+			destMap := destRft.Mutable(srcFD).Map()
+			srcMap.Range(func(mk protoreflect.MapKey, mv protoreflect.Value) bool {
+				if mi, ok := submask[mk.String()]; ok {
+					if i, ok := mv.Interface().(protoreflect.Message); ok && len(mi) > 0 {
+						// Clone existing dest entry so we don't mutate other fields.
+						var destMsg protoreflect.Message
+						if v := destMap.Get(mk); v.IsValid() && v.Message().IsValid() {
+							destMsg = proto.Clone(v.Message().Interface()).ProtoReflect()
+						} else {
+							destMsg = i.New()
+						}
+						// Store the (cloned/new) message then overwrite only masked fields.
+						destMap.Set(mk, protoreflect.ValueOfMessage(destMsg))
+						mi.overwrite(mv.Message(), destMsg)
+					} else {
+						destMap.Set(mk, mv)
+					}
+				} else {
+					destMap.Clear(mk)
+				}
+				return true
+			})
+		} else if srcFD.IsList() && srcFD.Kind() == protoreflect.MessageKind {
+			srcList := srcRft.Get(srcFD).List()
+			destList := destRft.Mutable(srcFD).List()
+			// Truncate anything in dest that exceeds the length of src
+			if srcList.Len() < destList.Len() {
+				destList.Truncate(srcList.Len())
+			}
+			for i := 0; i < srcList.Len(); i++ {
+				srcListItem := srcList.Get(i)
+				var destListItem protoreflect.Message
+				if destList.Len() > i {
+					// Overwrite existing items.
+					destListItem = destList.Get(i).Message()
+				} else {
+					// Append new items to overwrite.
+					destListItem = destList.AppendMutable().Message()
+				}
+				submask.overwrite(srcListItem.Message(), destListItem)
+			}
+
+		} else if srcFD.Kind() == protoreflect.MessageKind {
+			// If the dest field is nil
+			if !destRft.Get(srcFD).Message().IsValid() {
+				destRft.Set(srcFD, protoreflect.ValueOf(destRft.Get(srcFD).Message().New()))
+			}
+			submask.overwrite(srcRft.Get(srcFD).Message(), destRft.Get(srcFD).Message())
+		}
+	}
+}
+
+func (mask NestedMask) validate(pathPrefix string, msg protoreflect.Message) error {
+	for fieldName, submask := range mask {
+		path := fullPath(pathPrefix, fieldName)
+
+		fieldDesc := msg.Descriptor().Fields().ByName(protoreflect.Name(fieldName))
+		if fieldDesc == nil {
+			return fmt.Errorf("unknown path: %q", path)
+		}
+
+		if len(submask) == 0 {
+			continue
+		}
+
+		// The segment after a map field is a map key (always valid); anything
+		// nested beyond it is validated against the map value message.
+		if fieldDesc.IsMap() {
+			valueIsMessage := fieldDesc.MapValue().Kind() == protoreflect.MessageKind
+			for mapKey, keySubmask := range submask {
+				if len(keySubmask) == 0 {
+					continue
+				}
+
+				keyPath := fullPath(path, mapKey)
+				if !valueIsMessage {
+					return fmt.Errorf("%q: cannot select fields of a non-message map value", keyPath)
+				}
+
+				if err := keySubmask.validate(keyPath, msg.Get(fieldDesc).Map().NewValue().Message()); err != nil {
+					return err
+				}
+			}
+
+			continue
+		}
+
+		var nestedMsg protoreflect.Message
+
+		if fieldDesc.IsList() {
+			listVal := msg.Get(fieldDesc).List().NewElement()
+
+			var ok bool
+
+			if nestedMsg, ok = listVal.Interface().(protoreflect.Message); !ok {
+				return fmt.Errorf("%q: list element isn't message kind", path)
+			}
+		} else if fieldDesc.Kind() == protoreflect.MessageKind {
+			nestedMsg = msg.Get(fieldDesc).Message()
+		} else {
+			return fmt.Errorf("%q: can't get nested fields", path)
+		}
+
+		err := submask.validate(path, nestedMsg)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func fullPath(pathPrefix, field string) string {
+	if pathPrefix == "" {
+		return field
+	}
+
+	return pathPrefix + "." + field
+}
+
+// PathsFromFieldNumbers converts protobuf field numbers to field paths for the given message.
+//
+// This function takes a protobuf message and a list of field numbers, and
+// returns a slice of field paths (field names) corresponding to those numbers.
+//
+// Field numbers that don't exist in the message descriptor are skipped.
+//
+// If no field numbers are provided, returns nil.
+//
+// Example:
+//
+//	// For a message with fields: name (field 1), age (field 2), address (field 3)
+//	paths := PathsFromFieldNumbers(msg, 1, 2)
+//	// Returns: ["name", "age"]
+func PathsFromFieldNumbers(msg proto.Message, fieldNumbers ...int) []string {
+	if len(fieldNumbers) == 0 {
+		return nil
+	}
+	paths := make([]string, 0, len(fieldNumbers))
+	descriptor := msg.ProtoReflect().Descriptor()
+	for _, n := range fieldNumbers {
+		field := descriptor.Fields().ByNumber(protoreflect.FieldNumber(n))
+		if field != nil {
+			paths = append(paths, field.TextName())
+		}
+	}
+	return paths
+}
