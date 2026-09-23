@@ -413,9 +413,10 @@ const pageTemplate = `
             if (cm.pod_metrics && Object.keys(cm.pod_metrics).length > 0) {
                 // Collect all pod metrics by metric name first to keep the table organized
                 const podMetricsByName = {};
+                const podContainerMetrics = cm.pod_container_metrics || {};
                 for (const [podName, podData] of Object.entries(cm.pod_metrics)) {
-                    const podValues = (podData.values && podData.values.values) || {};
-                    const containerMetrics = podData.container_metrics || {};
+                    const podValues = (podData && podData.values) || {};
+                    const containerMetrics = (podContainerMetrics[podName] && podContainerMetrics[podName].container_metrics) || {};
 
                     for (const [name, val] of Object.entries(podValues)) {
                         if (!podMetricsByName[name]) podMetricsByName[name] = [];

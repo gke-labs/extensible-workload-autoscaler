@@ -26,19 +26,19 @@ const (
 	// ScopePod reports one value per pod in ControlMetrics.PodMetrics[pod].Values.
 	// Samples reported by individual containers are summed into their pod's value.
 	ScopePod = "Pod"
-	// ScopeContainer reports one value per container in
-	// ControlMetrics.PodMetrics[pod].ContainerMetrics[container], along with the
-	// pod-level rollup in ControlMetrics.PodMetrics[pod].Values.
-	ScopeContainer = "Container"
+	// ScopePodContainer reports one value per container in
+	// ControlMetrics.PodContainerMetrics[pod].ContainerMetrics[container], along
+	// with the pod-level rollup in ControlMetrics.PodMetrics[pod].Values.
+	ScopePodContainer = "PodContainer"
 )
 
 // isPodScoped reports whether the metric is tracked per pod instead of being
-// aggregated into a single policy-wide value. Both ScopePod and ScopeContainer
-// keep per-pod state; they differ only in whether the per-container breakdown is
-// reported alongside it. Any unrecognized scope (including the empty string) is
-// treated as ScopeGlobal.
+// aggregated into a single policy-wide value. Both ScopePod and
+// ScopePodContainer keep per-pod state; they differ only in whether the
+// per-container breakdown is reported alongside it. Any unrecognized scope
+// (including the empty string) is treated as ScopeGlobal.
 func isPodScoped(scope string) bool {
-	return scope == ScopePod || scope == ScopeContainer
+	return scope == ScopePod || scope == ScopePodContainer
 }
 
 // DataPoint represents a single calculated value (ControlMetric)
@@ -573,10 +573,11 @@ func (s *MemoryStore) GetControlMetrics(id *pb.PolicyId, recommenderName string)
 	}
 	// The recommender owns no metric: report the workload state only.
 	return &pb.ControlMetrics{
-		Values:        make(map[string]float64),
-		PodMetrics:    make(map[string]*pb.PodMetrics),
-		ReadyReplicas: ps.ControlMetrics.ReadyReplicas,
-		Timestamp:     ps.ControlMetrics.Timestamp,
+		Values:              make(map[string]float64),
+		PodMetrics:          make(map[string]*pb.MetricValues),
+		PodContainerMetrics: make(map[string]*pb.ContainerMetrics),
+		ReadyReplicas:       ps.ControlMetrics.ReadyReplicas,
+		Timestamp:           ps.ControlMetrics.Timestamp,
 	}, true
 }
 
@@ -627,7 +628,8 @@ func (s *MemoryStore) CalculateAll() {
 func (s *MemoryStore) calculateControlMetrics(ps *PolicyState, defs []*pb.MetricDefinition, workload map[string]*pb.PodState, readyReplicas int, now, cutoff, gcCutoff int64) *pb.ControlMetrics {
 	policy := ps.Policy
 	currentControlMetrics := make(map[string]float64)
-	currentPodMetrics := make(map[string]*pb.PodMetrics)
+	currentPodMetrics := make(map[string]*pb.MetricValues)
+	currentPodContainerMetrics := make(map[string]*pb.ContainerMetrics)
 
 	for _, def := range defs {
 		key := metricKey(def)
@@ -635,17 +637,11 @@ func (s *MemoryStore) calculateControlMetrics(ps *PolicyState, defs []*pb.Metric
 		if ok {
 			if podVals != nil {
 				for podName, podVal := range podVals {
-					podMetrics(currentPodMetrics, podName).Values.Values[def.Name] = podVal
+					podMetrics(currentPodMetrics, podName).Values[def.Name] = podVal
 				}
 				for podName, byContainer := range containerVals {
-					pm := podMetrics(currentPodMetrics, podName)
 					for containerName, containerVal := range byContainer {
-						cm, exists := pm.ContainerMetrics[containerName]
-						if !exists {
-							cm = &pb.MetricValues{Values: make(map[string]float64)}
-							pm.ContainerMetrics[containerName] = cm
-						}
-						cm.Values[def.Name] = containerVal
+						containerMetrics(currentPodContainerMetrics, podName, containerName).Values[def.Name] = containerVal
 					}
 				}
 			} else {
@@ -661,25 +657,39 @@ func (s *MemoryStore) calculateControlMetrics(ps *PolicyState, defs []*pb.Metric
 	}
 
 	return &pb.ControlMetrics{
-		Values:        currentControlMetrics,
-		PodMetrics:    currentPodMetrics,
-		ReadyReplicas: int32(readyReplicas),
-		Timestamp:     now,
+		Values:              currentControlMetrics,
+		PodMetrics:          currentPodMetrics,
+		PodContainerMetrics: currentPodContainerMetrics,
+		ReadyReplicas:       int32(readyReplicas),
+		Timestamp:           now,
 	}
 }
 
-// podMetrics returns the PodMetrics entry for podName, creating it (and its
-// nested maps) if it does not exist yet.
-func podMetrics(all map[string]*pb.PodMetrics, podName string) *pb.PodMetrics {
+// podMetrics returns the MetricValues entry for podName, creating it (and its
+// nested map) if it does not exist yet.
+func podMetrics(all map[string]*pb.MetricValues, podName string) *pb.MetricValues {
 	pm, ok := all[podName]
 	if !ok {
-		pm = &pb.PodMetrics{
-			Values:           &pb.MetricValues{Values: make(map[string]float64)},
-			ContainerMetrics: make(map[string]*pb.MetricValues),
-		}
+		pm = &pb.MetricValues{Values: make(map[string]float64)}
 		all[podName] = pm
 	}
 	return pm
+}
+
+// containerMetrics returns the MetricValues entry for containerName within
+// podName, creating the intermediate entries if they do not exist yet.
+func containerMetrics(all map[string]*pb.ContainerMetrics, podName, containerName string) *pb.MetricValues {
+	pcm, ok := all[podName]
+	if !ok {
+		pcm = &pb.ContainerMetrics{ContainerMetrics: make(map[string]*pb.MetricValues)}
+		all[podName] = pcm
+	}
+	cm, ok := pcm.ContainerMetrics[containerName]
+	if !ok {
+		cm = &pb.MetricValues{Values: make(map[string]float64)}
+		pcm.ContainerMetrics[containerName] = cm
+	}
+	return cm
 }
 
 // definedMetricKeys returns the keys of all the metrics a policy defines,
@@ -740,7 +750,7 @@ func (s *MemoryStore) cleanupOrphanedDecisions(ps *PolicyState) {
 //   - "Global" (default): only the policy-wide value is returned.
 //   - "Pod": only per-pod values are returned. Samples reported by individual
 //     containers are summed into their pod's value.
-//   - "Container": per-pod values are returned along with the per-container
+//   - "PodContainer": per-pod values are returned along with the per-container
 //     breakdown that rolls up into them.
 func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.MetricDefinition, seriesMap map[string]*Series, workload map[string]*pb.PodState, readyReplicas int, now, cutoff, gcCutoff int64) (float64, map[string]float64, map[string]map[string]float64, bool) {
 	if !isPodScoped(def.Scope) {
@@ -835,8 +845,8 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.Metri
 					}
 					sumRateBuckets(podBuckets[ser.PodName], ser.ControlMetric.Buckets)
 
-					// The per-container breakdown is only reported for Container scope.
-					if def.Scope == ScopeContainer && ser.ContainerName != "" {
+					// The per-container breakdown is only reported for PodContainer scope.
+					if def.Scope == ScopePodContainer && ser.ContainerName != "" {
 						if containerBuckets[ser.PodName] == nil {
 							containerBuckets[ser.PodName] = make(map[string]map[string]float64)
 						}
@@ -883,9 +893,9 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.Metri
 			podSums[ser.PodName] += weightedVal
 			podFound[ser.PodName] = true
 
-			// The per-container breakdown is only reported for Container scope.
+			// The per-container breakdown is only reported for PodContainer scope.
 			// Pod-scoped metrics keep the summed pod value only.
-			if def.Scope == ScopeContainer && ser.ContainerName != "" {
+			if def.Scope == ScopePodContainer && ser.ContainerName != "" {
 				if containerSums[ser.PodName] == nil {
 					containerSums[ser.PodName] = make(map[string]float64)
 				}

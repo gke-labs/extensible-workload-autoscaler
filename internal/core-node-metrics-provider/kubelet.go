@@ -166,8 +166,8 @@ func (a *CoreNodeMetricsProvider) processKubeletMetric(pod corev1.Pod, m *pb.Met
 	// Everything is computed and emitted per container: one batch per
 	// container, each carrying that container's own sample. The Control Plane
 	// keeps the per-container breakdown in
-	// ControlMetrics.pod_metrics[pod].container_metrics and derives the
-	// pod-level value from the container samples.
+	// ControlMetrics.pod_container_metrics[pod].container_metrics and derives
+	// the pod-level value from the container samples.
 	batches := make([]*pb.MetricBatch, 0, len(podStats.Containers))
 
 	for cName, cStats := range podStats.Containers {

@@ -896,11 +896,11 @@ func TestPodScopedDecayingHistogram(t *testing.T) {
 		t.Fatalf("PodMetrics is nil")
 	}
 
-	if p1Val := cm.PodMetrics["p1"].Values.Values["cpu"]; p1Val < 0.5 {
+	if p1Val := cm.PodMetrics["p1"].Values["cpu"]; p1Val < 0.5 {
 		t.Errorf("Pod 1 scoped metric: Want >= 0.5, Got %f", p1Val)
 	}
 
-	if p2Val := cm.PodMetrics["p2"].Values.Values["cpu"]; p2Val < 1.5 {
+	if p2Val := cm.PodMetrics["p2"].Values["cpu"]; p2Val < 1.5 {
 		t.Errorf("Pod 2 scoped metric: Want >= 1.5, Got %f", p2Val)
 	}
 }
@@ -917,7 +917,7 @@ func TestContainerResourceRequestWeighting(t *testing.T) {
 		Metrics: []*pb.MetricDefinition{
 			{
 				Name:  "cpu_util",
-				Scope: "Container",
+				Scope: "PodContainer",
 				Gauge: &pb.Gauge{Aggregation: "Avg"},
 			},
 		},
@@ -961,19 +961,19 @@ func TestContainerResourceRequestWeighting(t *testing.T) {
 	}
 
 	// p1: 0.5*(100/400) + 0.1*(300/400) = 0.2
-	if got, want := cm.PodMetrics["p1"].Values.Values["cpu_util"], 0.2; math.Abs(got-want) > 1e-9 {
+	if got, want := cm.PodMetrics["p1"].Values["cpu_util"], 0.2; math.Abs(got-want) > 1e-9 {
 		t.Errorf("Pod p1 weighted value: Want %f, Got %f", want, got)
 	}
 	// p2: c2 is dropped, so c1 carries the full weight: 0.4*(200/200) = 0.4
-	if got, want := cm.PodMetrics["p2"].Values.Values["cpu_util"], 0.4; math.Abs(got-want) > 1e-9 {
+	if got, want := cm.PodMetrics["p2"].Values["cpu_util"], 0.4; math.Abs(got-want) > 1e-9 {
 		t.Errorf("Pod p2 weighted value: Want %f, Got %f", want, got)
 	}
 
 	// The per-container breakdown keeps the raw (unweighted) values.
-	if got, want := cm.PodMetrics["p1"].ContainerMetrics["c2"].Values["cpu_util"], 0.1; math.Abs(got-want) > 1e-9 {
+	if got, want := cm.PodContainerMetrics["p1"].ContainerMetrics["c2"].Values["cpu_util"], 0.1; math.Abs(got-want) > 1e-9 {
 		t.Errorf("Container p1/c2 value: Want %f, Got %f", want, got)
 	}
-	if _, exists := cm.PodMetrics["p2"].ContainerMetrics["c2"]; exists {
+	if _, exists := cm.PodContainerMetrics["p2"].ContainerMetrics["c2"]; exists {
 		t.Errorf("Container p2/c2 has no cpu request, it should have been dropped")
 	}
 }

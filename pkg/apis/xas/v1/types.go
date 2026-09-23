@@ -116,7 +116,7 @@ type MetricDefinition struct {
 	// "Global" (default) reports a single aggregated value for the whole workload.
 	// "Pod" reports one value per pod; samples from individual containers are
 	// summed into their pod's value.
-	// "Container" reports one value per container, plus the pod-level rollup.
+	// "PodContainer" reports one value per pod and per container.
 	Scope string `json:"scope,omitempty"`
 }
 

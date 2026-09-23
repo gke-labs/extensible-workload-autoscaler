@@ -457,9 +457,9 @@ func TestGetControlMetrics_PodScope(t *testing.T) {
 			"cpu_global": 20.0, // Aggregated: (10 + 30) / 2
 			// cpu_pod should NOT be in Values
 		},
-		PodMetrics: map[string]*pb.PodMetrics{
-			"pod1": {Values: &pb.MetricValues{Values: map[string]float64{"cpu_pod": 10.0}}},
-			"pod2": {Values: &pb.MetricValues{Values: map[string]float64{"cpu_pod": 30.0}}},
+		PodMetrics: map[string]*pb.MetricValues{
+			"pod1": {Values: map[string]float64{"cpu_pod": 10.0}},
+			"pod2": {Values: map[string]float64{"cpu_pod": 30.0}},
 		},
 		Timestamp:     ts,
 		ReadyReplicas: 2,
@@ -470,7 +470,7 @@ func TestGetControlMetrics_PodScope(t *testing.T) {
 	}
 }
 
-func TestGetControlMetrics_ContainerScope(t *testing.T) {
+func TestGetControlMetrics_PodContainerScope(t *testing.T) {
 	clk := &clock.FakeClock{CurrentTime: time.Unix(1000, 0)}
 	memStore, client, cleanup := setupFunctionalGRPCServer(t, clk)
 	defer cleanup()
@@ -481,7 +481,7 @@ func TestGetControlMetrics_ContainerScope(t *testing.T) {
 		Policy: &pb.Policy{
 			Id: id,
 			Metrics: []*pb.MetricDefinition{
-				{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}, Scope: "Container"},
+				{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}, Scope: "PodContainer"},
 			},
 		},
 	})
@@ -514,30 +514,32 @@ func TestGetControlMetrics_ContainerScope(t *testing.T) {
 
 	wantCM := &pb.ControlMetrics{
 		Values: map[string]float64{},
-		PodMetrics: map[string]*pb.PodMetrics{
+		PodMetrics: map[string]*pb.MetricValues{
+			// Container samples are summed into the pod value.
+			"pod1": {Values: map[string]float64{"cpu": 12.0}},
+			"pod2": {Values: map[string]float64{"cpu": 30.0}},
+		},
+		PodContainerMetrics: map[string]*pb.ContainerMetrics{
 			"pod1": {
-				// Container samples are summed into the pod value.
-				Values: &pb.MetricValues{Values: map[string]float64{"cpu": 12.0}},
 				ContainerMetrics: map[string]*pb.MetricValues{
 					"app":     {Values: map[string]float64{"cpu": 10.0}},
 					"sidecar": {Values: map[string]float64{"cpu": 2.0}},
 				},
 			},
-			"pod2": {Values: &pb.MetricValues{Values: map[string]float64{"cpu": 30.0}}},
 		},
 		Timestamp:     ts,
 		ReadyReplicas: 2,
 	}
 
 	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
-		t.Errorf("ControlMetrics with Container scope mismatch (-want +got):\n%s", diff)
+		t.Errorf("ControlMetrics with PodContainer scope mismatch (-want +got):\n%s", diff)
 	}
 }
 
 // TestGetControlMetrics_PodScopeOmitsContainerBreakdown verifies that a "Pod"
 // scoped metric sums container-tagged samples into the pod value without
 // exposing the per-container breakdown. That breakdown is reserved for the
-// "Container" scope.
+// "PodContainer" scope.
 func TestGetControlMetrics_PodScopeOmitsContainerBreakdown(t *testing.T) {
 	clk := &clock.FakeClock{CurrentTime: time.Unix(1000, 0)}
 	memStore, client, cleanup := setupFunctionalGRPCServer(t, clk)
@@ -577,9 +579,9 @@ func TestGetControlMetrics_PodScopeOmitsContainerBreakdown(t *testing.T) {
 
 	wantCM := &pb.ControlMetrics{
 		Values: map[string]float64{},
-		PodMetrics: map[string]*pb.PodMetrics{
+		PodMetrics: map[string]*pb.MetricValues{
 			// Container samples are summed, but not broken out individually.
-			"pod1": {Values: &pb.MetricValues{Values: map[string]float64{"cpu": 12.0}}},
+			"pod1": {Values: map[string]float64{"cpu": 12.0}},
 		},
 		Timestamp:     ts,
 		ReadyReplicas: 1,
@@ -1938,9 +1940,9 @@ func TestIntent_PodScope_Gauge(t *testing.T) {
 
 	wantCM := &pb.ControlMetrics{
 		Values: map[string]float64{},
-		PodMetrics: map[string]*pb.PodMetrics{
-			"pod1": {Values: &pb.MetricValues{Values: map[string]float64{"g_avg": 10.0}}},
-			"pod2": {Values: &pb.MetricValues{Values: map[string]float64{"g_avg": 30.0}}},
+		PodMetrics: map[string]*pb.MetricValues{
+			"pod1": {Values: map[string]float64{"g_avg": 10.0}},
+			"pod2": {Values: map[string]float64{"g_avg": 30.0}},
 		},
 		Timestamp:     ts,
 		ReadyReplicas: 2,
@@ -1988,8 +1990,8 @@ func TestIntent_PodScope_Rate(t *testing.T) {
 
 	wantCM := &pb.ControlMetrics{
 		Values: map[string]float64{},
-		PodMetrics: map[string]*pb.PodMetrics{
-			"pod1": {Values: &pb.MetricValues{Values: map[string]float64{"c_rate": 1.0}}}, // Rate = 10/10s = 1.0
+		PodMetrics: map[string]*pb.MetricValues{
+			"pod1": {Values: map[string]float64{"c_rate": 1.0}}, // Rate = 10/10s = 1.0
 		},
 		Timestamp:     ts,
 		ReadyReplicas: 1,
@@ -2037,8 +2039,8 @@ func TestIntent_PodScope_Distribution(t *testing.T) {
 
 	wantCM := &pb.ControlMetrics{
 		Values: map[string]float64{},
-		PodMetrics: map[string]*pb.PodMetrics{
-			"pod1": {Values: &pb.MetricValues{Values: map[string]float64{"h_p99": 1.0}}},
+		PodMetrics: map[string]*pb.MetricValues{
+			"pod1": {Values: map[string]float64{"h_p99": 1.0}},
 		},
 		Timestamp:     ts,
 		ReadyReplicas: 1,
@@ -2082,8 +2084,8 @@ func TestIntent_PodScope_DecayingDistribution(t *testing.T) {
 
 	wantCM := &pb.ControlMetrics{
 		Values: map[string]float64{},
-		PodMetrics: map[string]*pb.PodMetrics{
-			"pod1": {Values: &pb.MetricValues{Values: map[string]float64{"decay_p100": 1.1}}}, // Upper bound of bucket 1.0 (size 0.1)
+		PodMetrics: map[string]*pb.MetricValues{
+			"pod1": {Values: map[string]float64{"decay_p100": 1.1}}, // Upper bound of bucket 1.0 (size 0.1)
 		},
 		Timestamp:     ts,
 		ReadyReplicas: 1,
