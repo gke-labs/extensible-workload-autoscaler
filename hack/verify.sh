@@ -1,11 +1,16 @@
 #!/bin/bash
 
+ROOT="$(git rev-parse --show-toplevel)"
+cd "${ROOT}"
+
+GO_VERSION=$(awk '$1 == "go" {print $2}' "$(go env GOMOD)")
+
 echo "=== Verifying Code ==="
 
 echo "[1/4] Checking Formatting..."
 # Check if gofmt would make any changes.
 # List files that need formatting. If output is not empty, fail.
-unformatted=$(gofmt -l .)
+unformatted=$(GOTOOLCHAIN=go${GO_VERSION} gofmt -l $(find . -name '*.go' -not -path "./vendor/*"))
 if [ -n "$unformatted" ]; then
     echo "Error: The following files are not formatted:"
     echo "$unformatted"
