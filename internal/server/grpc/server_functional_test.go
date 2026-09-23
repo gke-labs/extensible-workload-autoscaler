@@ -536,6 +536,132 @@ func TestGetControlMetrics_PodContainerScope(t *testing.T) {
 	}
 }
 
+// TestGetControlMetrics_ContainerScope verifies that a "Container" scoped
+// metric reports one value per container name, averaged over the pods, and
+// leaves the per-pod views empty.
+func TestGetControlMetrics_ContainerScope(t *testing.T) {
+	clk := &clock.FakeClock{CurrentTime: time.Unix(1000, 0)}
+	memStore, client, cleanup := setupFunctionalGRPCServer(t, clk)
+	defer cleanup()
+	ctx := context.Background()
+
+	id := &pb.PolicyId{ClusterName: "c1", Namespace: "ns", Name: "p1"}
+	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+		Policy: &pb.Policy{
+			Id: id,
+			Metrics: []*pb.MetricDefinition{
+				{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}, Scope: "Container"},
+			},
+		},
+	})
+	client.UpdateWorkload(ctx, &pb.UpdateWorkloadRequest{
+		Id: id,
+		Workload: &pb.Workload{
+			Pods: []*pb.PodState{
+				{Name: "pod1", IsReady: true},
+				{Name: "pod2", IsReady: true},
+			},
+		},
+	})
+
+	ts := clk.Now().Unix()
+	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
+		ClusterName: "c1", Timestamp: ts,
+		Policies: []*pb.PolicyBatch{{
+			Namespace: "ns", Name: "p1",
+			Batches: []*pb.MetricBatch{
+				{PodName: "pod1", ContainerName: "app", Samples: []*pb.MetricSample{{Name: "cpu", Value: 10}}},
+				{PodName: "pod1", ContainerName: "sidecar", Samples: []*pb.MetricSample{{Name: "cpu", Value: 2}}},
+				{PodName: "pod2", ContainerName: "app", Samples: []*pb.MetricSample{{Name: "cpu", Value: 30}}},
+				{PodName: "pod2", ContainerName: "sidecar", Samples: []*pb.MetricSample{{Name: "cpu", Value: 6}}},
+			},
+		}},
+	})
+
+	memStore.CalculateAll()
+	cm, _ := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: id})
+
+	wantCM := &pb.ControlMetrics{
+		Values: map[string]float64{},
+		ContainerMetrics: &pb.ContainerMetrics{
+			ContainerMetrics: map[string]*pb.MetricValues{
+				// Averaged across both pods: app (10+30)/2, sidecar (2+6)/2.
+				"app":     {Values: map[string]float64{"cpu": 20.0}},
+				"sidecar": {Values: map[string]float64{"cpu": 4.0}},
+			},
+		},
+		Timestamp:     ts,
+		ReadyReplicas: 2,
+	}
+
+	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+		t.Errorf("ControlMetrics with Container scope mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// TestGetControlMetrics_ContainerScopeAveragesOverReportingPodsOnly verifies
+// that a container running in only some of the pods is averaged over just
+// those pods, rather than being diluted by the pods that do not report it.
+func TestGetControlMetrics_ContainerScopeAveragesOverReportingPodsOnly(t *testing.T) {
+	clk := &clock.FakeClock{CurrentTime: time.Unix(1000, 0)}
+	memStore, client, cleanup := setupFunctionalGRPCServer(t, clk)
+	defer cleanup()
+	ctx := context.Background()
+
+	id := &pb.PolicyId{ClusterName: "c1", Namespace: "ns", Name: "p1"}
+	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+		Policy: &pb.Policy{
+			Id: id,
+			Metrics: []*pb.MetricDefinition{
+				{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}, Scope: "Container"},
+			},
+		},
+	})
+	client.UpdateWorkload(ctx, &pb.UpdateWorkloadRequest{
+		Id: id,
+		Workload: &pb.Workload{
+			Pods: []*pb.PodState{
+				{Name: "pod1", IsReady: true},
+				{Name: "pod2", IsReady: true},
+			},
+		},
+	})
+
+	ts := clk.Now().Unix()
+	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
+		ClusterName: "c1", Timestamp: ts,
+		Policies: []*pb.PolicyBatch{{
+			Namespace: "ns", Name: "p1",
+			Batches: []*pb.MetricBatch{
+				{PodName: "pod1", ContainerName: "app", Samples: []*pb.MetricSample{{Name: "cpu", Value: 10}}},
+				{PodName: "pod2", ContainerName: "app", Samples: []*pb.MetricSample{{Name: "cpu", Value: 30}}},
+				// Only pod1 runs the sidecar.
+				{PodName: "pod1", ContainerName: "sidecar", Samples: []*pb.MetricSample{{Name: "cpu", Value: 7}}},
+			},
+		}},
+	})
+
+	memStore.CalculateAll()
+	cm, _ := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: id})
+
+	wantCM := &pb.ControlMetrics{
+		Values: map[string]float64{},
+		ContainerMetrics: &pb.ContainerMetrics{
+			ContainerMetrics: map[string]*pb.MetricValues{
+				"app": {Values: map[string]float64{"cpu": 20.0}},
+				// Averaged over pod1 only, not halved by pod2.
+				"sidecar": {Values: map[string]float64{"cpu": 7.0}},
+			},
+		},
+		Timestamp:     ts,
+		ReadyReplicas: 2,
+	}
+
+	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+		t.Errorf("ControlMetrics with Container scope mismatch (-want +got):\n%s", diff)
+	}
+}
+
 // TestGetControlMetrics_PodScopeOmitsContainerBreakdown verifies that a "Pod"
 // scoped metric sums container-tagged samples into the pod value without
 // exposing the per-container breakdown. That breakdown is reserved for the

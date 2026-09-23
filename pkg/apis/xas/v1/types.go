@@ -117,6 +117,7 @@ type MetricDefinition struct {
 	// "Pod" reports one value per pod; samples from individual containers are
 	// summed into their pod's value.
 	// "PodContainer" reports one value per pod and per container.
+	// "Container" reports one value per container.
 	Scope string `json:"scope,omitempty"`
 }
 
