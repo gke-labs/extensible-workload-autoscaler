@@ -511,11 +511,11 @@ func TestDump(t *testing.T) {
       }
     },
     "ControlMetrics": {
+      "timestamp": 1000,
+      "ready_replicas": 1,
       "values": {
         "cpu": 1
-      },
-      "timestamp": 1000,
-      "ready_replicas": 1
+      }
     },
     "RecommenderControlMetrics": null
   }

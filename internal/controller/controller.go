@@ -297,15 +297,18 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	// Workload level recommendations are keyed by target container so that
 	// several recommenders can each size a different container. An empty
 	// container name means "the first container of the pod".
-	workloadRes := make(map[string]*pb.ResourceRecommendation)
+	workloadRes := make(map[string]*pb.ContainerResource)
 	var workloadResOrder []string
-	var podRes []*pb.PodResourceRecommendation
+	var podRes []*pb.PodContainerResource
 	for _, exp := range rec.Explanation {
-		if exp.WorkloadResources != nil {
-			if _, seen := workloadRes[exp.WorkloadResources.ContainerName]; !seen {
-				workloadResOrder = append(workloadResOrder, exp.WorkloadResources.ContainerName)
+		for _, wr := range exp.WorkloadResources {
+			if wr == nil {
+				continue
 			}
-			workloadRes[exp.WorkloadResources.ContainerName] = exp.WorkloadResources
+			if _, seen := workloadRes[wr.ContainerName]; !seen {
+				workloadResOrder = append(workloadResOrder, wr.ContainerName)
+			}
+			workloadRes[wr.ContainerName] = wr
 		}
 		if len(exp.PodResources) > 0 {
 			podRes = append(podRes, exp.PodResources...)
@@ -425,9 +428,13 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 
 	// Actuate Pod Resources via /resize subresource
 	for _, pr := range podRes {
+		if pr == nil || pr.ContainerResources == nil {
+			continue
+		}
 		pod, err := c.kubeclientset.CoreV1().Pods(policy.Namespace).Get(context.TODO(), pr.PodName, metav1.GetOptions{})
 		if err == nil {
-			patchPodResize(pod, "", pr.Requests, pr.Limits)
+			res := pr.ContainerResources
+			patchPodResize(pod, res.ContainerName, res.Requests, res.Limits)
 		}
 	}
 
@@ -466,22 +473,32 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 
 	policyCopy.Status.Decisions = make([]xasv1.DecisionStatus, len(rec.Explanation))
 	for i, d := range rec.Explanation {
-		var wrr *xasv1.ResourceRecommendation
-		if d.WorkloadResources != nil {
-			wrr = &xasv1.ResourceRecommendation{
-				ContainerName: d.WorkloadResources.ContainerName,
-				Requests:      d.WorkloadResources.Requests,
-				Limits:        d.WorkloadResources.Limits,
+		var wrr []xasv1.ResourceRecommendation
+		for _, wr := range d.WorkloadResources {
+			if wr == nil {
+				continue
 			}
+			wrr = append(wrr, xasv1.ResourceRecommendation{
+				ContainerName: wr.ContainerName,
+				Requests:      wr.Requests,
+				Limits:        wr.Limits,
+			})
 		}
 
 		var prr []xasv1.PodResourceRecommendation
 		for _, pr := range d.PodResources {
-			prr = append(prr, xasv1.PodResourceRecommendation{
-				PodName:  pr.PodName,
-				Requests: pr.Requests,
-				Limits:   pr.Limits,
-			})
+			if pr == nil {
+				continue
+			}
+			rec := xasv1.PodResourceRecommendation{PodName: pr.PodName}
+			if cr := pr.ContainerResources; cr != nil {
+				rec.Resources = &xasv1.ResourceRecommendation{
+					ContainerName: cr.ContainerName,
+					Requests:      cr.Requests,
+					Limits:        cr.Limits,
+				}
+			}
+			prr = append(prr, rec)
 		}
 
 		policyCopy.Status.Decisions[i] = xasv1.DecisionStatus{
