@@ -38,6 +38,16 @@ spec:
               cpu: "500m"
             limits:
               cpu: "2000m"
+        - name: sidecar
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          # Busy loop burning CPU without opening a port (main already binds :8080).
+          command: ["sh", "-c", "while true; do :; done"]
+          resources:
+            requests:
+              cpu: "500m"
+            limits:
+              cpu: "500m"
 ---
 apiVersion: xas.io/v1
 kind: ScalingPolicy
@@ -57,7 +67,7 @@ spec:
   metrics:
     - name: "pod_cpu_usage"
       provider: "kubelet"
-      scope: "Pod"
+      scope: "PodContainer" # per-pod, per-container breakdown required by per-pod-vertical
       params:
         type: "cpu"
         mode: "usage"
