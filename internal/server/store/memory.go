@@ -556,7 +556,29 @@ func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationR
 			if val, ok := ps.ControlMetrics.Values[def.Name]; ok {
 				status.Value = val
 			} else {
-				status.Error = "No data available"
+				var sum float64
+				var count int
+				for _, pcm := range ps.ControlMetrics.PodContainerMetrics {
+					for _, cm := range pcm.GetContainerMetrics() {
+						if v, ok := cm.Values[def.Name]; ok {
+							sum += v
+							count++
+						}
+					}
+				}
+				if count == 0 {
+					for _, pm := range ps.ControlMetrics.PodMetrics {
+						if v, ok := pm.Values[def.Name]; ok {
+							sum += v
+							count++
+						}
+					}
+				}
+				if count > 0 {
+					status.Value = sum / float64(count)
+				} else {
+					status.Error = "No data available"
+				}
 			}
 			metricStatuses = append(metricStatuses, status)
 		}
@@ -1148,8 +1170,9 @@ func (s *MemoryStore) processDecisions(ps *PolicyState, now int64) {
 	// number of replicas: workload is inactive (0 replicas), or active and a
 	// recommender has decided on a positive number of replicas.
 	replicas, scalingStatuses := s.calculateTargetReplicas(ps, isActive)
+	podRes := s.calculateArbitratedResources(ps, isActive)
 
-	if replicas == nil && scalingStatuses == nil {
+	if replicas == nil && len(podRes) == 0 && len(scalingStatuses) == 0 {
 		ps.Recommendation = nil
 		return
 	}
@@ -1157,6 +1180,7 @@ func (s *MemoryStore) processDecisions(ps *PolicyState, now int64) {
 	explanation := append(activationStatuses, scalingStatuses...)
 	ps.Recommendation = &pb.ArbitratedRecommendation{
 		TargetReplicas: replicas,
+		PodResources:   podRes,
 		Explanation:    explanation,
 	}
 
@@ -1165,6 +1189,96 @@ func (s *MemoryStore) processDecisions(ps *PolicyState, now int64) {
 			metrics.RecordRecommendation(policy.Id.ClusterName, policy.Id.Namespace, policy.Id.Name, policy.Workload.Group, policy.Workload.Version, policy.Workload.Kind, policy.Workload.Name, *replicas)
 		}
 		metrics.RecordActive(policy.Id.ClusterName, policy.Id.Namespace, policy.Id.Name, policy.Workload.Group, policy.Workload.Version, policy.Workload.Kind, policy.Workload.Name, isActive)
+	}
+}
+
+// calculateArbitratedResources combines pod-level vertical resource
+// recommendations across all active, non-dry-run scaling recommenders.
+//
+// For pod-level recommendations (PodResources):
+//   - Recommendations are grouped by "podName|containerName".
+//   - If multiple active recommenders specify resources for the same pod container,
+//     their requests and limits are arbitrated by taking the maximum quantity for each resource.
+//
+// Recommenders running in "DryRun" mode or reporting IsActive = false are excluded from arbitration.
+func (s *MemoryStore) calculateArbitratedResources(ps *PolicyState, isActive bool) []*pb.PodContainerResource {
+	if !isActive {
+		return nil
+	}
+
+	// Map key: "podName|containerName" -> PodContainerResource
+	podMap := make(map[string]*pb.PodContainerResource)
+	podKeys := []string{} // Maintain insertion order for deterministic outputs
+
+	for _, recDef := range ps.Policy.Scaling {
+		d, ok := ps.Decisions[recDef.Name]
+		if !ok || recDef.Mode == "DryRun" || !d.IsActive {
+			continue
+		}
+
+		for _, pr := range d.PodResources {
+			cName := ""
+			var reqs, lims map[string]string
+			if pr.ContainerResources != nil {
+				cName = pr.ContainerResources.ContainerName
+				reqs = pr.ContainerResources.Requests
+				lims = pr.ContainerResources.Limits
+			}
+			key := fmt.Sprintf("%s|%s", pr.PodName, cName)
+			existing, ok := podMap[key]
+			if !ok {
+				newReqs := make(map[string]string)
+				newLims := make(map[string]string)
+				for k, v := range reqs {
+					newReqs[k] = v
+				}
+				for k, v := range lims {
+					newLims[k] = v
+				}
+				podMap[key] = &pb.PodContainerResource{
+					PodName: pr.PodName,
+					ContainerResources: &pb.ContainerResource{
+						ContainerName: cName,
+						Requests:      newReqs,
+						Limits:        newLims,
+					},
+				}
+				podKeys = append(podKeys, key)
+			} else {
+				if existing.ContainerResources != nil {
+					arbitrateResourceMap(existing.ContainerResources.Requests, reqs)
+					arbitrateResourceMap(existing.ContainerResources.Limits, lims)
+				}
+			}
+		}
+	}
+
+	var arbitratedPods []*pb.PodContainerResource
+	for _, key := range podKeys {
+		arbitratedPods = append(arbitratedPods, podMap[key])
+	}
+
+	return arbitratedPods
+}
+
+func arbitrateResourceMap(dest map[string]string, src map[string]string) {
+	if dest == nil || src == nil {
+		return
+	}
+	for resName, srcVal := range src {
+		destVal, ok := dest[resName]
+		if !ok || destVal == "" {
+			dest[resName] = srcVal
+			continue
+		}
+
+		destQ, err1 := resource.ParseQuantity(destVal)
+		srcQ, err2 := resource.ParseQuantity(srcVal)
+		if err1 == nil && err2 == nil {
+			if destQ.Cmp(srcQ) < 0 {
+				dest[resName] = srcVal
+			}
+		}
 	}
 }
 

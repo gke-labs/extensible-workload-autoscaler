@@ -14,6 +14,7 @@ import (
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/cron"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/linear"
+	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/perpodvertical"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/vpa"
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -47,9 +48,10 @@ func NewEngine(recommenderClassLister listers.RecommenderClassLister, nodeLister
 		client:                 client,
 		recommenderClassLister: recommenderClassLister,
 		recommenders: map[string]Recommender{
-			"Linear": &linear.LinearRecommender{},
-			"Cron":   &cron.Recommender{},
-			"VPA":    &vpa.VPARecommender{},
+			"Linear":         &linear.LinearRecommender{},
+			"Cron":           &cron.Recommender{},
+			"VPA":            &vpa.VPARecommender{},
+			"PerPodVertical": &perpodvertical.PerPodVerticalRecommender{},
 		},
 		clusterName: clusterName,
 	}
