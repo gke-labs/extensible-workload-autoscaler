@@ -1073,12 +1073,14 @@ func TestUpdateRecommenderState_VerticalResources(t *testing.T) {
 
 	vote := &pb.RecommenderVote{
 		IsActive: true,
-		WorkloadResources: &pb.ResourceRecommendation{
-			Requests: map[string]string{"cpu": "100m", "memory": "200Mi"},
+		WorkloadResources: []*pb.ContainerResource{
+			{
+				Requests: map[string]string{"cpu": "100m", "memory": "200Mi"},
+			},
 		},
-		PodResources: []*pb.PodResourceRecommendation{
-			{PodName: "pod1", Requests: map[string]string{"cpu": "200m"}},
-			{PodName: "pod2", Limits: map[string]string{"memory": "1Gi"}},
+		PodContainerResources: []*pb.PodContainerResource{
+			{PodName: "pod1", ContainerResources: &pb.ContainerResource{Requests: map[string]string{"cpu": "200m"}}},
+			{PodName: "pod2", ContainerResources: &pb.ContainerResource{Limits: map[string]string{"memory": "1Gi"}}},
 		},
 	}
 
@@ -1099,7 +1101,7 @@ func TestUpdateRecommenderState_VerticalResources(t *testing.T) {
 					Mode:              "Active",
 					IsActive:          true,
 					WorkloadResources: vote.WorkloadResources,
-					PodResources:      vote.PodResources,
+					PodResources:      vote.PodContainerResources,
 				},
 			},
 		},
@@ -1134,17 +1136,21 @@ func TestUpdateRecommenderState_VerticalResources_PerContainer(t *testing.T) {
 
 	appVote := &pb.RecommenderVote{
 		IsActive: true,
-		WorkloadResources: &pb.ResourceRecommendation{
-			ContainerName: "app",
-			Requests:      map[string]string{"cpu": "500m", "memory": "1Gi"},
+		WorkloadResources: []*pb.ContainerResource{
+			{
+				ContainerName: "app",
+				Requests:      map[string]string{"cpu": "500m", "memory": "1Gi"},
+			},
 		},
 	}
 	sidecarVote := &pb.RecommenderVote{
 		IsActive: true,
-		WorkloadResources: &pb.ResourceRecommendation{
-			ContainerName: "sidecar",
-			Requests:      map[string]string{"cpu": "50m"},
-			Limits:        map[string]string{"memory": "128Mi"},
+		WorkloadResources: []*pb.ContainerResource{
+			{
+				ContainerName: "sidecar",
+				Requests:      map[string]string{"cpu": "50m"},
+				Limits:        map[string]string{"memory": "128Mi"},
+			},
 		},
 	}
 
@@ -1328,14 +1334,16 @@ func TestGetRecommendation_Aggregation(t *testing.T) {
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: id, RecommenderName: "vpa1", Vote: &pb.RecommenderVote{
 			IsActive: true,
-			WorkloadResources: &pb.ResourceRecommendation{
-				Requests: map[string]string{
-					"cpu":    "25m",
-					"memory": "265Mi",
-				},
-				Limits: map[string]string{
-					"cpu":    "25m",
-					"memory": "265Mi",
+			WorkloadResources: []*pb.ContainerResource{
+				{
+					Requests: map[string]string{
+						"cpu":    "25m",
+						"memory": "265Mi",
+					},
+					Limits: map[string]string{
+						"cpu":    "25m",
+						"memory": "265Mi",
+					},
 				},
 			},
 			Message: "Recommendation generated successfully.",
@@ -1353,9 +1361,11 @@ func TestGetRecommendation_Aggregation(t *testing.T) {
 				{Name: "scale2", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(20), IsActive: true},
 				{Name: "act1", Type: "Threshold", Phase: "Activation", Mode: "Active", IsActive: true},
 				{Name: "act2", Type: "Threshold", Phase: "Activation", Mode: "Active", IsActive: false},
-				{Name: "vpa1", Type: "VPA", Phase: "Scaling", Mode: "Active", IsActive: true, WorkloadResources: &pb.ResourceRecommendation{
-					Requests: map[string]string{"cpu": "25m", "memory": "265Mi"},
-					Limits:   map[string]string{"cpu": "25m", "memory": "265Mi"},
+				{Name: "vpa1", Type: "VPA", Phase: "Scaling", Mode: "Active", IsActive: true, WorkloadResources: []*pb.ContainerResource{
+					{
+						Requests: map[string]string{"cpu": "25m", "memory": "265Mi"},
+						Limits:   map[string]string{"cpu": "25m", "memory": "265Mi"},
+					},
 				},
 					Message: "Recommendation generated successfully."},
 			},

@@ -149,13 +149,15 @@ func TestRecommend(t *testing.T) {
 			},
 			want: &pb.RecommenderVote{
 				IsActive: true,
-				WorkloadResources: &pb.ResourceRecommendation{
-					ContainerName: "app",
-					Requests: map[string]string{
-						"memory": "282Mi",
-					},
-					Limits: map[string]string{
-						"memory": "282Mi",
+				WorkloadResources: []*pb.ContainerResource{
+					{
+						ContainerName: "app",
+						Requests: map[string]string{
+							"memory": "282Mi",
+						},
+						Limits: map[string]string{
+							"memory": "282Mi",
+						},
 					},
 				},
 			},
@@ -188,13 +190,15 @@ func TestRecommend(t *testing.T) {
 			},
 			want: &pb.RecommenderVote{
 				IsActive: true,
-				WorkloadResources: &pb.ResourceRecommendation{
-					ContainerName: "app",
-					Requests: map[string]string{
-						"cpu": "550m",
-					},
-					Limits: map[string]string{
-						"cpu": "550m",
+				WorkloadResources: []*pb.ContainerResource{
+					{
+						ContainerName: "app",
+						Requests: map[string]string{
+							"cpu": "550m",
+						},
+						Limits: map[string]string{
+							"cpu": "550m",
+						},
 					},
 				},
 			},
@@ -274,15 +278,17 @@ func TestRecommend(t *testing.T) {
 			},
 			want: &pb.RecommenderVote{
 				IsActive: true,
-				WorkloadResources: &pb.ResourceRecommendation{
-					ContainerName: "app",
-					Requests: map[string]string{
-						"cpu":    "550m",
-						"memory": "282Mi",
-					},
-					Limits: map[string]string{
-						"cpu":    "550m",
-						"memory": "282Mi",
+				WorkloadResources: []*pb.ContainerResource{
+					{
+						ContainerName: "app",
+						Requests: map[string]string{
+							"cpu":    "550m",
+							"memory": "282Mi",
+						},
+						Limits: map[string]string{
+							"cpu":    "550m",
+							"memory": "282Mi",
+						},
 					},
 				},
 			},
@@ -315,15 +321,17 @@ func TestRecommend(t *testing.T) {
 			},
 			want: &pb.RecommenderVote{
 				IsActive: true,
-				WorkloadResources: &pb.ResourceRecommendation{
-					ContainerName: "app",
-					Requests: map[string]string{
-						"cpu":    "10m",
-						"memory": "10Mi",
-					},
-					Limits: map[string]string{
-						"cpu":    "10m",
-						"memory": "10Mi",
+				WorkloadResources: []*pb.ContainerResource{
+					{
+						ContainerName: "app",
+						Requests: map[string]string{
+							"cpu":    "10m",
+							"memory": "10Mi",
+						},
+						Limits: map[string]string{
+							"cpu":    "10m",
+							"memory": "10Mi",
+						},
 					},
 				},
 			},

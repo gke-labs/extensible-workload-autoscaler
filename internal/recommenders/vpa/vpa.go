@@ -108,10 +108,12 @@ func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.C
 	} else {
 		return &pb.RecommenderVote{
 			IsActive: true,
-			WorkloadResources: &pb.ResourceRecommendation{
-				ContainerName: cfg.containerName,
-				Requests:      requests,
-				Limits:        limits,
+			WorkloadResources: []*pb.ContainerResource{
+				{
+					ContainerName: cfg.containerName,
+					Requests:      requests,
+					Limits:        limits,
+				},
 			},
 			Message: func() string {
 				if len(warnings) > 0 {

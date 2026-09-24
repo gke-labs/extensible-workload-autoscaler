@@ -561,19 +561,24 @@ const pageTemplate = `
                          voteHtml += '<div><strong>Rep:</strong> ' + d.replicas + '</div>';
                      }
 
-                     if (d.workload_resources && (d.workload_resources.requests || d.workload_resources.limits)) {
-                         let resHtml = '<div style="margin-top: 4px; font-size: 0.9rem; color: var(--primary);">';
-                         if (d.workload_resources.container_name) {
-                             resHtml += '<strong>Container:</strong> ' + d.workload_resources.container_name + '<br>';
+                     if (Array.isArray(d.workload_resources)) {
+                         for (const wr of d.workload_resources) {
+                             if (!wr || (!wr.requests && !wr.limits)) {
+                                 continue;
+                             }
+                             let resHtml = '<div style="margin-top: 4px; font-size: 0.9rem; color: var(--primary);">';
+                             if (wr.container_name) {
+                                 resHtml += '<strong>Container:</strong> ' + wr.container_name + '<br>';
+                             }
+                             if (wr.requests) {
+                                 resHtml += '<strong>Req:</strong> ' + Object.entries(wr.requests).map(([k,v])=>k+':'+v).join(', ') + '<br>';
+                             }
+                             if (wr.limits) {
+                                 resHtml += '<strong>Lim:</strong> ' + Object.entries(wr.limits).map(([k,v])=>k+':'+v).join(', ');
+                             }
+                             resHtml += '</div>';
+                             voteHtml += resHtml;
                          }
-                         if (d.workload_resources.requests) {
-                             resHtml += '<strong>Req:</strong> ' + Object.entries(d.workload_resources.requests).map(([k,v])=>k+':'+v).join(', ') + '<br>';
-                         }
-                         if (d.workload_resources.limits) {
-                             resHtml += '<strong>Lim:</strong> ' + Object.entries(d.workload_resources.limits).map(([k,v])=>k+':'+v).join(', ');
-                         }
-                         resHtml += '</div>';
-                         voteHtml += resHtml;
                      }
 
                      if (d.pod_resources && d.pod_resources.length > 0) {

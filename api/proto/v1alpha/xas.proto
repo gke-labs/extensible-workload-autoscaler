@@ -284,12 +284,12 @@ message ContainerMetrics {
 
 // ControlMetrics contains the aggregated values calculated by the Control Plane.
 message ControlMetrics {
-  // Global metric values, keyed by metric name.
-  map<string, double> values = 1;
   // Timestamp of the calculation (Unix seconds).
   int64 timestamp = 2;
   // The number of ready replicas.
   int32 ready_replicas = 3;
+  // Global metric values, keyed by metric name.
+  map<string, double> values = 1;
   // Per pod metric values, keyed by pod name.
   map<string, MetricValues> pod_metrics = 4;
   // Per pod, per container metric values, keyed by pod name.
@@ -311,10 +311,14 @@ message UpdateRecommenderStateRequest {
   RecommenderVote vote = 3;
 }
 
-// ResourceRecommendation defines CPU and Memory requests/limits for a workload.
-message ResourceRecommendation {
-  // The container this recommendation applies to.
-  // Empty string means the first container of the pod.
+// A container resources requests/limits (e.g. CPU and Memory). Can also be
+// used to specify pod-level resources.
+//
+// Pod-level resources is decribed in
+// https://kubernetes.io/docs/tasks/configure-pod-container/assign-pod-level-resources/
+message ContainerResource {
+  // The container this recommendation applies to. If omitted, the resources
+  // are pod-level resources.
   string container_name = 3;
   // Maps a resource to its requested value (e.g. 'memory: 10Mi').
   map<string, string> requests = 1;
@@ -322,27 +326,31 @@ message ResourceRecommendation {
   map<string, string> limits = 2;
 }
 
-// PodResourceRecommendation defines CPU and Memory requests/limits for a specific pod.
-message PodResourceRecommendation {
+// The resources requests/limits (e.g. CPU and Memory) for a given pod.
+// Requests/limits can either apply to a given container, or po
+message PodContainerResource {
   string pod_name = 1;
-  // Maps a resource to its requested value (e.g. 'memory: 10Mi').
-  map<string, string> requests = 2;
-  // Maps a resource to its value limit (e.g. 'cpu: 5m').
-  map<string, string> limits = 3;
+  ContainerResource container_resources = 2;
 }
 
-// RecommenderVote represents the input/decision from a recommender.
+// An autoscaling recommendation emitted by a recommender.
 message RecommenderVote {
-  // Recommendation for replicas.
+  // Recommendation for number of replicas.
   optional int32 replicas = 1;
+
   // If false, this recommender votes to scale to zero (if Activation type).
   bool is_active = 2;
+
   // Human-readable reason or message.
   string message = 3;
-  // Workload-level resource recommendation.
-  ResourceRecommendation workload_resources = 4;
-  // Pod-level resource recommendations.
-  repeated PodResourceRecommendation pod_resources = 5;
+  
+  // Workload-level resource request/limit recommendations. Resources can be
+  // specific to a container, or pod-level resources.
+  repeated ContainerResource workload_resources = 4;
+
+  // Per-pod resource request/limit recommendations. Resources can be specific
+  // to a container, or pod-level resources.
+  repeated PodContainerResource pod_container_resources = 5;
 }
 
 // RecommenderState represents the full state of a recommender (Config + Status).
@@ -373,10 +381,10 @@ message RecommenderStatus {
   string type = 8;
   // Replicas recommendation for the workload.
   optional int32 replicas = 1;
-  // Workload-level resource recommendation.
-  ResourceRecommendation workload_resources = 9;
+  // Workload-level resource recommendations (one per container).
+  repeated ContainerResource workload_resources = 9;
   // Pod-level resource recommendations.
-  repeated PodResourceRecommendation pod_resources = 10;
+  repeated PodContainerResource pod_resources = 10;
 }
 
 

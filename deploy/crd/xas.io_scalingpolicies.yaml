@@ -264,16 +264,29 @@ spec:
                       type: string
                     podResources:
                       items:
+                        description: PodResourceRecommendation targets a specific
+                          pod.
                         properties:
-                          limits:
-                            additionalProperties:
-                              type: string
-                            type: object
                           podName:
                             type: string
-                          requests:
-                            additionalProperties:
-                              type: string
+                          resources:
+                            description: |-
+                              Resources for a container of the pod, or for the pod itself when
+                              ContainerName is empty.
+                            properties:
+                              containerName:
+                                description: |-
+                                  ContainerName is the container this recommendation applies to.
+                                  Empty means the recommendation applies at the pod level.
+                                type: string
+                              limits:
+                                additionalProperties:
+                                  type: string
+                                type: object
+                              requests:
+                                additionalProperties:
+                                  type: string
+                                type: object
                             type: object
                         required:
                         - podName
@@ -289,21 +302,26 @@ spec:
                     type:
                       type: string
                     workloadResources:
-                      properties:
-                        containerName:
-                          description: |-
-                            ContainerName is the container this recommendation applies to.
-                            Empty means the first container of the pod.
-                          type: string
-                        limits:
-                          additionalProperties:
+                      items:
+                        description: |-
+                          ResourceRecommendation is a set of resource requests/limits for a container,
+                          or for the pod itself when ContainerName is empty.
+                        properties:
+                          containerName:
+                            description: |-
+                              ContainerName is the container this recommendation applies to.
+                              Empty means the recommendation applies at the pod level.
                             type: string
-                          type: object
-                        requests:
-                          additionalProperties:
-                            type: string
-                          type: object
-                      type: object
+                          limits:
+                            additionalProperties:
+                              type: string
+                            type: object
+                          requests:
+                            additionalProperties:
+                              type: string
+                            type: object
+                        type: object
+                      type: array
                   required:
                   - active
                   - phase

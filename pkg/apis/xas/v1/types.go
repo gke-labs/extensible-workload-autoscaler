@@ -201,22 +201,26 @@ type DecisionStatus struct {
 	Replicas          *int32                      `json:"replicas,omitempty"`
 	Reason            string                      `json:"reason,omitempty"`
 	Error             string                      `json:"error,omitempty"`
-	WorkloadResources *ResourceRecommendation     `json:"workloadResources,omitempty"`
+	WorkloadResources []ResourceRecommendation    `json:"workloadResources,omitempty"`
 	PodResources      []PodResourceRecommendation `json:"podResources,omitempty"`
 }
 
+// ResourceRecommendation is a set of resource requests/limits for a container,
+// or for the pod itself when ContainerName is empty.
 type ResourceRecommendation struct {
 	// ContainerName is the container this recommendation applies to.
-	// Empty means the first container of the pod.
+	// Empty means the recommendation applies at the pod level.
 	ContainerName string            `json:"containerName,omitempty"`
 	Requests      map[string]string `json:"requests,omitempty"`
 	Limits        map[string]string `json:"limits,omitempty"`
 }
 
+// PodResourceRecommendation targets a specific pod.
 type PodResourceRecommendation struct {
-	PodName  string            `json:"podName"`
-	Requests map[string]string `json:"requests,omitempty"`
-	Limits   map[string]string `json:"limits,omitempty"`
+	PodName string `json:"podName"`
+	// Resources for a container of the pod, or for the pod itself when
+	// ContainerName is empty.
+	Resources *ResourceRecommendation `json:"resources,omitempty"`
 }
 
 // +genclient

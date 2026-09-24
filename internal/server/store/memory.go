@@ -521,7 +521,7 @@ func (s *MemoryStore) UpdateRecommenderState(req *pb.UpdateRecommenderStateReque
 		Message:           req.Vote.Message,
 		LastUpdated:       timestamppb.New(s.clock.Now()),
 		WorkloadResources: req.Vote.WorkloadResources,
-		PodResources:      req.Vote.PodResources,
+		PodResources:      req.Vote.PodContainerResources,
 	}
 
 	// Wait, I need to check how to correctly create google.protobuf.Timestamp
