@@ -321,15 +321,15 @@ func TestRecommendationArbitration(t *testing.T) {
 	// Case 1: All Active. R1=3, R2=5. Result=5.
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "arb-pol"}, RecommenderName: "r1",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(3), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(3), IsActive: true},
 	})
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "arb-pol"}, RecommenderName: "r2",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(5), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(5), IsActive: true},
 	})
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "arb-pol"}, RecommenderName: "a1",
-		Vote: &pb.RecommenderVote{IsActive: true},
+		Recommendation: &pb.Recommendation{IsActive: true},
 	})
 
 	s.CalculateAll()
@@ -341,7 +341,7 @@ func TestRecommendationArbitration(t *testing.T) {
 	// Case 2: Inactive (Scale to Zero). a1=False.
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "arb-pol"}, RecommenderName: "a1",
-		Vote: &pb.RecommenderVote{IsActive: false},
+		Recommendation: &pb.Recommendation{IsActive: false},
 	})
 	// Force window expiry (default 300s window in store logic)
 	clk.Advance(301 * time.Second)
@@ -405,7 +405,7 @@ func TestDump(t *testing.T) {
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id:              &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "dump-pol"},
 		RecommenderName: "cpu-rec",
-		Vote: &pb.RecommenderVote{
+		Recommendation: &pb.Recommendation{
 			Replicas: proto.Int32(2),
 			IsActive: true,
 		},
@@ -669,7 +669,7 @@ func TestDeletePolicy(t *testing.T) {
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: name},
 	})
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{Id: id, Workload: &pb.Workload{Pods: []*pb.PodState{{Name: "p1"}}}})
-	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{Id: id, RecommenderName: "r1", Vote: &pb.RecommenderVote{IsActive: true}})
+	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{Id: id, RecommenderName: "r1", Recommendation: &pb.Recommendation{IsActive: true}})
 
 	// 2. Delete
 	s.DeletePolicy(id)
@@ -815,7 +815,7 @@ func TestRemoveRecommender(t *testing.T) {
 	// 2. Simulate R1 vote = 10
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: id, RecommenderName: "r1",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(10), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(10), IsActive: true},
 	})
 
 	s.CalculateAll()
@@ -837,7 +837,7 @@ func TestRemoveRecommender(t *testing.T) {
 	// 4. Simulate Zombie R1 vote = 100
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: id, RecommenderName: "r1",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(100), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(100), IsActive: true},
 	})
 
 	s.CalculateAll()

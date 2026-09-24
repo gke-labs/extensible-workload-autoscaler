@@ -28,28 +28,28 @@ type config struct {
 }
 
 // Recommend calculates the resource recommendations based on control metrics
-func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.ControlMetrics) *pb.RecommenderVote {
+func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.ControlMetrics) *pb.Recommendation {
 	var warnings []string
 
 	//Parse the configuration from def.Params using parseConfig.
 	cfg, err := parseConfig(def)
 
-	// If parsing fails, return a RecommenderVote with the error message in the Message field.
+	// If parsing fails, return a Recommendation with the error message in the Message field.
 	if err != nil {
-		return &pb.RecommenderVote{
+		return &pb.Recommendation{
 			IsActive: false,
 			Message:  fmt.Sprintf("Unable to parse recommender configuration: %v", err),
 		}
 	}
 
 	if state == nil {
-		return &pb.RecommenderVote{
+		return &pb.Recommendation{
 			IsActive: false,
 			Message:  "ControlMetrics is missing",
 		}
 	}
 	if len(state.PodContainerMetrics) == 0 {
-		return &pb.RecommenderVote{
+		return &pb.Recommendation{
 			IsActive: false,
 			Message:  "PodMetrics is empty (ensure metrics are configured with scope: Container)",
 		}
@@ -101,12 +101,12 @@ func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.C
 	if !cpuMetricFound && !memMetricFound {
 		warnings = append(warnings, "Unable to create recommendation as no value memory or cpu values were found")
 
-		return &pb.RecommenderVote{
+		return &pb.Recommendation{
 			IsActive: false,
 			Message:  fmt.Sprintf("No Recommendations generated: %s", strings.Join(warnings, "; ")),
 		}
 	} else {
-		return &pb.RecommenderVote{
+		return &pb.Recommendation{
 			IsActive: true,
 			WorkloadResources: []*pb.ContainerResource{
 				{

@@ -17,7 +17,7 @@ func TestLinearRecommend(t *testing.T) {
 		def            *pb.RecommenderDefinition
 		controlMetrics map[string]float64
 		readyReplicas  int32
-		want           *pb.RecommenderVote
+		want           *pb.Recommendation
 	}{
 		{
 			name: "Scale Up",
@@ -29,7 +29,7 @@ func TestLinearRecommend(t *testing.T) {
 			controlMetrics: map[string]float64{"cpu": 0.8},
 			readyReplicas:  2,
 			// Desired = 2 * (0.8 / 0.5) = 2 * 1.6 = 3.2 -> ceil(3.2) = 4
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				Replicas: proto.Int32(4),
 				IsActive: true,
 			},
@@ -44,7 +44,7 @@ func TestLinearRecommend(t *testing.T) {
 			controlMetrics: map[string]float64{"cpu": 0.2},
 			readyReplicas:  4,
 			// Desired = 4 * (0.2 / 0.5) = 4 * 0.4 = 1.6 -> ceil(1.6) = 2
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				Replicas: proto.Int32(2),
 				IsActive: true,
 			},
@@ -58,7 +58,7 @@ func TestLinearRecommend(t *testing.T) {
 			},
 			controlMetrics: map[string]float64{"cpu": 0.8},
 			readyReplicas:  2,
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				Message: "metric 'unknown' not found",
 			},
 		},
@@ -71,7 +71,7 @@ func TestLinearRecommend(t *testing.T) {
 			},
 			controlMetrics: map[string]float64{"cpu": 0.8},
 			readyReplicas:  2,
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				Message: "missing target param",
 			},
 		},

@@ -123,7 +123,7 @@ type PolicyState struct {
 	// metricKey, which identifies a metric by name and owner.
 	Series           map[string]map[string]*Series // MetricKey -> SeriesID -> Series
 	GlobalHistograms map[string]*DecayingHistogram // MetricKey -> Histogram
-	Recommendation   *pb.Recommendation
+	Recommendation   *pb.ArbitratedRecommendation
 	LastActive       int64
 	Decisions        map[string]*pb.RecommenderStatus
 	ControlMetrics   *pb.ControlMetrics
@@ -473,7 +473,7 @@ func (s *MemoryStore) UpdateRecommenderState(req *pb.UpdateRecommenderStateReque
 		return fmt.Errorf("policy not found")
 	}
 
-	if req.Vote == nil {
+	if req.Recommendation == nil {
 		delete(ps.Decisions, req.RecommenderName)
 		return nil
 	}
@@ -500,8 +500,8 @@ func (s *MemoryStore) UpdateRecommenderState(req *pb.UpdateRecommenderStateReque
 		return fmt.Errorf("recommender %s not defined in policy", req.RecommenderName)
 	}
 
-	// Basic validation of vote
-	if req.Vote.Replicas != nil && *req.Vote.Replicas < 0 {
+	// Basic validation of recommendation
+	if req.Recommendation.Replicas != nil && *req.Recommendation.Replicas < 0 {
 		return fmt.Errorf("desired replicas cannot be negative")
 	}
 
@@ -516,12 +516,12 @@ func (s *MemoryStore) UpdateRecommenderState(req *pb.UpdateRecommenderStateReque
 		Type:              def.Type,
 		Phase:             phase,
 		Mode:              def.Mode,
-		Replicas:          req.Vote.Replicas,
-		IsActive:          req.Vote.IsActive,
-		Message:           req.Vote.Message,
+		Replicas:          req.Recommendation.Replicas,
+		IsActive:          req.Recommendation.IsActive,
+		Message:           req.Recommendation.Message,
 		LastUpdated:       timestamppb.New(s.clock.Now()),
-		WorkloadResources: req.Vote.WorkloadResources,
-		PodResources:      req.Vote.PodContainerResources,
+		WorkloadResources: req.Recommendation.WorkloadResources,
+		PodResources:      req.Recommendation.PodContainerResources,
 	}
 
 	// Wait, I need to check how to correctly create google.protobuf.Timestamp
@@ -1155,7 +1155,7 @@ func (s *MemoryStore) processDecisions(ps *PolicyState, now int64) {
 	}
 
 	explanation := append(activationStatuses, scalingStatuses...)
-	ps.Recommendation = &pb.Recommendation{
+	ps.Recommendation = &pb.ArbitratedRecommendation{
 		TargetReplicas: replicas,
 		Explanation:    explanation,
 	}

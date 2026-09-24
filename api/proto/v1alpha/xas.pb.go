@@ -1445,10 +1445,10 @@ type UpdateRecommenderStateRequest struct {
 	Id *PolicyId `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// The name of the recommender to update.
 	RecommenderName string `protobuf:"bytes,2,opt,name=recommender_name,json=recommenderName,proto3" json:"recommender_name,omitempty"`
-	// The new status/decision (Vote).
-	Vote          *RecommenderVote `protobuf:"bytes,3,opt,name=vote,proto3" json:"vote,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// The new recommendation.
+	Recommendation *Recommendation `protobuf:"bytes,3,opt,name=recommendation,proto3" json:"recommendation,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *UpdateRecommenderStateRequest) Reset() {
@@ -1495,9 +1495,9 @@ func (x *UpdateRecommenderStateRequest) GetRecommenderName() string {
 	return ""
 }
 
-func (x *UpdateRecommenderStateRequest) GetVote() *RecommenderVote {
+func (x *UpdateRecommenderStateRequest) GetRecommendation() *Recommendation {
 	if x != nil {
-		return x.Vote
+		return x.Recommendation
 	}
 	return nil
 }
@@ -1626,7 +1626,7 @@ func (x *PodContainerResource) GetContainerResources() *ContainerResource {
 }
 
 // An autoscaling recommendation emitted by a recommender.
-type RecommenderVote struct {
+type Recommendation struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Recommendation for number of replicas.
 	Replicas *int32 `protobuf:"varint,1,opt,name=replicas,proto3,oneof" json:"replicas,omitempty"`
@@ -1644,20 +1644,20 @@ type RecommenderVote struct {
 	sizeCache             protoimpl.SizeCache
 }
 
-func (x *RecommenderVote) Reset() {
-	*x = RecommenderVote{}
+func (x *Recommendation) Reset() {
+	*x = Recommendation{}
 	mi := &file_xas_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RecommenderVote) String() string {
+func (x *Recommendation) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RecommenderVote) ProtoMessage() {}
+func (*Recommendation) ProtoMessage() {}
 
-func (x *RecommenderVote) ProtoReflect() protoreflect.Message {
+func (x *Recommendation) ProtoReflect() protoreflect.Message {
 	mi := &file_xas_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1669,40 +1669,40 @@ func (x *RecommenderVote) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RecommenderVote.ProtoReflect.Descriptor instead.
-func (*RecommenderVote) Descriptor() ([]byte, []int) {
+// Deprecated: Use Recommendation.ProtoReflect.Descriptor instead.
+func (*Recommendation) Descriptor() ([]byte, []int) {
 	return file_xas_proto_rawDescGZIP(), []int{25}
 }
 
-func (x *RecommenderVote) GetReplicas() int32 {
+func (x *Recommendation) GetReplicas() int32 {
 	if x != nil && x.Replicas != nil {
 		return *x.Replicas
 	}
 	return 0
 }
 
-func (x *RecommenderVote) GetIsActive() bool {
+func (x *Recommendation) GetIsActive() bool {
 	if x != nil {
 		return x.IsActive
 	}
 	return false
 }
 
-func (x *RecommenderVote) GetMessage() string {
+func (x *Recommendation) GetMessage() string {
 	if x != nil {
 		return x.Message
 	}
 	return ""
 }
 
-func (x *RecommenderVote) GetWorkloadResources() []*ContainerResource {
+func (x *Recommendation) GetWorkloadResources() []*ContainerResource {
 	if x != nil {
 		return x.WorkloadResources
 	}
 	return nil
 }
 
-func (x *RecommenderVote) GetPodContainerResources() []*PodContainerResource {
+func (x *Recommendation) GetPodContainerResources() []*PodContainerResource {
 	if x != nil {
 		return x.PodContainerResources
 	}
@@ -1949,8 +1949,8 @@ func (x *GetRecommendationRequest) GetId() *PolicyId {
 // GetRecommendationResponse wraps the recommendation.
 // If recommendation is not set, it means no decision is available yet.
 type GetRecommendationResponse struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Recommendation *Recommendation        `protobuf:"bytes,1,opt,name=recommendation,proto3" json:"recommendation,omitempty"`
+	state          protoimpl.MessageState    `protogen:"open.v1"`
+	Recommendation *ArbitratedRecommendation `protobuf:"bytes,1,opt,name=recommendation,proto3" json:"recommendation,omitempty"`
 	// Status of the input metrics used for the decision.
 	MetricStatuses []*MetricStatus `protobuf:"bytes,2,rep,name=metric_statuses,json=metricStatuses,proto3" json:"metric_statuses,omitempty"`
 	unknownFields  protoimpl.UnknownFields
@@ -1987,7 +1987,7 @@ func (*GetRecommendationResponse) Descriptor() ([]byte, []int) {
 	return file_xas_proto_rawDescGZIP(), []int{29}
 }
 
-func (x *GetRecommendationResponse) GetRecommendation() *Recommendation {
+func (x *GetRecommendationResponse) GetRecommendation() *ArbitratedRecommendation {
 	if x != nil {
 		return x.Recommendation
 	}
@@ -2001,8 +2001,8 @@ func (x *GetRecommendationResponse) GetMetricStatuses() []*MetricStatus {
 	return nil
 }
 
-// Recommendation is the final arbitrated decision from the Control Plane.
-type Recommendation struct {
+// ArbitratedRecommendation is the final arbitrated decision from the Control Plane.
+type ArbitratedRecommendation struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The calculated target replica count.
 	TargetReplicas *int32 `protobuf:"varint,1,opt,name=target_replicas,json=targetReplicas,proto3,oneof" json:"target_replicas,omitempty"`
@@ -2012,20 +2012,20 @@ type Recommendation struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Recommendation) Reset() {
-	*x = Recommendation{}
+func (x *ArbitratedRecommendation) Reset() {
+	*x = ArbitratedRecommendation{}
 	mi := &file_xas_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Recommendation) String() string {
+func (x *ArbitratedRecommendation) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Recommendation) ProtoMessage() {}
+func (*ArbitratedRecommendation) ProtoMessage() {}
 
-func (x *Recommendation) ProtoReflect() protoreflect.Message {
+func (x *ArbitratedRecommendation) ProtoReflect() protoreflect.Message {
 	mi := &file_xas_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2037,19 +2037,19 @@ func (x *Recommendation) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Recommendation.ProtoReflect.Descriptor instead.
-func (*Recommendation) Descriptor() ([]byte, []int) {
+// Deprecated: Use ArbitratedRecommendation.ProtoReflect.Descriptor instead.
+func (*ArbitratedRecommendation) Descriptor() ([]byte, []int) {
 	return file_xas_proto_rawDescGZIP(), []int{30}
 }
 
-func (x *Recommendation) GetTargetReplicas() int32 {
+func (x *ArbitratedRecommendation) GetTargetReplicas() int32 {
 	if x != nil && x.TargetReplicas != nil {
 		return *x.TargetReplicas
 	}
 	return 0
 }
 
-func (x *Recommendation) GetExplanation() []*RecommenderStatus {
+func (x *ArbitratedRecommendation) GetExplanation() []*RecommenderStatus {
 	if x != nil {
 		return x.Explanation
 	}
@@ -2622,11 +2622,11 @@ const file_xas_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\v2\x19.xas.v1alpha.MetricValuesR\x05value:\x028\x01\x1ae\n" +
 	"\x18PodContainerMetricsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x123\n" +
-	"\x05value\x18\x02 \x01(\v2\x1d.xas.v1alpha.ContainerMetricsR\x05value:\x028\x01\"\xa3\x01\n" +
+	"\x05value\x18\x02 \x01(\v2\x1d.xas.v1alpha.ContainerMetricsR\x05value:\x028\x01\"\xb6\x01\n" +
 	"\x1dUpdateRecommenderStateRequest\x12%\n" +
 	"\x02id\x18\x01 \x01(\v2\x15.xas.v1alpha.PolicyIdR\x02id\x12)\n" +
-	"\x10recommender_name\x18\x02 \x01(\tR\x0frecommenderName\x120\n" +
-	"\x04vote\x18\x03 \x01(\v2\x1c.xas.v1alpha.RecommenderVoteR\x04vote\"\xc0\x02\n" +
+	"\x10recommender_name\x18\x02 \x01(\tR\x0frecommenderName\x12C\n" +
+	"\x0erecommendation\x18\x03 \x01(\v2\x1b.xas.v1alpha.RecommendationR\x0erecommendation\"\xc0\x02\n" +
 	"\x11ContainerResource\x12%\n" +
 	"\x0econtainer_name\x18\x03 \x01(\tR\rcontainerName\x12H\n" +
 	"\brequests\x18\x01 \x03(\v2,.xas.v1alpha.ContainerResource.RequestsEntryR\brequests\x12B\n" +
@@ -2639,8 +2639,8 @@ const file_xas_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x82\x01\n" +
 	"\x14PodContainerResource\x12\x19\n" +
 	"\bpod_name\x18\x01 \x01(\tR\apodName\x12O\n" +
-	"\x13container_resources\x18\x02 \x01(\v2\x1e.xas.v1alpha.ContainerResourceR\x12containerResources\"\xa0\x02\n" +
-	"\x0fRecommenderVote\x12\x1f\n" +
+	"\x13container_resources\x18\x02 \x01(\v2\x1e.xas.v1alpha.ContainerResourceR\x12containerResources\"\x9f\x02\n" +
+	"\x0eRecommendation\x12\x1f\n" +
 	"\breplicas\x18\x01 \x01(\x05H\x00R\breplicas\x88\x01\x01\x12\x1b\n" +
 	"\tis_active\x18\x02 \x01(\bR\bisActive\x12\x18\n" +
 	"\amessage\x18\x03 \x01(\tR\amessage\x12M\n" +
@@ -2668,11 +2668,11 @@ const file_xas_proto_rawDesc = "" +
 	" \x03(\v2!.xas.v1alpha.PodContainerResourceR\fpodResourcesB\v\n" +
 	"\t_replicas\"A\n" +
 	"\x18GetRecommendationRequest\x12%\n" +
-	"\x02id\x18\x01 \x01(\v2\x15.xas.v1alpha.PolicyIdR\x02id\"\xa4\x01\n" +
-	"\x19GetRecommendationResponse\x12C\n" +
-	"\x0erecommendation\x18\x01 \x01(\v2\x1b.xas.v1alpha.RecommendationR\x0erecommendation\x12B\n" +
-	"\x0fmetric_statuses\x18\x02 \x03(\v2\x19.xas.v1alpha.MetricStatusR\x0emetricStatuses\"\x94\x01\n" +
-	"\x0eRecommendation\x12,\n" +
+	"\x02id\x18\x01 \x01(\v2\x15.xas.v1alpha.PolicyIdR\x02id\"\xae\x01\n" +
+	"\x19GetRecommendationResponse\x12M\n" +
+	"\x0erecommendation\x18\x01 \x01(\v2%.xas.v1alpha.ArbitratedRecommendationR\x0erecommendation\x12B\n" +
+	"\x0fmetric_statuses\x18\x02 \x03(\v2\x19.xas.v1alpha.MetricStatusR\x0emetricStatuses\"\x9e\x01\n" +
+	"\x18ArbitratedRecommendation\x12,\n" +
 	"\x0ftarget_replicas\x18\x01 \x01(\x05H\x00R\x0etargetReplicas\x88\x01\x01\x12@\n" +
 	"\vexplanation\x18\x02 \x03(\v2\x1e.xas.v1alpha.RecommenderStatusR\vexplanationB\x12\n" +
 	"\x10_target_replicas\"l\n" +
@@ -2760,12 +2760,12 @@ var file_xas_proto_goTypes = []any{
 	(*UpdateRecommenderStateRequest)(nil), // 22: xas.v1alpha.UpdateRecommenderStateRequest
 	(*ContainerResource)(nil),             // 23: xas.v1alpha.ContainerResource
 	(*PodContainerResource)(nil),          // 24: xas.v1alpha.PodContainerResource
-	(*RecommenderVote)(nil),               // 25: xas.v1alpha.RecommenderVote
+	(*Recommendation)(nil),                // 25: xas.v1alpha.Recommendation
 	(*RecommenderState)(nil),              // 26: xas.v1alpha.RecommenderState
 	(*RecommenderStatus)(nil),             // 27: xas.v1alpha.RecommenderStatus
 	(*GetRecommendationRequest)(nil),      // 28: xas.v1alpha.GetRecommendationRequest
 	(*GetRecommendationResponse)(nil),     // 29: xas.v1alpha.GetRecommendationResponse
-	(*Recommendation)(nil),                // 30: xas.v1alpha.Recommendation
+	(*ArbitratedRecommendation)(nil),      // 30: xas.v1alpha.ArbitratedRecommendation
 	(*MetricStatus)(nil),                  // 31: xas.v1alpha.MetricStatus
 	(*IngestMetricsRequest)(nil),          // 32: xas.v1alpha.IngestMetricsRequest
 	(*PolicyBatch)(nil),                   // 33: xas.v1alpha.PolicyBatch
@@ -2823,21 +2823,21 @@ var file_xas_proto_depIdxs = []int32{
 	46, // 28: xas.v1alpha.ControlMetrics.pod_container_metrics:type_name -> xas.v1alpha.ControlMetrics.PodContainerMetricsEntry
 	20, // 29: xas.v1alpha.ControlMetrics.container_metrics:type_name -> xas.v1alpha.ContainerMetrics
 	0,  // 30: xas.v1alpha.UpdateRecommenderStateRequest.id:type_name -> xas.v1alpha.PolicyId
-	25, // 31: xas.v1alpha.UpdateRecommenderStateRequest.vote:type_name -> xas.v1alpha.RecommenderVote
+	25, // 31: xas.v1alpha.UpdateRecommenderStateRequest.recommendation:type_name -> xas.v1alpha.Recommendation
 	47, // 32: xas.v1alpha.ContainerResource.requests:type_name -> xas.v1alpha.ContainerResource.RequestsEntry
 	48, // 33: xas.v1alpha.ContainerResource.limits:type_name -> xas.v1alpha.ContainerResource.LimitsEntry
 	23, // 34: xas.v1alpha.PodContainerResource.container_resources:type_name -> xas.v1alpha.ContainerResource
-	23, // 35: xas.v1alpha.RecommenderVote.workload_resources:type_name -> xas.v1alpha.ContainerResource
-	24, // 36: xas.v1alpha.RecommenderVote.pod_container_resources:type_name -> xas.v1alpha.PodContainerResource
+	23, // 35: xas.v1alpha.Recommendation.workload_resources:type_name -> xas.v1alpha.ContainerResource
+	24, // 36: xas.v1alpha.Recommendation.pod_container_resources:type_name -> xas.v1alpha.PodContainerResource
 	49, // 37: xas.v1alpha.RecommenderState.config:type_name -> xas.v1alpha.RecommenderState.ConfigEntry
 	27, // 38: xas.v1alpha.RecommenderState.status:type_name -> xas.v1alpha.RecommenderStatus
 	53, // 39: xas.v1alpha.RecommenderStatus.last_updated:type_name -> google.protobuf.Timestamp
 	23, // 40: xas.v1alpha.RecommenderStatus.workload_resources:type_name -> xas.v1alpha.ContainerResource
 	24, // 41: xas.v1alpha.RecommenderStatus.pod_resources:type_name -> xas.v1alpha.PodContainerResource
 	0,  // 42: xas.v1alpha.GetRecommendationRequest.id:type_name -> xas.v1alpha.PolicyId
-	30, // 43: xas.v1alpha.GetRecommendationResponse.recommendation:type_name -> xas.v1alpha.Recommendation
+	30, // 43: xas.v1alpha.GetRecommendationResponse.recommendation:type_name -> xas.v1alpha.ArbitratedRecommendation
 	31, // 44: xas.v1alpha.GetRecommendationResponse.metric_statuses:type_name -> xas.v1alpha.MetricStatus
-	27, // 45: xas.v1alpha.Recommendation.explanation:type_name -> xas.v1alpha.RecommenderStatus
+	27, // 45: xas.v1alpha.ArbitratedRecommendation.explanation:type_name -> xas.v1alpha.RecommenderStatus
 	33, // 46: xas.v1alpha.IngestMetricsRequest.policies:type_name -> xas.v1alpha.PolicyBatch
 	34, // 47: xas.v1alpha.PolicyBatch.batches:type_name -> xas.v1alpha.MetricBatch
 	35, // 48: xas.v1alpha.MetricBatch.samples:type_name -> xas.v1alpha.MetricSample

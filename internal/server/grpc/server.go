@@ -81,7 +81,7 @@ func (s *Server) UpdateRecommenderState(ctx context.Context, req *pb.UpdateRecom
 	if err := validateUpdateRecommenderStateRequest(req); err != nil {
 		return nil, err
 	}
-	if req.Vote != nil {
+	if req.Recommendation != nil {
 		slog.Debug("UpdateRecommenderState", "cluster", req.Id.ClusterName, "policy", req.Id.Name, "recommender", req.RecommenderName)
 	} else {
 		slog.Debug("UpdateRecommenderState: Clearing", "cluster", req.Id.ClusterName, "policy", req.Id.Name, "recommender", req.RecommenderName)

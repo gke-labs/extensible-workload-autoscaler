@@ -42,7 +42,7 @@ type owningRecommender struct {
 	metrics map[string][]*pb.MetricDefinition
 }
 
-func (r *owningRecommender) Recommend(*pb.RecommenderDefinition, *pb.ControlMetrics, *pb.ControlMetrics) *pb.RecommenderVote {
+func (r *owningRecommender) Recommend(*pb.RecommenderDefinition, *pb.ControlMetrics, *pb.ControlMetrics) *pb.Recommendation {
 	return nil
 }
 
@@ -53,7 +53,7 @@ func (r *owningRecommender) OwnedMetrics(def *pb.RecommenderDefinition) []*pb.Me
 // plainRecommender does not own any metric.
 type plainRecommender struct{}
 
-func (plainRecommender) Recommend(*pb.RecommenderDefinition, *pb.ControlMetrics, *pb.ControlMetrics) *pb.RecommenderVote {
+func (plainRecommender) Recommend(*pb.RecommenderDefinition, *pb.ControlMetrics, *pb.ControlMetrics) *pb.Recommendation {
 	return nil
 }
 

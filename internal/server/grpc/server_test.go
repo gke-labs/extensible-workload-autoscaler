@@ -155,7 +155,7 @@ func TestServerEndToEndGRPC(t *testing.T) {
 	// 6. Simulate Recommender
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "cpu",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(4), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(4), IsActive: true},
 	})
 
 	// 7. Calc Recommendation
@@ -164,7 +164,7 @@ func TestServerEndToEndGRPC(t *testing.T) {
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	rec := resp.Recommendation
 
-	wantRec := &pb.Recommendation{
+	wantRec := &pb.ArbitratedRecommendation{
 		TargetReplicas: proto.Int32(4),
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(4), IsActive: true, Phase: "Scaling", Mode: "Active", Name: "cpu", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1010, 0))}, // cpu
@@ -280,14 +280,14 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "cpu",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(16), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(16), IsActive: true},
 	})
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	rec := resp.Recommendation
 
-	wantRec := &pb.Recommendation{
+	wantRec := &pb.ArbitratedRecommendation{
 		TargetReplicas: proto.Int32(16),
 		Explanation:    []*pb.RecommenderStatus{{Replicas: proto.Int32(16), IsActive: true, Phase: "Scaling", Name: "cpu", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1012, 0))}},
 	}
@@ -354,14 +354,14 @@ func TestExternalMetricGRPC(t *testing.T) {
 
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "queue_target",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(100), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(100), IsActive: true},
 	})
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	rec := resp.Recommendation
 
-	wantRec := &pb.Recommendation{
+	wantRec := &pb.ArbitratedRecommendation{
 		TargetReplicas: proto.Int32(100),
 		Explanation:    []*pb.RecommenderStatus{{Replicas: proto.Int32(100), IsActive: true, Phase: "Scaling", Name: "queue_target", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))}},
 	}
@@ -428,14 +428,14 @@ func TestPerPodExternalMetricGRPC(t *testing.T) {
 
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "latency_target",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(2), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(2), IsActive: true},
 	})
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	rec := resp.Recommendation
 
-	wantRec := &pb.Recommendation{
+	wantRec := &pb.ArbitratedRecommendation{
 		TargetReplicas: proto.Int32(2),
 		Explanation:    []*pb.RecommenderStatus{{Replicas: proto.Int32(2), IsActive: true, Phase: "Scaling", Name: "latency_target", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))}},
 	}
@@ -489,18 +489,18 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	memStore.CalculateAll()
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "act_queue",
-		Vote: &pb.RecommenderVote{IsActive: true},
+		Recommendation: &pb.Recommendation{IsActive: true},
 	})
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "target",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(5), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(5), IsActive: true},
 	})
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	rec := resp.Recommendation
 
-	wantWakeUp := &pb.Recommendation{
+	wantWakeUp := &pb.ArbitratedRecommendation{
 		TargetReplicas: proto.Int32(5),
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(5), IsActive: true, Phase: "Scaling", Name: "target", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))},
@@ -527,18 +527,18 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	memStore.CalculateAll()
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "act_queue",
-		Vote: &pb.RecommenderVote{IsActive: false},
+		Recommendation: &pb.Recommendation{IsActive: false},
 	})
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "target",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(0), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(0), IsActive: true},
 	})
 
 	memStore.CalculateAll()
 	resp, _ = client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	rec = resp.Recommendation
 
-	wantCooldown := &pb.Recommendation{
+	wantCooldown := &pb.ArbitratedRecommendation{
 		TargetReplicas: proto.Int32(1), // MinReplicas (Control Plane kept active due to window)
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(0), IsActive: true, Phase: "Scaling", Name: "target", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1003, 0))},
@@ -560,18 +560,18 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	memStore.CalculateAll()
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "act_queue",
-		Vote: &pb.RecommenderVote{IsActive: false},
+		Recommendation: &pb.Recommendation{IsActive: false},
 	})
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "target",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(0), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(0), IsActive: true},
 	})
 
 	memStore.CalculateAll()
 	resp, _ = client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	rec = resp.Recommendation
 
-	wantScaleDown := &pb.Recommendation{
+	wantScaleDown := &pb.ArbitratedRecommendation{
 		TargetReplicas: proto.Int32(0),
 		Explanation: []*pb.RecommenderStatus{
 			{IsActive: false, Phase: "Activation", Name: "act_queue", Type: "Threshold", LastUpdated: timestamppb.New(time.Unix(1009, 0))},
@@ -633,18 +633,18 @@ func TestDryRunGRPC(t *testing.T) {
 
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "active_obj",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(10), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(10), IsActive: true},
 	})
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "dry_obj",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(100), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(100), IsActive: true},
 	})
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	rec := resp.Recommendation
 
-	wantRec := &pb.Recommendation{
+	wantRec := &pb.ArbitratedRecommendation{
 		TargetReplicas: proto.Int32(10),
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(10), IsActive: true, Phase: "Scaling", Mode: "Active", Name: "active_obj", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))},
@@ -826,14 +826,14 @@ func TestHistogramLatencyScalingGRPC(t *testing.T) {
 
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "latency_obj",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(2), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(2), IsActive: true},
 	})
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	rec := resp.Recommendation
 
-	wantRec := &pb.Recommendation{
+	wantRec := &pb.ArbitratedRecommendation{
 		TargetReplicas: proto.Int32(2),
 		Explanation:    []*pb.RecommenderStatus{{Replicas: proto.Int32(2), IsActive: true, Phase: "Scaling", Name: "latency_obj", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1010, 0))}},
 	}
@@ -1314,11 +1314,11 @@ func TestRecommenderInactiveGRPC(t *testing.T) {
 
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "r_active",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(5), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(5), IsActive: true},
 	})
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "r_inactive",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(100), IsActive: false},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(100), IsActive: false},
 	})
 
 	memStore.CalculateAll()
@@ -1326,7 +1326,7 @@ func TestRecommenderInactiveGRPC(t *testing.T) {
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	rec := resp.Recommendation
 
-	wantRec := &pb.Recommendation{
+	wantRec := &pb.ArbitratedRecommendation{
 		TargetReplicas: proto.Int32(5),
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(5), IsActive: true, Phase: "Scaling", Name: "r_active", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))},
@@ -1505,7 +1505,7 @@ func TestRemoveScalingSectionGRPC(t *testing.T) {
 	// 2. Simulate Recommender
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: id, RecommenderName: "r1",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(10), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(10), IsActive: true},
 	})
 
 	// 3. Calc Recommendation
@@ -1682,11 +1682,11 @@ func TestRecommenderArbitrationGRPC(t *testing.T) {
 	// Simulate Recommender States
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "r_low",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(5), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(5), IsActive: true},
 	})
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}, RecommenderName: "r_high",
-		Vote: &pb.RecommenderVote{Replicas: proto.Int32(20), IsActive: true},
+		Recommendation: &pb.Recommendation{Replicas: proto.Int32(20), IsActive: true},
 	})
 
 	memStore.CalculateAll()

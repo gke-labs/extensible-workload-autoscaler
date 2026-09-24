@@ -20,7 +20,7 @@ import (
 )
 
 type Recommender interface {
-	Recommend(def *pb.RecommenderDefinition, metrics, ownedMetrics *pb.ControlMetrics) *pb.RecommenderVote
+	Recommend(def *pb.RecommenderDefinition, metrics, ownedMetrics *pb.ControlMetrics) *pb.Recommendation
 }
 
 type Engine struct {
@@ -147,7 +147,7 @@ func (e *Engine) fetchControlMetrics(ns, name, recommenderName string) (*pb.Cont
 
 type decision struct {
 	name string
-	vote *pb.RecommenderVote
+	vote *pb.Recommendation
 }
 
 func (e *Engine) pushDecisions(policy *pb.Policy, decisions []decision) {
@@ -158,7 +158,7 @@ func (e *Engine) pushDecisions(policy *pb.Policy, decisions []decision) {
 		req := &pb.UpdateRecommenderStateRequest{
 			Id:              &pb.PolicyId{ClusterName: e.clusterName, Namespace: policy.Id.Namespace, Name: policy.Id.Name},
 			RecommenderName: d.name,
-			Vote:            d.vote,
+			Recommendation:  d.vote,
 		}
 		if d.vote != nil && d.vote.Replicas != nil {
 			slog.Debug("Pushing workload replicas recommendation", "policy", policy.Id.Name, "recommender", d.name, "desired", *d.vote.Replicas)

@@ -15,17 +15,17 @@ type config struct {
 	target float64
 }
 
-func (r *LinearRecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.ControlMetrics) *pb.RecommenderVote {
+func (r *LinearRecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.ControlMetrics) *pb.Recommendation {
 	cfg, err := parseConfig(def)
 	if err != nil {
-		return &pb.RecommenderVote{
+		return &pb.Recommendation{
 			Message: err.Error(),
 		}
 	}
 
 	val, ok := state.Values[cfg.metric]
 	if !ok {
-		return &pb.RecommenderVote{
+		return &pb.Recommendation{
 			Message: fmt.Sprintf("metric '%s' not found", cfg.metric),
 		}
 	}
@@ -33,7 +33,7 @@ func (r *LinearRecommender) Recommend(def *pb.RecommenderDefinition, state, _ *p
 	ratio := val / cfg.target
 	desired := int32(math.Ceil(float64(state.ReadyReplicas) * ratio))
 
-	return &pb.RecommenderVote{
+	return &pb.Recommendation{
 		Replicas: &desired,
 		IsActive: true,
 	}

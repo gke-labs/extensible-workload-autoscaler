@@ -307,8 +307,8 @@ message UpdateRecommenderStateRequest {
   PolicyId id = 1;
   // The name of the recommender to update.
   string recommender_name = 2;
-  // The new status/decision (Vote).
-  RecommenderVote vote = 3;
+  // The new recommendation.
+  Recommendation recommendation = 3;
 }
 
 // A container resources requests/limits (e.g. CPU and Memory). Can also be
@@ -334,7 +334,7 @@ message PodContainerResource {
 }
 
 // An autoscaling recommendation emitted by a recommender.
-message RecommenderVote {
+message Recommendation {
   // Recommendation for number of replicas.
   optional int32 replicas = 1;
 
@@ -399,13 +399,13 @@ message GetRecommendationRequest {
 // GetRecommendationResponse wraps the recommendation.
 // If recommendation is not set, it means no decision is available yet.
 message GetRecommendationResponse {
-  Recommendation recommendation = 1;
+  ArbitratedRecommendation recommendation = 1;
   // Status of the input metrics used for the decision.
   repeated MetricStatus metric_statuses = 2;
 }
 
-// Recommendation is the final arbitrated decision from the Control Plane.
-message Recommendation {
+// ArbitratedRecommendation is the final arbitrated decision from the Control Plane.
+message ArbitratedRecommendation {
   // The calculated target replica count.
   optional int32 target_replicas = 1;
   // Explains the decision by listing the status of all recommenders.
