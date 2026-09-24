@@ -123,7 +123,8 @@ type PolicyState struct {
 	// metricKey, which identifies a metric by name and owner.
 	Series           map[string]map[string]*Series // MetricKey -> SeriesID -> Series
 	GlobalHistograms map[string]*DecayingHistogram // MetricKey -> Histogram
-	Recommendation   *pb.ArbitratedRecommendation
+	Recommendation   *pb.Recommendation
+	Explanation      []*pb.RecommenderStatus
 	LastActive       int64
 	Decisions        map[string]*pb.RecommenderStatus
 	ControlMetrics   *pb.ControlMetrics
@@ -198,6 +199,7 @@ func (s *MemoryStore) UpdatePolicy(clusterName string, p *pb.Policy, updateMask 
 	}
 	ps.Policy = updated
 	ps.Recommendation = nil
+	ps.Explanation = nil
 	ps.ControlMetrics = nil
 	ps.RecommenderControlMetrics = nil
 
@@ -587,6 +589,7 @@ func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationR
 	return &pb.GetRecommendationResponse{
 		Recommendation: ps.Recommendation,
 		MetricStatuses: metricStatuses,
+		Explanation:    ps.Explanation,
 	}, true
 }
 
@@ -1170,19 +1173,20 @@ func (s *MemoryStore) processDecisions(ps *PolicyState, now int64) {
 	// number of replicas: workload is inactive (0 replicas), or active and a
 	// recommender has decided on a positive number of replicas.
 	replicas, scalingStatuses := s.calculateTargetReplicas(ps, isActive)
-	podRes := s.calculateArbitratedResources(ps, isActive)
+	workloadRes, podRes := s.calculateArbitratedResources(ps, isActive)
 
-	if replicas == nil && len(podRes) == 0 && len(scalingStatuses) == 0 {
+	if replicas == nil && len(workloadRes) == 0 && len(podRes) == 0 && len(scalingStatuses) == 0 {
 		ps.Recommendation = nil
+		ps.Explanation = nil
 		return
 	}
 
-	explanation := append(activationStatuses, scalingStatuses...)
-	ps.Recommendation = &pb.ArbitratedRecommendation{
-		TargetReplicas: replicas,
-		PodResources:   podRes,
-		Explanation:    explanation,
+	ps.Recommendation = &pb.Recommendation{
+		Replicas:              replicas,
+		WorkloadResources:     workloadRes,
+		PodContainerResources: podRes,
 	}
+	ps.Explanation = append(activationStatuses, scalingStatuses...)
 
 	if policy.Workload != nil {
 		if replicas != nil {
@@ -1192,8 +1196,13 @@ func (s *MemoryStore) processDecisions(ps *PolicyState, now int64) {
 	}
 }
 
-// calculateArbitratedResources combines pod-level vertical resource
+// calculateArbitratedResources combines workload-level and pod-level vertical resource
 // recommendations across all active, non-dry-run scaling recommenders.
+//
+// For workload-level recommendations (WorkloadResources):
+//   - Recommendations are grouped by "containerName".
+//   - If multiple active recommenders specify resources for the same container,
+//     their requests and limits are arbitrated by taking the maximum quantity for each resource.
 //
 // For pod-level recommendations (PodResources):
 //   - Recommendations are grouped by "podName|containerName".
@@ -1201,10 +1210,14 @@ func (s *MemoryStore) processDecisions(ps *PolicyState, now int64) {
 //     their requests and limits are arbitrated by taking the maximum quantity for each resource.
 //
 // Recommenders running in "DryRun" mode or reporting IsActive = false are excluded from arbitration.
-func (s *MemoryStore) calculateArbitratedResources(ps *PolicyState, isActive bool) []*pb.PodContainerResource {
+func (s *MemoryStore) calculateArbitratedResources(ps *PolicyState, isActive bool) ([]*pb.ContainerResource, []*pb.PodContainerResource) {
 	if !isActive {
-		return nil
+		return nil, nil
 	}
+
+	// Map key: "containerName" -> ContainerResource
+	workloadMap := make(map[string]*pb.ContainerResource)
+	workloadKeys := []string{}
 
 	// Map key: "podName|containerName" -> PodContainerResource
 	podMap := make(map[string]*pb.PodContainerResource)
@@ -1214,6 +1227,33 @@ func (s *MemoryStore) calculateArbitratedResources(ps *PolicyState, isActive boo
 		d, ok := ps.Decisions[recDef.Name]
 		if !ok || recDef.Mode == "DryRun" || !d.IsActive {
 			continue
+		}
+
+		for _, wr := range d.WorkloadResources {
+			if wr == nil {
+				continue
+			}
+			cName := wr.ContainerName
+			existing, ok := workloadMap[cName]
+			if !ok {
+				newReqs := make(map[string]string)
+				newLims := make(map[string]string)
+				for k, v := range wr.Requests {
+					newReqs[k] = v
+				}
+				for k, v := range wr.Limits {
+					newLims[k] = v
+				}
+				workloadMap[cName] = &pb.ContainerResource{
+					ContainerName: cName,
+					Requests:      newReqs,
+					Limits:        newLims,
+				}
+				workloadKeys = append(workloadKeys, cName)
+			} else {
+				arbitrateResourceMap(existing.Requests, wr.Requests)
+				arbitrateResourceMap(existing.Limits, wr.Limits)
+			}
 		}
 
 		for _, pr := range d.PodResources {
@@ -1253,12 +1293,17 @@ func (s *MemoryStore) calculateArbitratedResources(ps *PolicyState, isActive boo
 		}
 	}
 
+	var arbitratedWorkload []*pb.ContainerResource
+	for _, key := range workloadKeys {
+		arbitratedWorkload = append(arbitratedWorkload, workloadMap[key])
+	}
+
 	var arbitratedPods []*pb.PodContainerResource
 	for _, key := range podKeys {
 		arbitratedPods = append(arbitratedPods, podMap[key])
 	}
 
-	return arbitratedPods
+	return arbitratedWorkload, arbitratedPods
 }
 
 func arbitrateResourceMap(dest map[string]string, src map[string]string) {

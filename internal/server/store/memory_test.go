@@ -334,8 +334,8 @@ func TestRecommendationArbitration(t *testing.T) {
 
 	s.CalculateAll()
 	rec, _ := s.GetRecommendation(&pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "arb-pol"})
-	if rec.Recommendation.GetTargetReplicas() != 5 {
-		t.Errorf("Case 1: Want 5, Got %d", rec.Recommendation.GetTargetReplicas())
+	if rec.Recommendation.GetReplicas() != 5 {
+		t.Errorf("Case 1: Want 5, Got %d", rec.Recommendation.GetReplicas())
 	}
 
 	// Case 2: Inactive (Scale to Zero). a1=False.
@@ -351,8 +351,8 @@ func TestRecommendationArbitration(t *testing.T) {
 	s.CalculateAll()
 
 	rec, _ = s.GetRecommendation(&pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "arb-pol"})
-	if rec.Recommendation.GetTargetReplicas() != 0 {
-		t.Errorf("Case 2: Want 0 (Inactive), Got %d", rec.Recommendation.GetTargetReplicas())
+	if rec.Recommendation.GetReplicas() != 0 {
+		t.Errorf("Case 2: Want 0 (Inactive), Got %d", rec.Recommendation.GetReplicas())
 	}
 }
 
@@ -483,20 +483,20 @@ func TestDump(t *testing.T) {
     },
     "GlobalHistograms": {},
     "Recommendation": {
-      "target_replicas": 2,
-      "explanation": [
-        {
-          "is_active": true,
-          "last_updated": {
-            "seconds": 1000
-          },
-          "phase": "Scaling",
-          "name": "cpu-rec",
-          "type": "Linear",
-          "replicas": 2
-        }
-      ]
+      "replicas": 2
     },
+    "Explanation": [
+      {
+        "is_active": true,
+        "last_updated": {
+          "seconds": 1000
+        },
+        "phase": "Scaling",
+        "name": "cpu-rec",
+        "type": "Linear",
+        "replicas": 2
+      }
+    ],
     "LastActive": 1000,
     "Decisions": {
       "cpu-rec": {
@@ -820,8 +820,8 @@ func TestRemoveRecommender(t *testing.T) {
 
 	s.CalculateAll()
 	rec, _ := s.GetRecommendation(id)
-	if rec.Recommendation.GetTargetReplicas() != 10 {
-		t.Errorf("Initial: Want 10, Got %d", rec.Recommendation.GetTargetReplicas())
+	if rec.Recommendation.GetReplicas() != 10 {
+		t.Errorf("Initial: Want 10, Got %d", rec.Recommendation.GetReplicas())
 	}
 
 	// 3. Update Policy: Remove R1
@@ -1044,11 +1044,11 @@ func TestVerticalResourceArbitration(t *testing.T) {
 	}
 
 	rec := resp.Recommendation
-	if len(rec.PodResources) != 1 {
-		t.Fatalf("Want 1 arbitrated pod resource, got %d", len(rec.PodResources))
+	if len(rec.PodContainerResources) != 1 {
+		t.Fatalf("Want 1 arbitrated pod resource, got %d", len(rec.PodContainerResources))
 	}
 
-	gotPod := rec.PodResources[0]
+	gotPod := rec.PodContainerResources[0]
 	if gotPod.PodName != "p1" || gotPod.ContainerResources.ContainerName != "main" {
 		t.Errorf("Unexpected pod/container: %s/%s", gotPod.PodName, gotPod.ContainerResources.ContainerName)
 	}

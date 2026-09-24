@@ -396,22 +396,17 @@ message GetRecommendationRequest {
   PolicyId id = 1; 
 }
 
-// GetRecommendationResponse wraps the recommendation.
+// GetRecommendationResponse wraps the arbitrated recommendation.
 // If recommendation is not set, it means no decision is available yet.
 message GetRecommendationResponse {
-  ArbitratedRecommendation recommendation = 1;
+  Recommendation recommendation = 1;
+
+  // Explains the arbitration decision by listing the status of all
+  // recommenders.
+  repeated RecommenderStatus explanation = 3;
+
   // Status of the input metrics used for the decision.
   repeated MetricStatus metric_statuses = 2;
-}
-
-// ArbitratedRecommendation is the final arbitrated decision from the Control Plane.
-message ArbitratedRecommendation {
-  // The calculated target replica count.
-  optional int32 target_replicas = 1;
-  // Explains the decision by listing the status of all recommenders.
-  repeated RecommenderStatus explanation = 2;
-  // Arbitrated pod-level resource recommendations.
-  repeated PodContainerResource pod_resources = 4;
 }
 
 // MetricStatus represents the state of a single input metric.
