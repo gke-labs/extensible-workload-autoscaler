@@ -410,6 +410,8 @@ message ArbitratedRecommendation {
   optional int32 target_replicas = 1;
   // Explains the decision by listing the status of all recommenders.
   repeated RecommenderStatus explanation = 2;
+  // Arbitrated pod-level resource recommendations.
+  repeated PodContainerResource pod_resources = 4;
 }
 
 // MetricStatus represents the state of a single input metric.

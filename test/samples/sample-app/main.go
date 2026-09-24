@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"hash/fnv"
 	"math"
 	"math/rand"
 	"net/http"
+	"os"
 	"runtime"
 	"strconv"
 	"time"
@@ -67,7 +69,72 @@ func init() {
 	prometheus.MustRegister(sawtooth)
 }
 
+func startCpuBurnWorkers(count int) {
+	for i := 0; i < count; i++ {
+		go func(workerID int) {
+			for {
+				x := 0.0
+				for j := 0; j < 50_000_000; j++ {
+					x += math.Sqrt(float64(j))
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
+		}(i)
+	}
+}
+
+func allocateMemory(sizeMB int) {
+	memoryHold = nil
+	runtime.GC()
+
+	if sizeMB > 0 {
+		memoryHold = make([][]byte, sizeMB)
+		for i := 0; i < sizeMB; i++ {
+			memoryHold[i] = make([]byte, 1024*1024)
+			for j := 0; j < len(memoryHold[i]); j += 4096 {
+				memoryHold[i][j] = 1
+			}
+		}
+	}
+
+	memoryAllocated.Set(float64(sizeMB * 1024 * 1024))
+}
+
 func main() {
+	// Auto load generation from environment variables
+	podName := os.Getenv("POD_NAME")
+	if podName == "" {
+		podName = os.Getenv("HOSTNAME")
+	}
+
+	if cpuStr := os.Getenv("CPU_LOAD_WORKERS"); cpuStr != "" {
+		if workers, err := strconv.Atoi(cpuStr); err == nil && workers > 0 {
+			fmt.Printf("Starting %d background CPU burn workers\n", workers)
+			startCpuBurnWorkers(workers)
+		}
+	}
+
+	if memStr := os.Getenv("MEMORY_ALLOC_MB"); memStr != "" {
+		if sizeMB, err := strconv.Atoi(memStr); err == nil && sizeMB > 0 {
+			fmt.Printf("Allocating %d MB resident memory at startup\n", sizeMB)
+			allocateMemory(sizeMB)
+		}
+	}
+
+	if os.Getenv("AUTO_PER_POD_LOAD") == "true" && podName != "" {
+		h := fnv.New32a()
+		h.Write([]byte(podName))
+		hashVal := h.Sum32()
+
+		workers := int(hashVal % 3) // 0, 1, or 2 workers
+		memMB := int(((hashVal/3)%4 + 1) * 50)
+		fmt.Printf("AUTO_PER_POD_LOAD active for pod %s: %d CPU workers, %d MB memory\n", podName, workers, memMB)
+		if workers > 0 {
+			startCpuBurnWorkers(workers)
+		}
+		allocateMemory(memMB)
+	}
+
 	// 1. App Endpoint
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		requestActive.Inc()
@@ -78,13 +145,10 @@ func main() {
 
 		requestCount.Inc()
 
-		// Simulate latency (0-500ms)
-		//		time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond)
-
 		w.Write([]byte("Hello from XAS Sample App"))
 	})
 
-	// 1. App Endpoint
+	// Latency Endpoint
 	http.HandleFunc("/latency", func(w http.ResponseWriter, r *http.Request) {
 		requestActive.Inc()
 		defer requestActive.Dec()
@@ -94,7 +158,6 @@ func main() {
 
 		requestCount.Inc()
 
-		// Simulate latency (0-500ms)
 		time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond)
 
 		w.Write([]byte("Hello from XAS Sample App"))
@@ -125,22 +188,7 @@ func main() {
 			return
 		}
 
-		// Free previous allocation and request GC
-		memoryHold = nil
-		runtime.GC()
-
-		if sizeMB > 0 {
-			memoryHold = make([][]byte, sizeMB)
-			for i := 0; i < sizeMB; i++ {
-				memoryHold[i] = make([]byte, 1024*1024)
-				// Fill memory to ensure it's actually resident (paged in)
-				for j := 0; j < len(memoryHold[i]); j += 4096 {
-					memoryHold[i][j] = 1
-				}
-			}
-		}
-
-		memoryAllocated.Set(float64(sizeMB * 1024 * 1024))
+		allocateMemory(sizeMB)
 		fmt.Fprintf(w, "Allocated %d MB\n", sizeMB)
 	})
 

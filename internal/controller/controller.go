@@ -299,7 +299,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	// container name means "the first container of the pod".
 	workloadRes := make(map[string]*pb.ContainerResource)
 	var workloadResOrder []string
-	var podRes []*pb.PodContainerResource
+	podRes := rec.PodResources
 	for _, exp := range rec.Explanation {
 		for _, wr := range exp.WorkloadResources {
 			if wr == nil {
@@ -309,9 +309,6 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 				workloadResOrder = append(workloadResOrder, wr.ContainerName)
 			}
 			workloadRes[wr.ContainerName] = wr
-		}
-		if len(exp.PodResources) > 0 {
-			podRes = append(podRes, exp.PodResources...)
 		}
 	}
 
@@ -412,7 +409,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	}
 
 	// Actuate Workload Resources via /resize subresource on all matching pods
-	if len(workloadRes) > 0 {
+	if len(workloadRes) > 0 && deployment.Spec.Selector != nil {
 		selector := labels.Set(deployment.Spec.Selector.MatchLabels).String()
 		pods, err := c.kubeclientset.CoreV1().Pods(policy.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector})
 		if err == nil {

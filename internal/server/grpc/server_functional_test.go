@@ -1093,6 +1093,7 @@ func TestUpdateRecommenderState_VerticalResources(t *testing.T) {
 
 	wantResp := &pb.GetRecommendationResponse{
 		Recommendation: &pb.ArbitratedRecommendation{
+			PodResources: vote.PodContainerResources,
 			Explanation: []*pb.RecommenderStatus{
 				{
 					Name:              "r1",
