@@ -21,17 +21,17 @@ type config struct {
 	replicas *int32
 }
 
-func (r *Recommender) Recommend(def *pb.RecommenderDefinition, _, _ *pb.ControlMetrics) *pb.RecommenderVote {
+func (r *Recommender) Recommend(def *pb.RecommenderDefinition, _, _ *pb.ControlMetrics) *pb.Recommendation {
 	cfg, err := parseConfig(def)
 	if err != nil {
-		return &pb.RecommenderVote{
+		return &pb.Recommendation{
 			Message: err.Error(),
 		}
 	}
 
 	isActive, err := checkCron(cfg.start, cfg.end, cfg.location, r.now())
 	if err != nil {
-		return &pb.RecommenderVote{
+		return &pb.Recommendation{
 			Message: err.Error(),
 		}
 	}
@@ -45,7 +45,7 @@ func (r *Recommender) Recommend(def *pb.RecommenderDefinition, _, _ *pb.ControlM
 		replicas = &desired
 	}
 
-	return &pb.RecommenderVote{
+	return &pb.Recommendation{
 		IsActive: isActive,
 		Replicas: replicas,
 	}

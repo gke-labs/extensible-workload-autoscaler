@@ -984,7 +984,7 @@ func TestUpdateRecommenderState_NotFound(t *testing.T) {
 	_, err := client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id:              &pb.PolicyId{ClusterName: "c1", Namespace: "ns", Name: "missing"},
 		RecommenderName: "r1",
-		Vote:            &pb.RecommenderVote{Replicas: proto.Int32(1)},
+		Recommendation:  &pb.Recommendation{Replicas: proto.Int32(1)},
 	})
 	if status.Code(err) != codes.NotFound {
 		t.Errorf("Expected NotFound, got %v", err)
@@ -1002,7 +1002,7 @@ func TestUpdateRecommenderState_NotDefined(t *testing.T) {
 	_, err := client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 		Id:              id,
 		RecommenderName: "undefined",
-		Vote:            &pb.RecommenderVote{Replicas: proto.Int32(1)},
+		Recommendation:  &pb.Recommendation{Replicas: proto.Int32(1)},
 	})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Errorf("Expected InvalidArgument, got %v", err)
@@ -1023,13 +1023,13 @@ func TestUpdateRecommenderState_EmptyClears(t *testing.T) {
 	})
 
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "r1", Vote: &pb.RecommenderVote{Replicas: proto.Int32(5), IsActive: true},
+		Id: id, RecommenderName: "r1", Recommendation: &pb.Recommendation{Replicas: proto.Int32(5), IsActive: true},
 	})
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: id})
 	wantResp1 := &pb.GetRecommendationResponse{
-		Recommendation: &pb.Recommendation{
+		Recommendation: &pb.ArbitratedRecommendation{
 			TargetReplicas: proto.Int32(5),
 			Explanation:    []*pb.RecommenderStatus{{Name: "r1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(5), IsActive: true}},
 		},
@@ -1046,7 +1046,7 @@ func TestUpdateRecommenderState_EmptyClears(t *testing.T) {
 	}
 
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "r1", Vote: nil,
+		Id: id, RecommenderName: "r1", Recommendation: nil,
 	})
 
 	memStore.CalculateAll()
@@ -1071,7 +1071,7 @@ func TestUpdateRecommenderState_VerticalResources(t *testing.T) {
 		},
 	})
 
-	vote := &pb.RecommenderVote{
+	vote := &pb.Recommendation{
 		IsActive: true,
 		WorkloadResources: []*pb.ContainerResource{
 			{
@@ -1085,14 +1085,14 @@ func TestUpdateRecommenderState_VerticalResources(t *testing.T) {
 	}
 
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "r1", Vote: vote,
+		Id: id, RecommenderName: "r1", Recommendation: vote,
 	})
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: id})
 
 	wantResp := &pb.GetRecommendationResponse{
-		Recommendation: &pb.Recommendation{
+		Recommendation: &pb.ArbitratedRecommendation{
 			Explanation: []*pb.RecommenderStatus{
 				{
 					Name:              "r1",
@@ -1134,7 +1134,7 @@ func TestUpdateRecommenderState_VerticalResources_PerContainer(t *testing.T) {
 		},
 	})
 
-	appVote := &pb.RecommenderVote{
+	appVote := &pb.Recommendation{
 		IsActive: true,
 		WorkloadResources: []*pb.ContainerResource{
 			{
@@ -1143,7 +1143,7 @@ func TestUpdateRecommenderState_VerticalResources_PerContainer(t *testing.T) {
 			},
 		},
 	}
-	sidecarVote := &pb.RecommenderVote{
+	sidecarVote := &pb.Recommendation{
 		IsActive: true,
 		WorkloadResources: []*pb.ContainerResource{
 			{
@@ -1155,17 +1155,17 @@ func TestUpdateRecommenderState_VerticalResources_PerContainer(t *testing.T) {
 	}
 
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "app-sizer", Vote: appVote,
+		Id: id, RecommenderName: "app-sizer", Recommendation: appVote,
 	})
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "sidecar-sizer", Vote: sidecarVote,
+		Id: id, RecommenderName: "sidecar-sizer", Recommendation: sidecarVote,
 	})
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: id})
 
 	wantResp := &pb.GetRecommendationResponse{
-		Recommendation: &pb.Recommendation{
+		Recommendation: &pb.ArbitratedRecommendation{
 			Explanation: []*pb.RecommenderStatus{
 				{
 					Name:              "app-sizer",
@@ -1215,9 +1215,9 @@ func TestUpdateRecommenderState_Validation(t *testing.T) {
 
 	tests := []struct {
 		name string
-		vote *pb.RecommenderVote
+		vote *pb.Recommendation
 	}{
-		{"Negative Replicas", &pb.RecommenderVote{Replicas: proto.Int32(-1)}},
+		{"Negative Replicas", &pb.Recommendation{Replicas: proto.Int32(-1)}},
 	}
 
 	for _, tc := range tests {
@@ -1225,7 +1225,7 @@ func TestUpdateRecommenderState_Validation(t *testing.T) {
 			_, err := client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 				Id:              id,
 				RecommenderName: "r1",
-				Vote:            tc.vote,
+				Recommendation:  tc.vote,
 			})
 			if status.Code(err) != codes.InvalidArgument {
 				t.Errorf("Expected InvalidArgument for %s, got %v", tc.name, err)
@@ -1320,19 +1320,19 @@ func TestGetRecommendation_Aggregation(t *testing.T) {
 	//           scale1=10, scale2=20 -> 20 (MAX)
 	//					 mem=256Mi, cpu=25m
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "act1", Vote: &pb.RecommenderVote{IsActive: true},
+		Id: id, RecommenderName: "act1", Recommendation: &pb.Recommendation{IsActive: true},
 	})
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "act2", Vote: &pb.RecommenderVote{IsActive: false},
+		Id: id, RecommenderName: "act2", Recommendation: &pb.Recommendation{IsActive: false},
 	})
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "scale1", Vote: &pb.RecommenderVote{Replicas: proto.Int32(10), IsActive: true},
+		Id: id, RecommenderName: "scale1", Recommendation: &pb.Recommendation{Replicas: proto.Int32(10), IsActive: true},
 	})
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "scale2", Vote: &pb.RecommenderVote{Replicas: proto.Int32(20), IsActive: true},
+		Id: id, RecommenderName: "scale2", Recommendation: &pb.Recommendation{Replicas: proto.Int32(20), IsActive: true},
 	})
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "vpa1", Vote: &pb.RecommenderVote{
+		Id: id, RecommenderName: "vpa1", Recommendation: &pb.Recommendation{
 			IsActive: true,
 			WorkloadResources: []*pb.ContainerResource{
 				{
@@ -1354,7 +1354,7 @@ func TestGetRecommendation_Aggregation(t *testing.T) {
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: id})
 
 	wantResp := &pb.GetRecommendationResponse{
-		Recommendation: &pb.Recommendation{
+		Recommendation: &pb.ArbitratedRecommendation{
 			TargetReplicas: proto.Int32(20),
 			Explanation: []*pb.RecommenderStatus{
 				{Name: "scale1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(10), IsActive: true},
@@ -1410,14 +1410,14 @@ func TestGetRecommendation_MetricStatuses(t *testing.T) {
 	// m2 has no data
 
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "r1", Vote: &pb.RecommenderVote{Replicas: proto.Int32(5), IsActive: true},
+		Id: id, RecommenderName: "r1", Recommendation: &pb.Recommendation{Replicas: proto.Int32(5), IsActive: true},
 	})
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: id})
 
 	wantResp := &pb.GetRecommendationResponse{
-		Recommendation: &pb.Recommendation{
+		Recommendation: &pb.ArbitratedRecommendation{
 			TargetReplicas: proto.Int32(5),
 			Explanation:    []*pb.RecommenderStatus{{Name: "r1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(5), IsActive: true}},
 		},

@@ -23,7 +23,7 @@ func TestCronRecommend(t *testing.T) {
 	tests := []struct {
 		name string
 		def  *pb.RecommenderDefinition
-		want *pb.RecommenderVote
+		want *pb.Recommendation
 	}{
 		{
 			name: "Active Window (9am-5pm)",
@@ -37,7 +37,7 @@ func TestCronRecommend(t *testing.T) {
 					"replicas": "5",
 				},
 			},
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				IsActive: true,
 				Replicas: proto.Int32(5),
 			},
@@ -54,7 +54,7 @@ func TestCronRecommend(t *testing.T) {
 					"replicas": "10",
 				},
 			},
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				IsActive: false,
 				Replicas: proto.Int32(0),
 			},
@@ -70,7 +70,7 @@ func TestCronRecommend(t *testing.T) {
 					"timezone": "UTC",
 				},
 			},
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				IsActive: true,
 			},
 		},
@@ -84,7 +84,7 @@ func TestCronRecommend(t *testing.T) {
 					"end":   "* * * * *",
 				},
 			},
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				Message: "expected exactly 5 fields, found 1: [invalid]",
 			},
 		},

@@ -14,7 +14,7 @@ func TestRecommend(t *testing.T) {
 		name            string
 		def             *pb.RecommenderDefinition
 		state           *pb.ControlMetrics
-		want            *pb.RecommenderVote
+		want            *pb.Recommendation
 		wantMsgContains string
 	}{
 		{
@@ -26,7 +26,7 @@ func TestRecommend(t *testing.T) {
 				},
 			},
 			state: nil, // not required here
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				IsActive: false,
 			},
 			wantMsgContains: "Unable to parse recommender configuration",
@@ -40,7 +40,7 @@ func TestRecommend(t *testing.T) {
 				},
 			},
 			state: &pb.ControlMetrics{},
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				IsActive: false,
 			},
 			wantMsgContains: "container is undefined",
@@ -68,7 +68,7 @@ func TestRecommend(t *testing.T) {
 					},
 				},
 			},
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				IsActive: false,
 			},
 			wantMsgContains: "No Recommendations generated",
@@ -88,7 +88,7 @@ func TestRecommend(t *testing.T) {
 					"cpu_p95": 0.5,
 				},
 			},
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				IsActive: false,
 			},
 			wantMsgContains: "PodMetrics is empty",
@@ -103,7 +103,7 @@ func TestRecommend(t *testing.T) {
 				},
 			},
 			state: nil, //purposefully omitted here
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				IsActive: false,
 			},
 			wantMsgContains: "ControlMetrics is missing",
@@ -118,7 +118,7 @@ func TestRecommend(t *testing.T) {
 				},
 			},
 			state: &pb.ControlMetrics{},
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				IsActive: false,
 			},
 			wantMsgContains: "PodMetrics is empty",
@@ -147,7 +147,7 @@ func TestRecommend(t *testing.T) {
 					},
 				},
 			},
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				IsActive: true,
 				WorkloadResources: []*pb.ContainerResource{
 					{
@@ -188,7 +188,7 @@ func TestRecommend(t *testing.T) {
 					},
 				},
 			},
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				IsActive: true,
 				WorkloadResources: []*pb.ContainerResource{
 					{
@@ -229,7 +229,7 @@ func TestRecommend(t *testing.T) {
 					},
 				},
 			},
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				IsActive:          false,
 				WorkloadResources: nil,
 			},
@@ -276,7 +276,7 @@ func TestRecommend(t *testing.T) {
 					},
 				},
 			},
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				IsActive: true,
 				WorkloadResources: []*pb.ContainerResource{
 					{
@@ -319,7 +319,7 @@ func TestRecommend(t *testing.T) {
 					},
 				},
 			},
-			want: &pb.RecommenderVote{
+			want: &pb.Recommendation{
 				IsActive: true,
 				WorkloadResources: []*pb.ContainerResource{
 					{
@@ -353,7 +353,7 @@ func TestRecommend(t *testing.T) {
 			// 2. Compare the rest of the fields (ignoring Message if we checked it via substring)
 			opts := []cmp.Option{protocmp.Transform()}
 			if tt.wantMsgContains != "" {
-				opts = append(opts, protocmp.IgnoreFields(&pb.RecommenderVote{}, "message"))
+				opts = append(opts, protocmp.IgnoreFields(&pb.Recommendation{}, "message"))
 			}
 			if diff := cmp.Diff(tt.want, got, opts...); diff != "" {
 				t.Errorf("Recommend() mismatch (-want +got):\n%s", diff)
