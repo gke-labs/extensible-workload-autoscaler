@@ -291,33 +291,15 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	if deployment.Spec.Replicas != nil {
 		currentReplicas = *deployment.Spec.Replicas
 	}
-	slog.Info("Recommendation", "deployment", deploymentName, "targetReplicas", rec.TargetReplicas, "currentReplicas", currentReplicas)
+	slog.Info("Recommendation", "deployment", deploymentName, "replicas", rec.Replicas, "currentReplicas", currentReplicas)
 
 	// 5. Actuate
-	// Workload level recommendations are keyed by target container so that
-	// several recommenders can each size a different container. An empty
-	// container name means "the first container of the pod".
-	workloadRes := make(map[string]*pb.ContainerResource)
-	var workloadResOrder []string
-	podRes := rec.PodResources
-	for _, exp := range rec.Explanation {
-		for _, wr := range exp.WorkloadResources {
-			if wr == nil {
-				continue
-			}
-			if _, seen := workloadRes[wr.ContainerName]; !seen {
-				workloadResOrder = append(workloadResOrder, wr.ContainerName)
-			}
-			workloadRes[wr.ContainerName] = wr
-		}
-	}
-
 	// If there's a horizontal recommendation, and it differs from the deployment's current value, actuate.
-	if rec.TargetReplicas != nil &&
-		(deployment.Spec.Replicas == nil || *deployment.Spec.Replicas != *rec.TargetReplicas) {
-		slog.Info("SCALING", "deployment", deploymentName, "from", currentReplicas, "to", *rec.TargetReplicas)
+	if rec.Replicas != nil &&
+		(deployment.Spec.Replicas == nil || *deployment.Spec.Replicas != *rec.Replicas) {
+		slog.Info("SCALING", "deployment", deploymentName, "from", currentReplicas, "to", *rec.Replicas)
 		deploymentCopy := deployment.DeepCopy()
-		deploymentCopy.Spec.Replicas = rec.TargetReplicas
+		deploymentCopy.Spec.Replicas = rec.Replicas
 		if _, err := c.kubeclientset.AppsV1().Deployments(policy.Namespace).
 			Update(context.TODO(), deploymentCopy, metav1.UpdateOptions{}); err != nil {
 			return err
@@ -409,14 +391,16 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	}
 
 	// Actuate Workload Resources via /resize subresource on all matching pods
-	if len(workloadRes) > 0 && deployment.Spec.Selector != nil {
+	if len(rec.WorkloadResources) > 0 && deployment.Spec.Selector != nil {
 		selector := labels.Set(deployment.Spec.Selector.MatchLabels).String()
 		pods, err := c.kubeclientset.CoreV1().Pods(policy.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector})
 		if err == nil {
 			for i := range pods.Items {
 				pod := &pods.Items[i]
-				for _, containerName := range workloadResOrder {
-					res := workloadRes[containerName]
+				for _, res := range rec.WorkloadResources {
+					if res == nil {
+						continue
+					}
 					patchPodResize(pod, res.ContainerName, res.Requests, res.Limits)
 				}
 			}
@@ -424,7 +408,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	}
 
 	// Actuate Pod Resources via /resize subresource
-	for _, pr := range podRes {
+	for _, pr := range rec.PodContainerResources {
 		if pr == nil || pr.ContainerResources == nil {
 			continue
 		}
@@ -454,8 +438,8 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	if deployment.Spec.Replicas != nil {
 		policyCopy.Status.CurrentReplicas = *deployment.Spec.Replicas
 	}
-	if rec.TargetReplicas != nil {
-		policyCopy.Status.DesiredReplicas = *rec.TargetReplicas
+	if rec.Replicas != nil {
+		policyCopy.Status.DesiredReplicas = *rec.Replicas
 	} else if deployment.Spec.Replicas != nil {
 		policyCopy.Status.DesiredReplicas = *deployment.Spec.Replicas
 	}
@@ -468,8 +452,8 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		policyCopy.Status.Selector = selector.String()
 	}
 
-	policyCopy.Status.Decisions = make([]xasv1.DecisionStatus, len(rec.Explanation))
-	for i, d := range rec.Explanation {
+	policyCopy.Status.Decisions = make([]xasv1.DecisionStatus, len(resp.Explanation))
+	for i, d := range resp.Explanation {
 		var wrr []xasv1.ResourceRecommendation
 		for _, wr := range d.WorkloadResources {
 			if wr == nil {

@@ -270,7 +270,7 @@ const pageTemplate = `
 
         function updatePolicyCard(card, ps) {
             const currentReplicas = ps.Workload ? Object.keys(ps.Workload).length : 0;
-            const targetReplicas = ps.Recommendation ? ps.Recommendation.target_replicas : '-';
+            const targetReplicas = ps.Recommendation ? ps.Recommendation.replicas : '-';
             const maxReplicas = ps.Policy.max_replicas;
 
             // Summary

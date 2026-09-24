@@ -162,20 +162,22 @@ func TestServerEndToEndGRPC(t *testing.T) {
 	memStore.CalculateAll()
 
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
-	rec := resp.Recommendation
 
-	wantRec := &pb.ArbitratedRecommendation{
-		TargetReplicas: proto.Int32(4),
+	wantResp := &pb.GetRecommendationResponse{
+		Recommendation: &pb.Recommendation{
+			Replicas: proto.Int32(4),
+		},
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(4), IsActive: true, Phase: "Scaling", Mode: "Active", Name: "cpu", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1010, 0))}, // cpu
 		},
+		MetricStatuses: resp.GetMetricStatuses(),
 	}
 	// Sort slices for deterministic comparison
 	opts := []cmp.Option{
 		protocmp.Transform(),
 		protocmp.SortRepeated(func(a, b *pb.RecommenderStatus) bool { return a.Phase < b.Phase }), // Simple sort if needed
 	}
-	if diff := cmp.Diff(wantRec, rec, opts...); diff != "" {
+	if diff := cmp.Diff(wantResp, resp, opts...); diff != "" {
 		t.Errorf("Recommendation mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -285,13 +287,15 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
-	rec := resp.Recommendation
 
-	wantRec := &pb.ArbitratedRecommendation{
-		TargetReplicas: proto.Int32(16),
+	wantResp := &pb.GetRecommendationResponse{
+		Recommendation: &pb.Recommendation{
+			Replicas: proto.Int32(16),
+		},
 		Explanation:    []*pb.RecommenderStatus{{Replicas: proto.Int32(16), IsActive: true, Phase: "Scaling", Name: "cpu", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1012, 0))}},
+		MetricStatuses: resp.GetMetricStatuses(),
 	}
-	if diff := cmp.Diff(wantRec, rec, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(wantResp, resp, protocmp.Transform()); diff != "" {
 		t.Errorf("Recommendation mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -359,13 +363,15 @@ func TestExternalMetricGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
-	rec := resp.Recommendation
 
-	wantRec := &pb.ArbitratedRecommendation{
-		TargetReplicas: proto.Int32(100),
+	wantResp := &pb.GetRecommendationResponse{
+		Recommendation: &pb.Recommendation{
+			Replicas: proto.Int32(100),
+		},
 		Explanation:    []*pb.RecommenderStatus{{Replicas: proto.Int32(100), IsActive: true, Phase: "Scaling", Name: "queue_target", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))}},
+		MetricStatuses: resp.GetMetricStatuses(),
 	}
-	if diff := cmp.Diff(wantRec, rec, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(wantResp, resp, protocmp.Transform()); diff != "" {
 		t.Errorf("Recommendation mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -433,13 +439,15 @@ func TestPerPodExternalMetricGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
-	rec := resp.Recommendation
 
-	wantRec := &pb.ArbitratedRecommendation{
-		TargetReplicas: proto.Int32(2),
+	wantResp := &pb.GetRecommendationResponse{
+		Recommendation: &pb.Recommendation{
+			Replicas: proto.Int32(2),
+		},
 		Explanation:    []*pb.RecommenderStatus{{Replicas: proto.Int32(2), IsActive: true, Phase: "Scaling", Name: "latency_target", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))}},
+		MetricStatuses: resp.GetMetricStatuses(),
 	}
-	if diff := cmp.Diff(wantRec, rec, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(wantResp, resp, protocmp.Transform()); diff != "" {
 		t.Errorf("Recommendation mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -498,20 +506,22 @@ func TestScaleToZeroGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
-	rec := resp.Recommendation
 
-	wantWakeUp := &pb.ArbitratedRecommendation{
-		TargetReplicas: proto.Int32(5),
+	wantWakeUp := &pb.GetRecommendationResponse{
+		Recommendation: &pb.Recommendation{
+			Replicas: proto.Int32(5),
+		},
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(5), IsActive: true, Phase: "Scaling", Name: "target", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))},
 			{IsActive: true, Phase: "Activation", Name: "act_queue", Type: "Threshold", LastUpdated: timestamppb.New(time.Unix(1000, 0))},
 		},
+		MetricStatuses: resp.GetMetricStatuses(),
 	}
 	opts := []cmp.Option{
 		protocmp.Transform(),
 		protocmp.SortRepeated(func(a, b *pb.RecommenderStatus) bool { return a.Phase < b.Phase }),
 	}
-	if diff := cmp.Diff(wantWakeUp, rec, opts...); diff != "" {
+	if diff := cmp.Diff(wantWakeUp, resp, opts...); diff != "" {
 		t.Errorf("WakeUp mismatch (-want +got):\n%s", diff)
 	}
 
@@ -536,16 +546,18 @@ func TestScaleToZeroGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 	resp, _ = client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
-	rec = resp.Recommendation
 
-	wantCooldown := &pb.ArbitratedRecommendation{
-		TargetReplicas: proto.Int32(1), // MinReplicas (Control Plane kept active due to window)
+	wantCooldown := &pb.GetRecommendationResponse{
+		Recommendation: &pb.Recommendation{
+			Replicas: proto.Int32(1), // MinReplicas (Control Plane kept active due to window)
+		},
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(0), IsActive: true, Phase: "Scaling", Name: "target", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1003, 0))},
 			{IsActive: false, Phase: "Activation", Name: "act_queue", Type: "Threshold", LastUpdated: timestamppb.New(time.Unix(1003, 0))},
 		},
+		MetricStatuses: resp.GetMetricStatuses(),
 	}
-	if diff := cmp.Diff(wantCooldown, rec, opts...); diff != "" {
+	if diff := cmp.Diff(wantCooldown, resp, opts...); diff != "" {
 		t.Errorf("Cooldown mismatch (-want +got):\n%s", diff)
 	}
 
@@ -569,22 +581,17 @@ func TestScaleToZeroGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 	resp, _ = client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
-	rec = resp.Recommendation
 
-	wantScaleDown := &pb.ArbitratedRecommendation{
-		TargetReplicas: proto.Int32(0),
+	wantScaleDown := &pb.GetRecommendationResponse{
+		Recommendation: &pb.Recommendation{
+			Replicas: proto.Int32(0),
+		},
 		Explanation: []*pb.RecommenderStatus{
 			{IsActive: false, Phase: "Activation", Name: "act_queue", Type: "Threshold", LastUpdated: timestamppb.New(time.Unix(1009, 0))},
-			// Note: If Inactive, Scaling recommenders might be omitted by Control Plane or present.
-			// MemoryStore logic: "if isActive { append scaling } else { maxReplicas = 0 }".
-			// So scaling decisions are NOT appended if Inactive.
-			// Let's verify MemoryStore logic.
-			// "if isActive { ... append Scaling ... }"
-			// "for _, recDef := range policy.Activation { ... append Activation ... }"
-			// So Scaling decisions are indeed MISSING if Inactive.
 		},
+		MetricStatuses: resp.GetMetricStatuses(),
 	}
-	if diff := cmp.Diff(wantScaleDown, rec, opts...); diff != "" {
+	if diff := cmp.Diff(wantScaleDown, resp, opts...); diff != "" {
 		t.Errorf("ScaleDown mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -642,14 +649,16 @@ func TestDryRunGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
-	rec := resp.Recommendation
 
-	wantRec := &pb.ArbitratedRecommendation{
-		TargetReplicas: proto.Int32(10),
+	wantResp := &pb.GetRecommendationResponse{
+		Recommendation: &pb.Recommendation{
+			Replicas: proto.Int32(10),
+		},
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(10), IsActive: true, Phase: "Scaling", Mode: "Active", Name: "active_obj", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))},
 			{Replicas: proto.Int32(100), IsActive: true, Phase: "Scaling", Mode: "DryRun", Name: "dry_obj", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))},
 		},
+		MetricStatuses: resp.GetMetricStatuses(),
 	}
 
 	opts := []cmp.Option{
@@ -658,7 +667,7 @@ func TestDryRunGRPC(t *testing.T) {
 			return a.GetReplicas() < b.GetReplicas()
 		}),
 	}
-	if diff := cmp.Diff(wantRec, rec, opts...); diff != "" {
+	if diff := cmp.Diff(wantResp, resp, opts...); diff != "" {
 		t.Errorf("DryRun mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -831,13 +840,15 @@ func TestHistogramLatencyScalingGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
-	rec := resp.Recommendation
 
-	wantRec := &pb.ArbitratedRecommendation{
-		TargetReplicas: proto.Int32(2),
+	wantResp := &pb.GetRecommendationResponse{
+		Recommendation: &pb.Recommendation{
+			Replicas: proto.Int32(2),
+		},
 		Explanation:    []*pb.RecommenderStatus{{Replicas: proto.Int32(2), IsActive: true, Phase: "Scaling", Name: "latency_obj", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1010, 0))}},
+		MetricStatuses: resp.GetMetricStatuses(),
 	}
-	if diff := cmp.Diff(wantRec, rec, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(wantResp, resp, protocmp.Transform()); diff != "" {
 		t.Errorf("Recommendation mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -1324,21 +1335,23 @@ func TestRecommenderInactiveGRPC(t *testing.T) {
 	memStore.CalculateAll()
 
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
-	rec := resp.Recommendation
 
-	wantRec := &pb.ArbitratedRecommendation{
-		TargetReplicas: proto.Int32(5),
+	wantResp := &pb.GetRecommendationResponse{
+		Recommendation: &pb.Recommendation{
+			Replicas: proto.Int32(5),
+		},
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(5), IsActive: true, Phase: "Scaling", Name: "r_active", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))},
 			{Replicas: proto.Int32(100), IsActive: false, Phase: "Scaling", Name: "r_inactive", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1000, 0))},
 		},
+		MetricStatuses: resp.GetMetricStatuses(),
 	}
 
 	opts := []cmp.Option{
 		protocmp.Transform(),
 		protocmp.SortRepeated(func(a, b *pb.RecommenderStatus) bool { return a.Name < b.Name }),
 	}
-	if diff := cmp.Diff(wantRec, rec, opts...); diff != "" {
+	if diff := cmp.Diff(wantResp, resp, opts...); diff != "" {
 		t.Errorf("Recommendation mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -1511,7 +1524,7 @@ func TestRemoveScalingSectionGRPC(t *testing.T) {
 	// 3. Calc Recommendation
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: id})
-	if resp.Recommendation == nil || resp.Recommendation.GetTargetReplicas() != 10 {
+	if resp.Recommendation == nil || resp.Recommendation.GetReplicas() != 10 {
 		t.Errorf("Initial: Want 10, Got %v", resp.Recommendation)
 	}
 
@@ -1693,8 +1706,8 @@ func TestRecommenderArbitrationGRPC(t *testing.T) {
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 
 	// Should equal Max(5, 20) = 20
-	if resp.Recommendation.GetTargetReplicas() != 20 {
-		t.Errorf("Arbitration failed: Want 20, Got %d", resp.Recommendation.GetTargetReplicas())
+	if resp.Recommendation.GetReplicas() != 20 {
+		t.Errorf("Arbitration failed: Want 20, Got %d", resp.Recommendation.GetReplicas())
 	}
 }
 

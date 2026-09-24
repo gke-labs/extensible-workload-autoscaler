@@ -1029,10 +1029,10 @@ func TestUpdateRecommenderState_EmptyClears(t *testing.T) {
 	memStore.CalculateAll()
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: id})
 	wantResp1 := &pb.GetRecommendationResponse{
-		Recommendation: &pb.ArbitratedRecommendation{
-			TargetReplicas: proto.Int32(5),
-			Explanation:    []*pb.RecommenderStatus{{Name: "r1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(5), IsActive: true}},
+		Recommendation: &pb.Recommendation{
+			Replicas: proto.Int32(5),
 		},
+		Explanation:    []*pb.RecommenderStatus{{Name: "r1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(5), IsActive: true}},
 		MetricStatuses: []*pb.MetricStatus{},
 	}
 	// Note: Enrichment logic adds LastUpdated, which we might want to ignore or match in cmp.Diff
@@ -1092,18 +1092,19 @@ func TestUpdateRecommenderState_VerticalResources(t *testing.T) {
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: id})
 
 	wantResp := &pb.GetRecommendationResponse{
-		Recommendation: &pb.ArbitratedRecommendation{
-			PodResources: vote.PodContainerResources,
-			Explanation: []*pb.RecommenderStatus{
-				{
-					Name:              "r1",
-					Type:              "AddonResizer",
-					Phase:             "Scaling",
-					Mode:              "Active",
-					IsActive:          true,
-					WorkloadResources: vote.WorkloadResources,
-					PodResources:      vote.PodContainerResources,
-				},
+		Recommendation: &pb.Recommendation{
+			WorkloadResources:     vote.WorkloadResources,
+			PodContainerResources: vote.PodContainerResources,
+		},
+		Explanation: []*pb.RecommenderStatus{
+			{
+				Name:              "r1",
+				Type:              "AddonResizer",
+				Phase:             "Scaling",
+				Mode:              "Active",
+				IsActive:          true,
+				WorkloadResources: vote.WorkloadResources,
+				PodResources:      vote.PodContainerResources,
 			},
 		},
 		MetricStatuses: []*pb.MetricStatus{},
@@ -1166,24 +1167,25 @@ func TestUpdateRecommenderState_VerticalResources_PerContainer(t *testing.T) {
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: id})
 
 	wantResp := &pb.GetRecommendationResponse{
-		Recommendation: &pb.ArbitratedRecommendation{
-			Explanation: []*pb.RecommenderStatus{
-				{
-					Name:              "app-sizer",
-					Type:              "AddonResizer",
-					Phase:             "Scaling",
-					Mode:              "Active",
-					IsActive:          true,
-					WorkloadResources: appVote.WorkloadResources,
-				},
-				{
-					Name:              "sidecar-sizer",
-					Type:              "AddonResizer",
-					Phase:             "Scaling",
-					Mode:              "Active",
-					IsActive:          true,
-					WorkloadResources: sidecarVote.WorkloadResources,
-				},
+		Recommendation: &pb.Recommendation{
+			WorkloadResources: append([]*pb.ContainerResource{}, append(appVote.WorkloadResources, sidecarVote.WorkloadResources...)...),
+		},
+		Explanation: []*pb.RecommenderStatus{
+			{
+				Name:              "app-sizer",
+				Type:              "AddonResizer",
+				Phase:             "Scaling",
+				Mode:              "Active",
+				IsActive:          true,
+				WorkloadResources: appVote.WorkloadResources,
+			},
+			{
+				Name:              "sidecar-sizer",
+				Type:              "AddonResizer",
+				Phase:             "Scaling",
+				Mode:              "Active",
+				IsActive:          true,
+				WorkloadResources: sidecarVote.WorkloadResources,
 			},
 		},
 		MetricStatuses: []*pb.MetricStatus{},
@@ -1355,21 +1357,27 @@ func TestGetRecommendation_Aggregation(t *testing.T) {
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: id})
 
 	wantResp := &pb.GetRecommendationResponse{
-		Recommendation: &pb.ArbitratedRecommendation{
-			TargetReplicas: proto.Int32(20),
-			Explanation: []*pb.RecommenderStatus{
-				{Name: "scale1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(10), IsActive: true},
-				{Name: "scale2", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(20), IsActive: true},
-				{Name: "act1", Type: "Threshold", Phase: "Activation", Mode: "Active", IsActive: true},
-				{Name: "act2", Type: "Threshold", Phase: "Activation", Mode: "Active", IsActive: false},
-				{Name: "vpa1", Type: "VPA", Phase: "Scaling", Mode: "Active", IsActive: true, WorkloadResources: []*pb.ContainerResource{
-					{
-						Requests: map[string]string{"cpu": "25m", "memory": "265Mi"},
-						Limits:   map[string]string{"cpu": "25m", "memory": "265Mi"},
-					},
+		Recommendation: &pb.Recommendation{
+			Replicas: proto.Int32(20),
+			WorkloadResources: []*pb.ContainerResource{
+				{
+					Requests: map[string]string{"cpu": "25m", "memory": "265Mi"},
+					Limits:   map[string]string{"cpu": "25m", "memory": "265Mi"},
 				},
-					Message: "Recommendation generated successfully."},
 			},
+		},
+		Explanation: []*pb.RecommenderStatus{
+			{Name: "scale1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(10), IsActive: true},
+			{Name: "scale2", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(20), IsActive: true},
+			{Name: "act1", Type: "Threshold", Phase: "Activation", Mode: "Active", IsActive: true},
+			{Name: "act2", Type: "Threshold", Phase: "Activation", Mode: "Active", IsActive: false},
+			{Name: "vpa1", Type: "VPA", Phase: "Scaling", Mode: "Active", IsActive: true, WorkloadResources: []*pb.ContainerResource{
+				{
+					Requests: map[string]string{"cpu": "25m", "memory": "265Mi"},
+					Limits:   map[string]string{"cpu": "25m", "memory": "265Mi"},
+				},
+			},
+				Message: "Recommendation generated successfully."},
 		},
 		MetricStatuses: []*pb.MetricStatus{},
 	}
@@ -1418,10 +1426,10 @@ func TestGetRecommendation_MetricStatuses(t *testing.T) {
 	resp, _ := client.GetRecommendation(ctx, &pb.GetRecommendationRequest{Id: id})
 
 	wantResp := &pb.GetRecommendationResponse{
-		Recommendation: &pb.ArbitratedRecommendation{
-			TargetReplicas: proto.Int32(5),
-			Explanation:    []*pb.RecommenderStatus{{Name: "r1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(5), IsActive: true}},
+		Recommendation: &pb.Recommendation{
+			Replicas: proto.Int32(5),
 		},
+		Explanation: []*pb.RecommenderStatus{{Name: "r1", Type: "Linear", Phase: "Scaling", Mode: "Active", Replicas: proto.Int32(5), IsActive: true}},
 		MetricStatuses: []*pb.MetricStatus{
 			{Name: "m1", Value: 10, Timestamp: ts},
 			{Name: "m2", Error: "No data available", Timestamp: ts},
