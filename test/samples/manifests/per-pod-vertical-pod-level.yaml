@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sample-per-pod-vertical-pod-level
+  labels:
+    sample: per-pod-vertical-pod-level
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-level-consumer
+  namespace: sample-per-pod-vertical-pod-level
+  labels:
+    sample: per-pod-vertical-pod-level
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pod-level-consumer
+  template:
+    metadata:
+      labels:
+        app: pod-level-consumer
+    spec:
+      # No pod-level resources in the template: xAS adds spec.resources to each
+      # running pod through the resize subresource.
+      containers:
+        - name: main
+          image: xas-sample:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: AUTO_PER_POD_LOAD # load differs per pod
+              value: "true"
+          resources:
+            # At least one request keeps the pod Burstable: a BestEffort pod
+            # cannot be resized in place (its QoS class would change).
+            requests:
+              cpu: "100m"
+        - name: sidecar
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          # Busy loop burning CPU without opening a port (main already binds :8080).
+          # No resources at all: its usage still counts towards the pod total.
+          command: ["sh", "-c", "while true; do :; done"]
+---
+apiVersion: xas.io/v1
+kind: ScalingPolicy
+metadata:
+  name: per-pod-vertical-pod-level-sample
+  namespace: sample-per-pod-vertical-pod-level
+  labels:
+    sample: per-pod-vertical-pod-level
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pod-level-consumer
+  minReplicas: 1
+  maxReplicas: 10
+
+  metrics:
+    - name: "pod_cpu_usage"
+      provider: "kubelet"
+      scope: "PodContainer" # per-pod, per-container breakdown, summed by the recommender
+      params:
+        type: "cpu"
+        mode: "usage"
+      gauge:
+        aggregation: "Avg"
+
+  scaling:
+    - recommender: "per-pod-vertical"
+      name: "pod_level_vpa"
+      params:
+        resourceLevel: "Pod" # size pod.spec.resources from the sum of all containers
+        metric: "pod_cpu_usage"
+        target: "1.0"
+        safetyMargin: "1.2" # 20% headroom
+        limitRatio: "2"     # pod CPU limit = 2 x pod CPU request
+        minCpu: "200m"      # Floor bound per pod (total)
+        maxCpu: "3"         # Ceiling bound per pod (total)

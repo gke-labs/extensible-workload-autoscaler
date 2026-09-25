@@ -953,9 +953,23 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.Metri
 				val = ser.DecayingHistogram.Percentile(p, time.Unix(now, 0))
 			}
 
-			// When aggregating accross containers, resource metrics (e.g. "cpu") are weighted by the
-			// container's relative resource request. A container that does not declare a request
-			// for the resource has no meaningful weight, so its sample is dropped.
+			// The per-container breakdown backs both the PodContainer scope and
+			// the per-container average of the Container scope. It holds the raw
+			// container value, so it is recorded even when the container declares
+			// no request for the resource (e.g. pods sized with pod-level
+			// resources only).
+			if isContainerBreakdown(def.Scope) && ser.ContainerName != "" {
+				if containerSums[ser.PodName] == nil {
+					containerSums[ser.PodName] = make(map[string]float64)
+				}
+				containerSums[ser.PodName][ser.ContainerName] += val
+			}
+
+			// When aggregating accross containers into a pod value, resource
+			// metrics (e.g. "cpu") are weighted by the container's relative
+			// resource request. A container that does not declare a request for
+			// the resource has no meaningful weight, so it is left out of the pod
+			// value.
 			weightedVal := val
 			if ser.ResourceName != "" && ser.ContainerName != "" {
 				w, ok := requestWeights.weight(workload[ser.PodName], ser.ContainerName, ser.ResourceName)
@@ -967,16 +981,6 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.Metri
 
 			podSums[ser.PodName] += weightedVal
 			podFound[ser.PodName] = true
-
-			// The per-container breakdown backs both the PodContainer scope and
-			// the per-container average of the Container scope. Pod-scoped
-			// metrics keep the summed pod value only.
-			if isContainerBreakdown(def.Scope) && ser.ContainerName != "" {
-				if containerSums[ser.PodName] == nil {
-					containerSums[ser.PodName] = make(map[string]float64)
-				}
-				containerSums[ser.PodName][ser.ContainerName] += val
-			}
 		}
 	}
 
@@ -1013,21 +1017,23 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.Metri
 			val = val / float64(readyReplicas)
 		}
 		return metricResult{global: val}, true
-	} else if len(podFound) > 0 {
+	} else if len(podFound) > 0 || len(containerSums) > 0 {
 		if def.Scope == ScopeContainer {
 			if len(containerSums) == 0 {
 				return metricResult{}, false
 			}
 			return metricResult{container: averageByContainer(containerSums)}, true
 		}
+		// Pods whose containers declare no request for the resource only
+		// appear in the per-container breakdown, not in podSums.
+		if isPodBreakdown(def.Scope) {
+			return metricResult{pod: podSums, podContainer: containerSums}, true
+		}
 		values := []float64{}
 		for pName := range podFound {
 			values = append(values, podSums[pName])
 		}
 		if len(values) > 0 {
-			if isPodBreakdown(def.Scope) {
-				return metricResult{pod: podSums, podContainer: containerSums}, true
-			}
 			return metricResult{global: aggregate(values, agg)}, true
 		}
 	}

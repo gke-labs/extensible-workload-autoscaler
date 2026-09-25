@@ -244,6 +244,155 @@ func TestPerPodVerticalRecommender(t *testing.T) {
 				Message: "missing container param",
 			},
 		},
+		{
+			name: "Container level with limitRatio",
+			def: &pb.RecommenderDefinition{
+				Params: map[string]string{
+					"metric":     "pod_cpu",
+					"target":     "1.0",
+					"container":  "main",
+					"limitRatio": "1.5",
+				},
+			},
+			state: &pb.ControlMetrics{
+				PodContainerMetrics: map[string]*pb.ContainerMetrics{
+					"pod1": podContainers(map[string]map[string]float64{"main": {"pod_cpu": 0.4}}),
+				},
+			},
+			wantVote: &pb.Recommendation{
+				IsActive: true,
+				PodContainerResources: []*pb.PodContainerResource{
+					{
+						PodName: "pod1",
+						ContainerResources: &pb.ContainerResource{
+							ContainerName: "main",
+							Requests:      map[string]string{"cpu": "400m"},
+							Limits:        map[string]string{"cpu": "600m"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Pod level sums all containers and targets pod-level resources",
+			def: &pb.RecommenderDefinition{
+				Params: map[string]string{
+					"resourceLevel": "Pod",
+					"metric":        "pod_cpu",
+					"target":        "0.8",
+					"safetyMargin":  "1.2",
+					"limitRatio":    "2",
+				},
+			},
+			state: &pb.ControlMetrics{
+				PodContainerMetrics: map[string]*pb.ContainerMetrics{
+					// (1.0 + 0.6) * 1.5 = 2.4 -> 2400m, limit 4800m
+					"pod1": podContainers(map[string]map[string]float64{
+						"main":    {"pod_cpu": 1.0},
+						"sidecar": {"pod_cpu": 0.6},
+					}),
+					// A pod missing a container sums what it has: 0.2 * 1.5 = 0.3 -> 300m, limit 600m
+					"pod2": podContainers(map[string]map[string]float64{
+						"main": {"pod_cpu": 0.2},
+					}),
+				},
+			},
+			wantVote: &pb.Recommendation{
+				IsActive: true,
+				PodContainerResources: []*pb.PodContainerResource{
+					{
+						PodName: "pod1",
+						ContainerResources: &pb.ContainerResource{
+							Requests: map[string]string{"cpu": "2400m"},
+							Limits:   map[string]string{"cpu": "4800m"},
+						},
+					},
+					{
+						PodName: "pod2",
+						ContainerResources: &pb.ContainerResource{
+							Requests: map[string]string{"cpu": "300m"},
+							Limits:   map[string]string{"cpu": "600m"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Pod level bounds apply to the pod total",
+			def: &pb.RecommenderDefinition{
+				Params: map[string]string{
+					"resourceLevel": "Pod",
+					"metric":        "pod_cpu",
+					"target":        "1.0",
+					"maxCpu":        "1",
+				},
+			},
+			state: &pb.ControlMetrics{
+				PodContainerMetrics: map[string]*pb.ContainerMetrics{
+					// 0.7 + 0.7 = 1.4 -> capped at 1000m, although each container is below the cap.
+					"pod1": podContainers(map[string]map[string]float64{
+						"a": {"pod_cpu": 0.7},
+						"b": {"pod_cpu": 0.7},
+					}),
+				},
+			},
+			wantVote: &pb.Recommendation{
+				IsActive: true,
+				PodContainerResources: []*pb.PodContainerResource{
+					{
+						PodName: "pod1",
+						ContainerResources: &pb.ContainerResource{
+							Requests: map[string]string{"cpu": "1000m"},
+							Limits:   map[string]string{},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Pod level rejects container param",
+			def: &pb.RecommenderDefinition{
+				Params: map[string]string{
+					"resourceLevel": "Pod",
+					"metric":        "pod_cpu",
+					"target":        "1.0",
+					"container":     "main",
+				},
+			},
+			state: &pb.ControlMetrics{},
+			wantVote: &pb.Recommendation{
+				Message: `container param is not allowed with resourceLevel "Pod"`,
+			},
+		},
+		{
+			name: "Invalid resourceLevel",
+			def: &pb.RecommenderDefinition{
+				Params: map[string]string{
+					"resourceLevel": "Node",
+					"metric":        "pod_cpu",
+					"target":        "1.0",
+				},
+			},
+			state: &pb.ControlMetrics{},
+			wantVote: &pb.Recommendation{
+				Message: `invalid resourceLevel "Node": must be "Container" or "Pod"`,
+			},
+		},
+		{
+			name: "limitRatio below 1 is rejected",
+			def: &pb.RecommenderDefinition{
+				Params: map[string]string{
+					"metric":     "pod_cpu",
+					"target":     "1.0",
+					"container":  "main",
+					"limitRatio": "0.5",
+				},
+			},
+			state: &pb.ControlMetrics{},
+			wantVote: &pb.Recommendation{
+				Message: "limitRatio must be >= 1",
+			},
+		},
 	}
 
 	opts := []cmp.Option{
