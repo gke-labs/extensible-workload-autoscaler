@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -12,7 +11,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -306,87 +304,26 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		}
 	}
 
-	// Helper to patch pod resize. An empty containerName targets the pod's
-	// first container.
+	// Helper to patch pod resize. An empty containerName targets the pod-level
+	// resources (pod.spec.resources).
 	patchPodResize := func(pod *corev1.Pod, containerName string, requests, limits map[string]string) {
-		if len(pod.Spec.Containers) == 0 {
-			return
-		}
-		if containerName == "" {
-			containerName = pod.Spec.Containers[0].Name
-		}
-
-		var targetContainer *corev1.Container
-		for i, c := range pod.Spec.Containers {
-			if c.Name == containerName {
-				targetContainer = &pod.Spec.Containers[i]
-				break
-			}
-		}
-		if targetContainer == nil {
-			slog.Warn("Container not found for resource recommendation", "pod", pod.Name, "container", containerName)
-			return
-		}
-
-		needsPatch := false
-		for k, v := range requests {
-			q, err := resource.ParseQuantity(v)
-			if err != nil {
-				continue
-			}
-			current, exists := targetContainer.Resources.Requests[corev1.ResourceName(k)]
-			if !exists || current.Cmp(q) != 0 {
-				needsPatch = true
-				break
-			}
-		}
-
-		if !needsPatch {
-			for k, v := range limits {
-				q, err := resource.ParseQuantity(v)
-				if err != nil {
-					continue
-				}
-				current, exists := targetContainer.Resources.Limits[corev1.ResourceName(k)]
-				if !exists || current.Cmp(q) != 0 {
-					needsPatch = true
-					break
-				}
-			}
-		}
-
-		if !needsPatch {
-			return
-		}
-
-		reqs := make(map[string]string)
-		for k, v := range requests {
-			reqs[k] = v
-		}
-		lims := make(map[string]string)
-		for k, v := range limits {
-			lims[k] = v
-		}
-
-		patch := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"containers": []map[string]interface{}{
-					{
-						"name": containerName,
-						"resources": map[string]interface{}{
-							"requests": reqs,
-							"limits":   lims,
-						},
-					},
-				},
-			},
-		}
-		patchBytes, _ := json.Marshal(patch)
-		_, err := c.kubeclientset.CoreV1().Pods(policy.Namespace).Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "resize")
+		patchBytes, skipReason, err := buildResizePatch(pod, containerName, requests, limits)
 		if err != nil {
-			slog.Error("Failed to patch pod resize", "pod", pod.Name, "error", err)
+			slog.Error("Failed to build pod resize patch", "pod", pod.Name, "container", containerName, "error", err)
+			return
+		}
+		if skipReason != "" {
+			slog.Warn("Skipping pod resize", "pod", pod.Name, "container", containerName, "reason", skipReason)
+			return
+		}
+		if patchBytes == nil {
+			return
+		}
+		_, err = c.kubeclientset.CoreV1().Pods(policy.Namespace).Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "resize")
+		if err != nil {
+			slog.Error("Failed to patch pod resize", "pod", pod.Name, "container", containerName, "error", err)
 		} else {
-			slog.Info("Patched pod resize successfully", "pod", pod.Name)
+			slog.Info("Patched pod resize successfully", "pod", pod.Name, "container", containerName, "patch", string(patchBytes))
 		}
 	}
 

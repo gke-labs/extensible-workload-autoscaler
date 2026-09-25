@@ -941,8 +941,19 @@ func TestContainerResourceRequestWeighting(t *testing.T) {
 				IsReady: true,
 				Containers: []*pb.ContainerState{
 					{Name: "c1", Requests: map[string]string{"cpu": "200m"}},
-					// c2 has no cpu request: its samples must be dropped.
+					// c2 has no cpu request: it is left out of the weighted pod
+					// value, but kept in the raw per-container breakdown.
 					{Name: "c2", Requests: map[string]string{"memory": "100Mi"}},
+				},
+			},
+			{
+				// No container declares a cpu request, as with pods sized by
+				// pod-level resources only.
+				Name:    "p3",
+				IsReady: true,
+				Containers: []*pb.ContainerState{
+					{Name: "c1"},
+					{Name: "c2"},
 				},
 			},
 		}},
@@ -953,6 +964,8 @@ func TestContainerResourceRequestWeighting(t *testing.T) {
 	ingestResource(s, ts, ns, pol, "p1", "c2", "cpu_util", "cpu", 0.1)
 	ingestResource(s, ts, ns, pol, "p2", "c1", "cpu_util", "cpu", 0.4)
 	ingestResource(s, ts, ns, pol, "p2", "c2", "cpu_util", "cpu", 0.9)
+	ingestResource(s, ts, ns, pol, "p3", "c1", "cpu_util", "cpu", 0.3)
+	ingestResource(s, ts, ns, pol, "p3", "c2", "cpu_util", "cpu", 0.6)
 
 	s.CalculateAll()
 	cm, ok := s.GetControlMetrics(id, "")
@@ -964,17 +977,34 @@ func TestContainerResourceRequestWeighting(t *testing.T) {
 	if got, want := cm.PodMetrics["p1"].Values["cpu_util"], 0.2; math.Abs(got-want) > 1e-9 {
 		t.Errorf("Pod p1 weighted value: Want %f, Got %f", want, got)
 	}
-	// p2: c2 is dropped, so c1 carries the full weight: 0.4*(200/200) = 0.4
+	// p2: c2 is left out of the weighted value, so c1 carries the full weight: 0.4*(200/200) = 0.4
 	if got, want := cm.PodMetrics["p2"].Values["cpu_util"], 0.4; math.Abs(got-want) > 1e-9 {
 		t.Errorf("Pod p2 weighted value: Want %f, Got %f", want, got)
 	}
-
-	// The per-container breakdown keeps the raw (unweighted) values.
-	if got, want := cm.PodContainerMetrics["p1"].ContainerMetrics["c2"].Values["cpu_util"], 0.1; math.Abs(got-want) > 1e-9 {
-		t.Errorf("Container p1/c2 value: Want %f, Got %f", want, got)
+	// p3: no container is weightable, so there is no pod value.
+	if _, exists := cm.PodMetrics["p3"]; exists {
+		t.Errorf("Pod p3 has no cpu request, it should have no weighted pod value")
 	}
-	if _, exists := cm.PodContainerMetrics["p2"].ContainerMetrics["c2"]; exists {
-		t.Errorf("Container p2/c2 has no cpu request, it should have been dropped")
+
+	// The per-container breakdown keeps the raw (unweighted) values of every
+	// container, whether or not it declares a request.
+	for _, tc := range []struct {
+		pod, container string
+		want           float64
+	}{
+		{"p1", "c2", 0.1},
+		{"p2", "c2", 0.9},
+		{"p3", "c1", 0.3},
+		{"p3", "c2", 0.6},
+	} {
+		pcm, ok := cm.PodContainerMetrics[tc.pod]
+		if !ok || pcm.ContainerMetrics[tc.container] == nil {
+			t.Errorf("Container %s/%s missing from the breakdown", tc.pod, tc.container)
+			continue
+		}
+		if got := pcm.ContainerMetrics[tc.container].Values["cpu_util"]; math.Abs(got-tc.want) > 1e-9 {
+			t.Errorf("Container %s/%s value: Want %f, Got %f", tc.pod, tc.container, tc.want, got)
+		}
 	}
 }
 
