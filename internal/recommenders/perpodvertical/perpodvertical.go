@@ -24,6 +24,15 @@ type config struct {
 	maxMemory    int64 // bytes
 }
 
+// Recommend sizes the configured container of each pod individually, based on
+// that container's own usage.
+//
+// The metric must be defined with scope "PodContainer" so that the Control
+// Plane keeps the per-container breakdown in
+// ControlMetrics.pod_container_metrics. The pod-level values in pod_metrics are
+// not used: for resource metrics they are a request-weighted mix of all the
+// pod's containers, which would size the target container on its neighbors'
+// usage.
 func (r *PerPodVerticalRecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.ControlMetrics) *pb.Recommendation {
 	cfg, err := parseConfig(def)
 	if err != nil {
@@ -32,16 +41,25 @@ func (r *PerPodVerticalRecommender) Recommend(def *pb.RecommenderDefinition, sta
 		}
 	}
 
-	if state == nil || len(state.PodMetrics) == 0 {
+	if state == nil || len(state.PodContainerMetrics) == 0 {
+		if state != nil && hasPodLevelMetric(state, cfg.metric) {
+			return &pb.Recommendation{
+				Message: fmt.Sprintf("metric %q has no per-container data: define it with scope \"PodContainer\"", cfg.metric),
+			}
+		}
 		return &pb.Recommendation{
-			Message: "no pod metrics available",
+			Message: "no pod container metrics available",
 		}
 	}
 
 	var podRecs []*pb.PodContainerResource
 
-	for podName, podM := range state.PodMetrics {
-		val, ok := podM.Values[cfg.metric]
+	for podName, pcm := range state.PodContainerMetrics {
+		cm, ok := pcm.GetContainerMetrics()[cfg.container]
+		if !ok || cm == nil {
+			continue
+		}
+		val, ok := cm.Values[cfg.metric]
 		if !ok {
 			continue
 		}
@@ -90,6 +108,17 @@ func (r *PerPodVerticalRecommender) Recommend(def *pb.RecommenderDefinition, sta
 	}
 }
 
+// hasPodLevelMetric reports whether the metric is only available as a pod-level
+// value, i.e. it was defined with scope "Pod" rather than "PodContainer".
+func hasPodLevelMetric(state *pb.ControlMetrics, metric string) bool {
+	for _, pm := range state.PodMetrics {
+		if _, ok := pm.Values[metric]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 func getParam(params map[string]string, keys ...string) string {
 	for _, k := range keys {
 		if v, ok := params[k]; ok && v != "" {
@@ -131,6 +160,9 @@ func parseConfig(def *pb.RecommenderDefinition) (*config, error) {
 	}
 
 	container := getParam(def.Params, "container")
+	if container == "" {
+		return nil, fmt.Errorf("missing container param")
+	}
 
 	resourceType := getParam(def.Params, "resourceType", "resource_type")
 	if resourceType == "" {
