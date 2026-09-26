@@ -50,17 +50,12 @@ For more details, see our
 
 ### Prerequisites
 
-1.  *KinD* development clusters
+The only prerequisite is to install the *KinD* tool for running local clusters.
 
-    xAS is in an early stage of development and only supports KinD clusters.
-    Refer to the
-    [KinD website](https://kind.sigs.k8s.io/#installation-and-usage) for
-    installation instructions.
-
-2.  *Protoc Protocol Buffer Compiler*
-
-    Refer to https://grpc.io/docs/protoc-installation/ for installation
-    instructions.
+xAS is in an early stage of development and only supports KinD clusters.
+Refer to the
+[KinD website](https://kind.sigs.k8s.io/#installation-and-usage) for
+installation instructions.
 
 ### Getting Started
 
