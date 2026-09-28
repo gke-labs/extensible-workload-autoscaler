@@ -250,8 +250,37 @@ spec:
                   the target workload.
                 format: int32
                 type: integer
-              decisions:
-                description: Decisions lists the status of each recommender.
+              desiredReplicas:
+                description: DesiredReplicas is the number of replicas calculated
+                  by the XAS Server.
+                format: int32
+                type: integer
+              lastUpdated:
+                description: LastUpdated is the timestamp of the last recommendation
+                  calculation (ISO8601).
+                type: string
+              metricStatuses:
+                description: MetricStatuses lists the current value and status of
+                  each metric.
+                items:
+                  properties:
+                    error:
+                      type: string
+                    lastUpdated:
+                      type: string
+                    name:
+                      type: string
+                    value:
+                      type: string
+                  required:
+                  - lastUpdated
+                  - name
+                  - value
+                  type: object
+                type: array
+              recommendations:
+                description: Recommendations lists the latest recommendation of each
+                  recommender.
                 items:
                   properties:
                     active:
@@ -327,34 +356,6 @@ spec:
                   - phase
                   - recommenderName
                   - type
-                  type: object
-                type: array
-              desiredReplicas:
-                description: DesiredReplicas is the number of replicas calculated
-                  by the XAS Server.
-                format: int32
-                type: integer
-              lastUpdated:
-                description: LastUpdated is the timestamp of the last recommendation
-                  calculation (ISO8601).
-                type: string
-              metricStatuses:
-                description: MetricStatuses lists the current value and status of
-                  each metric.
-                items:
-                  properties:
-                    error:
-                      type: string
-                    lastUpdated:
-                      type: string
-                    name:
-                      type: string
-                    value:
-                      type: string
-                  required:
-                  - lastUpdated
-                  - name
-                  - value
                   type: object
                 type: array
               selector:

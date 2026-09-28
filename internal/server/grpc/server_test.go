@@ -191,7 +191,7 @@ func TestServerEndToEndGRPC(t *testing.T) {
 // 4. Agent A ingests T1 metrics for pods p1, p2 (Value 120, rate = 2.0).
 // 5. Agent B ingests T1 metrics for pods p3, p4 (Value 124, rate = 2.0) slightly later.
 // 6. Calculate Control Metrics and verify the aggregated average is 2.0.
-// 7. Verify the final Recommendation matches the expected scaling decision.
+// 7. Verify the final Recommendation matches the expected arbitrated recommendation.
 func TestDistributedCollectionGRPC(t *testing.T) {
 	start := time.Unix(1000, 0)
 	clk := &clock.FakeClock{CurrentTime: start}
@@ -307,7 +307,7 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 // 2. Register 10 ready pods.
 // 3. Ingest a global metric sample for "queue" with value 1000.
 // 4. Calculate Control Metrics and verify the average value is 100.0 (1000 / 10 pods).
-// 5. Simulate a Recommender decision to scale to 100 replicas.
+// 5. Simulate a Recommender recommendation to scale to 100 replicas.
 // 6. Verify the final Recommendation.
 func TestExternalMetricGRPC(t *testing.T) {
 	start := time.Unix(1000, 0)
@@ -601,9 +601,9 @@ func TestScaleToZeroGRPC(t *testing.T) {
 // Steps:
 // 1. Create Policy with both recommenders.
 // 2. Ingest metrics.
-// 3. Simulate Recommender states: Active votes 10, DryRun votes 100.
+// 3. Simulate Recommender states: Active recommends 10, DryRun recommends 100.
 // 4. Verify that the final Recommendation Target Replicas is 10 (DryRun is ignored for actuation).
-// 5. Verify that the DryRun decision is still present in the Recommendation explanation for observability.
+// 5. Verify that the DryRun recommendation is still present in the Recommendation explanation for observability.
 func TestDryRunGRPC(t *testing.T) {
 	start := time.Unix(1000, 0)
 	clk := &clock.FakeClock{CurrentTime: start}
@@ -1292,8 +1292,8 @@ func TestMetricAggregationGRPC(t *testing.T) {
 	}
 }
 
-// TestRecommenderInactiveGRPC ensures inactive recommenders do not influence the decision.
-// Scenario: Two recommenders, one Active (votes 5) and one Inactive (votes 100).
+// TestRecommenderInactiveGRPC ensures inactive recommenders do not influence the arbitrated recommendation.
+// Scenario: Two recommenders, one Active (recommends 5) and one Inactive (recommends 100).
 // Steps:
 // 1. Create Policy.
 // 2. Set Recommender states.
@@ -1685,8 +1685,8 @@ func TestRecommenderArbitrationGRPC(t *testing.T) {
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app", Namespace: ns},
 			Metrics:  []*pb.MetricDefinition{{Name: "m", Provider: "kubelet", Gauge: &pb.Gauge{Aggregation: "Avg"}}},
 			Scaling: []*pb.RecommenderDefinition{
-				{Recommender: "Linear", Name: "r_low", Type: "Linear", Params: map[string]string{"target": "100"}}, // Votes low
-				{Recommender: "Linear", Name: "r_high", Type: "Linear", Params: map[string]string{"target": "10"}}, // Votes high (metric=200 -> 20 reps)
+				{Recommender: "Linear", Name: "r_low", Type: "Linear", Params: map[string]string{"target": "100"}}, // Recommends low
+				{Recommender: "Linear", Name: "r_high", Type: "Linear", Params: map[string]string{"target": "10"}}, // Recommends high (metric=200 -> 20 reps)
 			},
 			MinReplicas: 1, MaxReplicas: 100,
 		},

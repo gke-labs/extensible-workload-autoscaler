@@ -52,11 +52,11 @@ type XASServerClient interface {
 	UpdateWorkload(ctx context.Context, in *UpdateWorkloadRequest, opts ...grpc.CallOption) (*Workload, error)
 	// --- Control Metrics (Recommender -> Server) ---
 	// Read the current aggregated metric values ("Control Metrics") for a policy.
-	// Recommenders use this to make scaling decisions.
+	// Recommenders use this to compute their recommendations.
 	GetControlMetrics(ctx context.Context, in *GetControlMetricsRequest, opts ...grpc.CallOption) (*ControlMetrics, error)
 	// --- Recommender State (Plugin -> Server) ---
-	// Update Status (Decision) for a specific recommender.
-	// Recommenders push their calculated vote here.
+	// Update the status (recommendation) of a specific recommender.
+	// Recommenders push their calculated recommendation here.
 	UpdateRecommenderState(ctx context.Context, in *UpdateRecommenderStateRequest, opts ...grpc.CallOption) (*RecommenderState, error)
 	// --- Recommendation (Controller -> Server) ---
 	// Retrieve the final arbitrated recommendation for a policy.
@@ -177,11 +177,11 @@ type XASServerServer interface {
 	UpdateWorkload(context.Context, *UpdateWorkloadRequest) (*Workload, error)
 	// --- Control Metrics (Recommender -> Server) ---
 	// Read the current aggregated metric values ("Control Metrics") for a policy.
-	// Recommenders use this to make scaling decisions.
+	// Recommenders use this to compute their recommendations.
 	GetControlMetrics(context.Context, *GetControlMetricsRequest) (*ControlMetrics, error)
 	// --- Recommender State (Plugin -> Server) ---
-	// Update Status (Decision) for a specific recommender.
-	// Recommenders push their calculated vote here.
+	// Update the status (recommendation) of a specific recommender.
+	// Recommenders push their calculated recommendation here.
 	UpdateRecommenderState(context.Context, *UpdateRecommenderStateRequest) (*RecommenderState, error)
 	// --- Recommendation (Controller -> Server) ---
 	// Retrieve the final arbitrated recommendation for a policy.

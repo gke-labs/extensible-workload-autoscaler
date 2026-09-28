@@ -313,10 +313,10 @@ const pageTemplate = `
             }
 
             const metricsHTML = renderMetricsTable(ps);
-            const decisionsHTML = renderDecisionsTable(ps);
+            const recommendationsHTML = renderRecommendationsTable(ps);
             const workloadHTML = renderWorkloadTable(ps);
 
-            const newContentHTML = metricsHTML + decisionsHTML + workloadHTML;
+            const newContentHTML = metricsHTML + recommendationsHTML + workloadHTML;
             if (content.innerHTML !== newContentHTML) {
                 content.innerHTML = newContentHTML;
             }
@@ -532,7 +532,7 @@ const pageTemplate = `
                 '</div>';
         }
 
-        function renderDecisionsTable(ps) {
+        function renderRecommendationsTable(ps) {
             let rows = '';
             
             // Build lookup for config
@@ -540,11 +540,11 @@ const pageTemplate = `
             if (ps.Policy.scaling) ps.Policy.scaling.forEach(r => recConfig[r.name] = r.params);
             if (ps.Policy.activation) ps.Policy.activation.forEach(r => recConfig[r.name] = r.params);
 
-            if (ps.Decisions) {
-                // Sort decisions by name for stability
-                const sortedDecisions = Object.values(ps.Decisions).sort((a, b) => a.name.localeCompare(b.name));
+            if (ps.RecommenderStatuses) {
+                // Sort recommendations by name for stability
+                const sortedRecommendations = Object.values(ps.RecommenderStatuses).sort((a, b) => a.name.localeCompare(b.name));
                 
-                for (const d of sortedDecisions) {
+                for (const d of sortedRecommendations) {
                      const activeClass = d.is_active ? 'tag-active' : 'tag-inactive';
                      const activeText = d.is_active ? 'Active' : 'Inactive';
                      
@@ -556,9 +556,9 @@ const pageTemplate = `
                             .join(', ');
                      }
 
-                     let voteHtml = '';
+                     let recommendationHtml = '';
                      if (d.replicas !== undefined && d.replicas !== null) {
-                         voteHtml += '<div><strong>Rep:</strong> ' + d.replicas + '</div>';
+                         recommendationHtml += '<div><strong>Rep:</strong> ' + d.replicas + '</div>';
                      }
 
                      if (Array.isArray(d.workload_resources)) {
@@ -577,41 +577,41 @@ const pageTemplate = `
                                  resHtml += '<strong>Lim:</strong> ' + Object.entries(wr.limits).map(([k,v])=>k+':'+v).join(', ');
                              }
                              resHtml += '</div>';
-                             voteHtml += resHtml;
+                             recommendationHtml += resHtml;
                          }
                      }
 
                      if (d.pod_resources && d.pod_resources.length > 0) {
-                         voteHtml += '<div style="margin-top: 4px; font-size: 0.9rem; color: var(--primary);"><strong>Pods:</strong> ' + d.pod_resources.length + ' targeted updates</div>';
+                         recommendationHtml += '<div style="margin-top: 4px; font-size: 0.9rem; color: var(--primary);"><strong>Pods:</strong> ' + d.pod_resources.length + ' targeted updates</div>';
                      }
 
-                     if (!voteHtml) {
-                         voteHtml = '<span class="text-muted-small">-</span>';
+                     if (!recommendationHtml) {
+                         recommendationHtml = '<span class="text-muted-small">-</span>';
                      }
 
                      rows += '<tr>' +
                             '<td>' + d.name + '</td>' +
                             '<td class="text-muted-small">' + d.type + '</td>' +
                             '<td class="text-muted-small">' + paramsStr + '</td>' +
-                            '<td>' + voteHtml + '</td>' +
+                            '<td>' + recommendationHtml + '</td>' +
                             '<td><span class="tag ' + activeClass + '">' + activeText + '</span></td>' +
                             '<td class="text-muted-small">' + (d.message || '') + '</td>' +
                         '</tr>';
                 }
             }
              if (!rows) {
-                rows = '<tr><td colspan="6" style="text-align: center; color: var(--muted);">No decisions made yet.</td></tr>';
+                rows = '<tr><td colspan="6" style="text-align: center; color: var(--muted);">No recommendations yet.</td></tr>';
             }
 
             return '<div class="section">' +
-                    '<div class="section-title">Recommender Decisions</div>' +
+                    '<div class="section-title">Recommendations</div>' +
                     '<table>' +
                         '<thead>' +
                             '<tr>' +
                                 '<th>Recommender</th>' +
                                 '<th>Type</th>' +
                                 '<th>Params</th>' +
-                                '<th>Vote</th>' +
+                                '<th>Recommendation</th>' +
                                 '<th>Status</th>' +
                                 '<th>Message</th>' +
                             '</tr>' +

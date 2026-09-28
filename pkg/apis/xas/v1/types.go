@@ -178,8 +178,8 @@ type ScalingPolicyStatus struct {
 	// LastUpdated is the timestamp of the last recommendation calculation (ISO8601).
 	LastUpdated string `json:"lastUpdated"` // ISO8601
 
-	// Decisions lists the status of each recommender.
-	Decisions []DecisionStatus `json:"decisions,omitempty"`
+	// Recommendations lists the latest recommendation of each recommender.
+	Recommendations []RecommendationStatus `json:"recommendations,omitempty"`
 
 	// MetricStatuses lists the current value and status of each metric.
 	MetricStatuses []MetricStatus `json:"metricStatuses,omitempty"`
@@ -192,7 +192,7 @@ type MetricStatus struct {
 	Error       string `json:"error,omitempty"`
 }
 
-type DecisionStatus struct {
+type RecommendationStatus struct {
 	RecommenderName   string                      `json:"recommenderName"`
 	Type              string                      `json:"type"`
 	Phase             string                      `json:"phase"` // "Activation" or "Scaling"

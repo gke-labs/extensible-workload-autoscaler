@@ -98,7 +98,7 @@ func (e *Engine) processPolicy(policy *pb.Policy) {
 
 	// Call each recommender to get their recommendation. Provide both policy-wide
 	// metrics and the metrics owned by the recommender.
-	var decisions []decision
+	var recommendations []namedRecommendation
 	for _, def := range slices.Concat(policy.Activation, policy.Scaling) {
 		ownedMetrics, err := e.fetchControlMetrics(policy.Id.Namespace, policy.Id.Name, def.Name)
 		if err != nil {
@@ -111,13 +111,13 @@ func (e *Engine) processPolicy(policy *pb.Policy) {
 			return
 		}
 		if v := rec.Recommend(def, metrics, ownedMetrics); v != nil {
-			decisions = append(decisions, decision{name: def.Name, vote: v})
+			recommendations = append(recommendations, namedRecommendation{name: def.Name, recommendation: v})
 		}
 	}
 
-	slog.Debug("Recommender decisions generated", "policy", policy.Id.Name, "count", len(decisions))
-	if len(decisions) > 0 {
-		e.pushDecisions(policy, decisions)
+	slog.Debug("Recommendations generated", "policy", policy.Id.Name, "count", len(recommendations))
+	if len(recommendations) > 0 {
+		e.pushRecommendations(policy, recommendations)
 	}
 }
 
@@ -147,27 +147,27 @@ func (e *Engine) fetchControlMetrics(ns, name, recommenderName string) (*pb.Cont
 	})
 }
 
-type decision struct {
-	name string
-	vote *pb.Recommendation
+type namedRecommendation struct {
+	name           string
+	recommendation *pb.Recommendation
 }
 
-func (e *Engine) pushDecisions(policy *pb.Policy, decisions []decision) {
+func (e *Engine) pushRecommendations(policy *pb.Policy, recommendations []namedRecommendation) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	for _, d := range decisions {
+	for _, r := range recommendations {
 		req := &pb.UpdateRecommenderStateRequest{
 			Id:              &pb.PolicyId{ClusterName: e.clusterName, Namespace: policy.Id.Namespace, Name: policy.Id.Name},
-			RecommenderName: d.name,
-			Recommendation:  d.vote,
+			RecommenderName: r.name,
+			Recommendation:  r.recommendation,
 		}
-		if d.vote != nil && d.vote.Replicas != nil {
-			slog.Debug("Pushing workload replicas recommendation", "policy", policy.Id.Name, "recommender", d.name, "desired", *d.vote.Replicas)
+		if r.recommendation != nil && r.recommendation.Replicas != nil {
+			slog.Debug("Pushing workload replicas recommendation", "policy", policy.Id.Name, "recommender", r.name, "desired", *r.recommendation.Replicas)
 		}
 		_, err := e.client.UpdateRecommenderState(ctx, req)
 		if err != nil {
-			slog.Error("Failed to update decision", "policy", policy.Id.Name, "recommender", d.name, "error", err)
+			slog.Error("Failed to push recommendation", "policy", policy.Id.Name, "recommender", r.name, "error", err)
 		}
 	}
 }

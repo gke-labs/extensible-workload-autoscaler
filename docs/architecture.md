@@ -13,13 +13,13 @@ configure *Metric Providers* (reading metrics from configurable sources), and
 number of replicas the scaling target is scaled to is given by the recommender
 with the highest recommendation.
 
-### The Decision Loop
+### The Recommendation Loop
 
 1.  *Collect:* Providers scrape metrics (via Plugins) and push them to the
     *Server*.
 2.  *Recommend:* The *Recommender Engine* polls the *Server*, calculates
-    desired replicas based on your policy, and pushes a *Decision*.
-3.  *Aggregate:* The Server aggregates all decisions:
+    desired replicas based on your policy, and pushes a *Recommendation*.
+3.  *Aggregate:* The Server aggregates all recommendations into an arbitrated recommendation:
     *   *Activation Phase:* Checks if *any* recommender says "Active". If not,
         scales to 0.
     *   *Scaling Phase:* Takes the *maximum* replicas requested by any active

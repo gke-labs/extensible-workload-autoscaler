@@ -46,7 +46,7 @@ func TestRecommend(t *testing.T) {
 			wantMsgContains: "container is undefined",
 		},
 		{
-			name: "Wrong container name (typo) not present in ContainerMetrics should return inactive vote",
+			name: "Wrong container name (typo) not present in ContainerMetrics should return inactive recommendation",
 			def: &pb.RecommenderDefinition{
 				Params: map[string]string{
 					"container":  "wrong-container-name",

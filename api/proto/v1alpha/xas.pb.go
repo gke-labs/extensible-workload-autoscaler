@@ -1438,7 +1438,7 @@ func (x *ControlMetrics) GetContainerMetrics() *ContainerMetrics {
 	return nil
 }
 
-// UpdateRecommenderStateRequest updates the status (decision) of a recommender.
+// UpdateRecommenderStateRequest updates the status (recommendation) of a recommender.
 type UpdateRecommenderStateRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The policy ID.
@@ -1630,7 +1630,7 @@ type Recommendation struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Recommendation for number of replicas.
 	Replicas *int32 `protobuf:"varint,1,opt,name=replicas,proto3,oneof" json:"replicas,omitempty"`
-	// If false, this recommender votes to scale to zero (if Activation type).
+	// If false, this recommender recommends scaling to zero (if Activation type).
 	IsActive bool `protobuf:"varint,2,opt,name=is_active,json=isActive,proto3" json:"is_active,omitempty"`
 	// Human-readable reason or message.
 	Message string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
@@ -1716,7 +1716,7 @@ type RecommenderState struct {
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Configuration parameters for this recommender (from Policy).
 	Config map[string]string `protobuf:"bytes,2,rep,name=config,proto3" json:"config,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// The current decision/status of this recommender.
+	// The current recommendation/status of this recommender.
 	Status        *RecommenderStatus `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1773,10 +1773,10 @@ func (x *RecommenderState) GetStatus() *RecommenderStatus {
 	return nil
 }
 
-// RecommenderStatus represents the output/decision of a recommender.
+// RecommenderStatus represents the output (recommendation) of a recommender.
 type RecommenderStatus struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// If false, this recommender votes to scale to zero (if Activation type).
+	// If false, this recommender recommends scaling to zero (if Activation type).
 	IsActive bool `protobuf:"varint,2,opt,name=is_active,json=isActive,proto3" json:"is_active,omitempty"`
 	// Human-readable reason or message.
 	Message string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
@@ -1947,14 +1947,14 @@ func (x *GetRecommendationRequest) GetId() *PolicyId {
 }
 
 // GetRecommendationResponse wraps the arbitrated recommendation.
-// If recommendation is not set, it means no decision is available yet.
+// If recommendation is not set, it means no arbitrated recommendation is available yet.
 type GetRecommendationResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Recommendation *Recommendation        `protobuf:"bytes,1,opt,name=recommendation,proto3" json:"recommendation,omitempty"`
-	// Explains the arbitration decision by listing the status of all
+	// Explains the arbitrated recommendation by listing the status of all
 	// recommenders.
 	Explanation []*RecommenderStatus `protobuf:"bytes,3,rep,name=explanation,proto3" json:"explanation,omitempty"`
-	// Status of the input metrics used for the decision.
+	// Status of the input metrics used for the arbitrated recommendation.
 	MetricStatuses []*MetricStatus `protobuf:"bytes,2,rep,name=metric_statuses,json=metricStatuses,proto3" json:"metric_statuses,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache

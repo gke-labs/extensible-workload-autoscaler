@@ -97,7 +97,7 @@ func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.C
 		}
 	}
 
-	// If no valid recommendations were generated, returning a vote with an error
+	// If no valid recommendations were generated, returning a recommendation with an error
 	if !cpuMetricFound && !memMetricFound {
 		warnings = append(warnings, "Unable to create recommendation as no value memory or cpu values were found")
 

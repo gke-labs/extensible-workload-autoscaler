@@ -31,12 +31,12 @@ service XASServer {
 
   // --- Control Metrics (Recommender -> Server) ---
   // Read the current aggregated metric values ("Control Metrics") for a policy.
-  // Recommenders use this to make scaling decisions.
+  // Recommenders use this to compute their recommendations.
   rpc GetControlMetrics(GetControlMetricsRequest) returns (ControlMetrics);
 
   // --- Recommender State (Plugin -> Server) ---
-  // Update Status (Decision) for a specific recommender.
-  // Recommenders push their calculated vote here.
+  // Update the status (recommendation) of a specific recommender.
+  // Recommenders push their calculated recommendation here.
   rpc UpdateRecommenderState(UpdateRecommenderStateRequest) returns (RecommenderState);
 
   // --- Recommendation (Controller -> Server) ---
@@ -301,7 +301,7 @@ message ControlMetrics {
 
 // --- Recommender State ---
 
-// UpdateRecommenderStateRequest updates the status (decision) of a recommender.
+// UpdateRecommenderStateRequest updates the status (recommendation) of a recommender.
 message UpdateRecommenderStateRequest {
   // The policy ID.
   PolicyId id = 1;
@@ -338,7 +338,7 @@ message Recommendation {
   // Recommendation for number of replicas.
   optional int32 replicas = 1;
 
-  // If false, this recommender votes to scale to zero (if Activation type).
+  // If false, this recommender recommends scaling to zero (if Activation type).
   bool is_active = 2;
 
   // Human-readable reason or message.
@@ -359,13 +359,13 @@ message RecommenderState {
   string name = 1;
   // Configuration parameters for this recommender (from Policy).
   map<string, string> config = 2; 
-  // The current decision/status of this recommender.
+  // The current recommendation/status of this recommender.
   RecommenderStatus status = 3;
 }
 
-// RecommenderStatus represents the output/decision of a recommender.
+// RecommenderStatus represents the output (recommendation) of a recommender.
 message RecommenderStatus {
-  // If false, this recommender votes to scale to zero (if Activation type).
+  // If false, this recommender recommends scaling to zero (if Activation type).
   bool is_active = 2;
   // Human-readable reason or message.
   string message = 3;
@@ -397,15 +397,15 @@ message GetRecommendationRequest {
 }
 
 // GetRecommendationResponse wraps the arbitrated recommendation.
-// If recommendation is not set, it means no decision is available yet.
+// If recommendation is not set, it means no arbitrated recommendation is available yet.
 message GetRecommendationResponse {
   Recommendation recommendation = 1;
 
-  // Explains the arbitration decision by listing the status of all
+  // Explains the arbitrated recommendation by listing the status of all
   // recommenders.
   repeated RecommenderStatus explanation = 3;
 
-  // Status of the input metrics used for the decision.
+  // Status of the input metrics used for the arbitrated recommendation.
   repeated MetricStatus metric_statuses = 2;
 }
 

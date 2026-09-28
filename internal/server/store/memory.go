@@ -121,13 +121,13 @@ type PolicyState struct {
 	Workload map[string]*pb.PodState
 	// Series and GlobalHistograms are keyed by the metric key returned by
 	// metricKey, which identifies a metric by name and owner.
-	Series           map[string]map[string]*Series // MetricKey -> SeriesID -> Series
-	GlobalHistograms map[string]*DecayingHistogram // MetricKey -> Histogram
-	Recommendation   *pb.Recommendation
-	Explanation      []*pb.RecommenderStatus
-	LastActive       int64
-	Decisions        map[string]*pb.RecommenderStatus
-	ControlMetrics   *pb.ControlMetrics
+	Series              map[string]map[string]*Series // MetricKey -> SeriesID -> Series
+	GlobalHistograms    map[string]*DecayingHistogram // MetricKey -> Histogram
+	Recommendation      *pb.Recommendation
+	Explanation         []*pb.RecommenderStatus
+	LastActive          int64
+	RecommenderStatuses map[string]*pb.RecommenderStatus
+	ControlMetrics      *pb.ControlMetrics
 	// RecommenderControlMetrics holds the values of the metrics owned by each
 	// recommender, keyed by recommender name.
 	RecommenderControlMetrics map[string]*pb.ControlMetrics
@@ -190,10 +190,10 @@ func (s *MemoryStore) UpdatePolicy(clusterName string, p *pb.Policy, updateMask 
 
 	if ps == nil {
 		ps = &PolicyState{
-			Workload:         make(map[string]*pb.PodState),
-			Series:           make(map[string]map[string]*Series),
-			GlobalHistograms: make(map[string]*DecayingHistogram),
-			Decisions:        make(map[string]*pb.RecommenderStatus),
+			Workload:            make(map[string]*pb.PodState),
+			Series:              make(map[string]map[string]*Series),
+			GlobalHistograms:    make(map[string]*DecayingHistogram),
+			RecommenderStatuses: make(map[string]*pb.RecommenderStatus),
 		}
 		s.state[key] = ps
 	}
@@ -205,7 +205,7 @@ func (s *MemoryStore) UpdatePolicy(clusterName string, p *pb.Policy, updateMask 
 
 	s.cleanupOrphanedSeries(ps)
 	s.cleanupOrphanedHistograms(ps)
-	s.cleanupOrphanedDecisions(ps)
+	s.cleanupOrphanedRecommenderStatuses(ps)
 
 	return updated, nil
 }
@@ -476,7 +476,7 @@ func (s *MemoryStore) UpdateRecommenderState(req *pb.UpdateRecommenderStateReque
 	}
 
 	if req.Recommendation == nil {
-		delete(ps.Decisions, req.RecommenderName)
+		delete(ps.RecommenderStatuses, req.RecommenderName)
 		return nil
 	}
 
@@ -528,14 +528,14 @@ func (s *MemoryStore) UpdateRecommenderState(req *pb.UpdateRecommenderStateReque
 
 	// Wait, I need to check how to correctly create google.protobuf.Timestamp
 	// I'll check imports and existing usage.
-	return s.updateDecision(ps, req.RecommenderName, status)
+	return s.updateRecommenderStatus(ps, req.RecommenderName, status)
 }
 
-func (s *MemoryStore) updateDecision(ps *PolicyState, name string, status *pb.RecommenderStatus) error {
-	if ps.Decisions == nil {
-		ps.Decisions = make(map[string]*pb.RecommenderStatus)
+func (s *MemoryStore) updateRecommenderStatus(ps *PolicyState, name string, status *pb.RecommenderStatus) error {
+	if ps.RecommenderStatuses == nil {
+		ps.RecommenderStatuses = make(map[string]*pb.RecommenderStatus)
 	}
-	ps.Decisions[name] = status
+	ps.RecommenderStatuses[name] = status
 	return nil
 }
 
@@ -661,7 +661,7 @@ func (s *MemoryStore) CalculateAll() {
 			}
 		}
 
-		s.processDecisions(ps, now)
+		s.processRecommendations(ps, now)
 	}
 }
 
@@ -782,7 +782,7 @@ func (s *MemoryStore) cleanupOrphanedHistograms(ps *PolicyState) {
 	}
 }
 
-func (s *MemoryStore) cleanupOrphanedDecisions(ps *PolicyState) {
+func (s *MemoryStore) cleanupOrphanedRecommenderStatuses(ps *PolicyState) {
 	recommenderNames := make(map[string]bool)
 	for _, r := range ps.Policy.Scaling {
 		recommenderNames[r.Name] = true
@@ -790,9 +790,9 @@ func (s *MemoryStore) cleanupOrphanedDecisions(ps *PolicyState) {
 	for _, r := range ps.Policy.Activation {
 		recommenderNames[r.Name] = true
 	}
-	for rName := range ps.Decisions {
+	for rName := range ps.RecommenderStatuses {
 		if !recommenderNames[rName] {
-			delete(ps.Decisions, rName)
+			delete(ps.RecommenderStatuses, rName)
 		}
 	}
 }
@@ -1133,7 +1133,7 @@ func parsePercentile(s string) float64 {
 	return 0.95
 }
 
-func (s *MemoryStore) processDecisions(ps *PolicyState, now int64) {
+func (s *MemoryStore) processRecommendations(ps *PolicyState, now int64) {
 	policy := ps.Policy
 	isActive := false
 	var activationStatuses []*pb.RecommenderStatus
@@ -1142,7 +1142,7 @@ func (s *MemoryStore) processDecisions(ps *PolicyState, now int64) {
 		isActive = true
 	} else {
 		for _, recDef := range policy.Activation {
-			if d, ok := ps.Decisions[recDef.Name]; ok {
+			if d, ok := ps.RecommenderStatuses[recDef.Name]; ok {
 				activationStatuses = append(activationStatuses, d)
 				if recDef.Mode == "DryRun" {
 					continue
@@ -1230,7 +1230,7 @@ func (s *MemoryStore) calculateArbitratedResources(ps *PolicyState, isActive boo
 	podKeys := []string{} // Maintain insertion order for deterministic outputs
 
 	for _, recDef := range ps.Policy.Scaling {
-		d, ok := ps.Decisions[recDef.Name]
+		d, ok := ps.RecommenderStatuses[recDef.Name]
 		if !ok || recDef.Mode == "DryRun" || !d.IsActive {
 			continue
 		}
@@ -1339,10 +1339,10 @@ func (s *MemoryStore) calculateTargetReplicas(ps *PolicyState, isActive bool) (*
 	}
 
 	var targetReplicas *int32
-	var decisionStatuses []*pb.RecommenderStatus
+	var recommenderStatuses []*pb.RecommenderStatus
 
 	for _, recDef := range ps.Policy.Scaling {
-		d, ok := ps.Decisions[recDef.Name]
+		d, ok := ps.RecommenderStatuses[recDef.Name]
 		if !ok {
 			continue
 		}
@@ -1353,18 +1353,18 @@ func (s *MemoryStore) calculateTargetReplicas(ps *PolicyState, isActive bool) (*
 			targetReplicas = &r
 		}
 
-		decisionStatuses = append(decisionStatuses, d)
+		recommenderStatuses = append(recommenderStatuses, d)
 	}
 
 	if targetReplicas == nil {
-		return nil, decisionStatuses
+		return nil, recommenderStatuses
 	}
 
 	if ps.Policy.MaxReplicas > 0 {
 		*targetReplicas = min(*targetReplicas, ps.Policy.MaxReplicas)
 	}
 	*targetReplicas = max(*targetReplicas, ps.Policy.MinReplicas)
-	return targetReplicas, decisionStatuses
+	return targetReplicas, recommenderStatuses
 }
 
 func aggregate(values []float64, method string) float64 {

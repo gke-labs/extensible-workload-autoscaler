@@ -1071,7 +1071,7 @@ func TestUpdateRecommenderState_VerticalResources(t *testing.T) {
 		},
 	})
 
-	vote := &pb.Recommendation{
+	recommendation := &pb.Recommendation{
 		IsActive: true,
 		WorkloadResources: []*pb.ContainerResource{
 			{
@@ -1085,7 +1085,7 @@ func TestUpdateRecommenderState_VerticalResources(t *testing.T) {
 	}
 
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
-		Id: id, RecommenderName: "r1", Recommendation: vote,
+		Id: id, RecommenderName: "r1", Recommendation: recommendation,
 	})
 
 	memStore.CalculateAll()
@@ -1093,8 +1093,8 @@ func TestUpdateRecommenderState_VerticalResources(t *testing.T) {
 
 	wantResp := &pb.GetRecommendationResponse{
 		Recommendation: &pb.Recommendation{
-			WorkloadResources:     vote.WorkloadResources,
-			PodContainerResources: vote.PodContainerResources,
+			WorkloadResources:     recommendation.WorkloadResources,
+			PodContainerResources: recommendation.PodContainerResources,
 		},
 		Explanation: []*pb.RecommenderStatus{
 			{
@@ -1103,8 +1103,8 @@ func TestUpdateRecommenderState_VerticalResources(t *testing.T) {
 				Phase:             "Scaling",
 				Mode:              "Active",
 				IsActive:          true,
-				WorkloadResources: vote.WorkloadResources,
-				PodResources:      vote.PodContainerResources,
+				WorkloadResources: recommendation.WorkloadResources,
+				PodResources:      recommendation.PodContainerResources,
 			},
 		},
 		MetricStatuses: []*pb.MetricStatus{},
@@ -1217,8 +1217,8 @@ func TestUpdateRecommenderState_Validation(t *testing.T) {
 	})
 
 	tests := []struct {
-		name string
-		vote *pb.Recommendation
+		name           string
+		recommendation *pb.Recommendation
 	}{
 		{"Negative Replicas", &pb.Recommendation{Replicas: proto.Int32(-1)}},
 	}
@@ -1228,7 +1228,7 @@ func TestUpdateRecommenderState_Validation(t *testing.T) {
 			_, err := client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
 				Id:              id,
 				RecommenderName: "r1",
-				Recommendation:  tc.vote,
+				Recommendation:  tc.recommendation,
 			})
 			if status.Code(err) != codes.InvalidArgument {
 				t.Errorf("Expected InvalidArgument for %s, got %v", tc.name, err)

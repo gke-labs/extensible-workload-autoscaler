@@ -389,7 +389,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		policyCopy.Status.Selector = selector.String()
 	}
 
-	policyCopy.Status.Decisions = make([]xasv1.DecisionStatus, len(resp.Explanation))
+	policyCopy.Status.Recommendations = make([]xasv1.RecommendationStatus, len(resp.Explanation))
 	for i, d := range resp.Explanation {
 		var wrr []xasv1.ResourceRecommendation
 		for _, wr := range d.WorkloadResources {
@@ -419,7 +419,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 			prr = append(prr, rec)
 		}
 
-		policyCopy.Status.Decisions[i] = xasv1.DecisionStatus{
+		policyCopy.Status.Recommendations[i] = xasv1.RecommendationStatus{
 			RecommenderName:   d.Name,
 			Type:              d.Type,
 			Phase:             d.Phase,

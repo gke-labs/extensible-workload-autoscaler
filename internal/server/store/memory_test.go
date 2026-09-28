@@ -401,7 +401,7 @@ func TestDump(t *testing.T) {
 		}},
 	})
 
-	// 4. Calculate (ControlMetrics, Decisions, Recommendations)
+	// 4. Calculate (ControlMetrics, RecommenderStatuses, arbitrated Recommendation)
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id:              &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: "dump-pol"},
 		RecommenderName: "cpu-rec",
@@ -498,7 +498,7 @@ func TestDump(t *testing.T) {
       }
     ],
     "LastActive": 1000,
-    "Decisions": {
+    "RecommenderStatuses": {
       "cpu-rec": {
         "is_active": true,
         "last_updated": {
@@ -812,7 +812,7 @@ func TestRemoveRecommender(t *testing.T) {
 	}
 	s.SetPolicy("default", pol)
 
-	// 2. Simulate R1 vote = 10
+	// 2. Simulate R1 recommendation = 10
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: id, RecommenderName: "r1",
 		Recommendation: &pb.Recommendation{Replicas: proto.Int32(10), IsActive: true},
@@ -834,7 +834,7 @@ func TestRemoveRecommender(t *testing.T) {
 		t.Errorf("After removal: Want nil recommendation, Got %v (ok=%v)", rec.Recommendation, ok)
 	}
 
-	// 4. Simulate Zombie R1 vote = 100
+	// 4. Simulate Zombie R1 recommendation = 100
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
 		Id: id, RecommenderName: "r1",
 		Recommendation: &pb.Recommendation{Replicas: proto.Int32(100), IsActive: true},
@@ -843,13 +843,13 @@ func TestRemoveRecommender(t *testing.T) {
 	s.CalculateAll()
 	rec, ok = s.GetRecommendation(id)
 	if !ok || rec.Recommendation != nil {
-		t.Errorf("After zombie vote: Want nil recommendation, Got %v (ok=%v)", rec.Recommendation, ok)
+		t.Errorf("After zombie recommendation: Want nil recommendation, Got %v (ok=%v)", rec.Recommendation, ok)
 	}
 
-	// 5. Verify cleanup of internal Decisions map
+	// 5. Verify cleanup of internal RecommenderStatuses map
 	dump := s.Dump().(map[string]*store.PolicyState)
-	if _, exists := dump["default/default/pol"].Decisions["r1"]; exists {
-		t.Error("Orphaned decision r1 still exists in Decisions map")
+	if _, exists := dump["default/default/pol"].RecommenderStatuses["r1"]; exists {
+		t.Error("Orphaned status for r1 still exists in RecommenderStatuses map")
 	}
 }
 
