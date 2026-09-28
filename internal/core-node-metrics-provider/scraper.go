@@ -32,7 +32,7 @@ type CoreNodeMetricsProvider struct {
 	providerLister listers.MetricProviderClassLister
 
 	grpcConn   *grpc.ClientConn
-	grpcClient pb.XASControlPlaneClient
+	grpcClient pb.XASServerClient
 
 	clusterName   string
 	nodeName      string
@@ -52,7 +52,7 @@ func NewCoreNodeMetricsProvider(kubeClient kubernetes.Interface, providerLister 
 		slog.Error("did not connect", "error", err)
 		os.Exit(1)
 	}
-	client := pb.NewXASControlPlaneClient(conn)
+	client := pb.NewXASServerClient(conn)
 
 	return &CoreNodeMetricsProvider{
 		kubeClient:     kubeClient,
@@ -92,7 +92,7 @@ func (a *CoreNodeMetricsProvider) Run(ctx context.Context) {
 func (a *CoreNodeMetricsProvider) scrapeAndSend() {
 	slog.Info("Scrape cycle starting...")
 
-	// 1. Get Policies from Control Plane
+	// 1. Get Policies from Server
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

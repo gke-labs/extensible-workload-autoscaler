@@ -6,7 +6,7 @@ XAS is a decoupled, model-based autoscaling system for Kubernetes. It separates 
 
 The system architecture follows a Hub-and-Spoke model:
 
-*   **Server (Control Plane):** The central brain. Aggregates metrics, stores history in memory, and makes scaling decisions.
+*   **Server:** The central brain. Aggregates metrics, stores history in memory, and makes scaling decisions.
 *   **Controller (Actuator):** The Kubernetes Operator. Syncs `ScalingPolicy` CRDs to the Server and applies scaling recommendations to Deployments.
 *   **Core Node Metrics Provider (Agent):** Runs as a DaemonSet. Scrapes metrics from Pods (Prometheus) and Nodes (Kubelet) and pushes them to the Server.
 *   **Core Recommenders (Engine):** Runs as a Deployment. Executes advanced scaling algorithms (like Linear Regression) and pushes votes to the Server.
@@ -86,7 +86,7 @@ Defines a reusable scaling strategy.
 *   `cmd/`: Main entrypoints for each component.
 *   `deploy/`: Kubernetes manifests (CRDs, RBAC, Install).
 *   `internal/`: Private implementation code.
-    *   `server/`: Control Plane logic.
+    *   `server/`: Server logic.
     *   `controller/`: K8s Operator logic.
     *   `core-node-metrics-provider/`: Scraper logic.
     *   `recommenders/`: Scaling algorithms.

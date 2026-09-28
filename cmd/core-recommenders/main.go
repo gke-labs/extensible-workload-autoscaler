@@ -21,7 +21,7 @@ import (
 )
 
 func main() {
-	serverAddress := flag.String("server-address", "localhost:8080", "XAS Control Plane Address (host:port)")
+	serverAddress := flag.String("server-address", "localhost:8080", "XAS Server Address (host:port)")
 	clusterName := flag.String("cluster-name", "default", "Name of the cluster")
 	kubeconfig := flag.String("kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	debug := flag.Bool("debug", false, "Enable debug logging")

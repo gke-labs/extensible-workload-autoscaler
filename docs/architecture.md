@@ -16,10 +16,10 @@ with the highest recommendation.
 ### The Decision Loop
 
 1.  *Collect:* Providers scrape metrics (via Plugins) and push them to the
-    *Control Plane*.
-2.  *Recommend:* The *Recommender Engine* polls the *Control Plane*, calculates
+    *Server*.
+2.  *Recommend:* The *Recommender Engine* polls the *Server*, calculates
     desired replicas based on your policy, and pushes a *Decision*.
-3.  *Aggregate:* The Control Plane aggregates all decisions:
+3.  *Aggregate:* The Server aggregates all decisions:
     *   *Activation Phase:* Checks if *any* recommender says "Active". If not,
         scales to 0.
     *   *Scaling Phase:* Takes the *maximum* replicas requested by any active
@@ -30,7 +30,7 @@ with the highest recommendation.
 
 The xAS prototype has four main components:
 
-1.  *xAS Control Plane*: Keeps track of autoscaling signals, policies and
+1.  *xAS Server*: Keeps track of autoscaling signals, policies and
     recommendations. All other components connect to it: there are no networking
     requirements for it to connect to any other in-cluster component.
 
@@ -41,20 +41,20 @@ The xAS prototype has four main components:
 
 2.  *xAS Controller*: Connects to the Kubernetes API server to watch for
     `ScalingPolicy` CRDs and for scaling target state (e.g., the number of ready
-    Pods under the target). Syncs them to the Control Plane.
+    Pods under the target). Syncs them to the Server.
 
-    Updates ScalingPolicy `status` field with updates from xAS control plane,
+    Updates ScalingPolicy `status` field with updates from the xAS Server,
     and actuates scaling targets with the latest recommended number of replicas.
 
 3.  *Metric provider*: Either a custom provider implemented by a third-party, or
     one of the core metric providers. Reads metrics and regularly pushes them to
-    the Control Plane.
+    the Server.
 
 4.  *Recommender*: Either a custom recommender implemented by a third-party, or
     one of the core recommenders. Responsible for reading scaling policies and
-    metrics, and pushing scaling recommendations, to the Control Plane.
+    metrics, and pushing scaling recommendations, to the Server.
 
-    Note that using bidirectional gRPC streams would allow the Control Plane to
+    Note that using bidirectional gRPC streams would allow the Server to
     push metric updates to the recommender while preserving the requirement that
     recommenders have no network connectivity to user workloads.
 

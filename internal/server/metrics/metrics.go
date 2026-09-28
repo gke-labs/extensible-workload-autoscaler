@@ -21,7 +21,7 @@ var (
 	ReplicasRecommended = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "xas_replicas_recommended",
-			Help: "The number of replicas recommended by the XAS control plane",
+			Help: "The number of replicas recommended by the XAS Server",
 		},
 		[]string{
 			"policy_cluster", "policy_namespace", "policy_name",

@@ -331,7 +331,7 @@ spec:
                 type: array
               desiredReplicas:
                 description: DesiredReplicas is the number of replicas calculated
-                  by the XAS control plane.
+                  by the XAS Server.
                 format: int32
                 type: integer
               lastUpdated:

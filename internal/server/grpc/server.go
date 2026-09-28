@@ -14,7 +14,7 @@ import (
 )
 
 type Server struct {
-	pb.UnimplementedXASControlPlaneServer
+	pb.UnimplementedXASServerServer
 	store store.MetricStore
 	clock clock.Clock
 }

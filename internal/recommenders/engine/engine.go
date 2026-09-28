@@ -26,7 +26,7 @@ type Recommender interface {
 
 type Engine struct {
 	grpcConn               *grpc.ClientConn
-	client                 pb.XASControlPlaneClient
+	client                 pb.XASServerClient
 	recommenderClassLister listers.RecommenderClassLister
 	// recommenders holds the implementation backing each RecommenderClass type
 	// this binary supports, keyed by type (e.g. "Linear").
@@ -41,7 +41,7 @@ func NewEngine(recommenderClassLister listers.RecommenderClassLister, nodeLister
 		slog.Error("did not connect", "error", err)
 		os.Exit(1)
 	}
-	client := pb.NewXASControlPlaneClient(conn)
+	client := pb.NewXASServerClient(conn)
 
 	return &Engine{
 		grpcConn:               conn,

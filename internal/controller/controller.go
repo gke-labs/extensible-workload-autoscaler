@@ -57,7 +57,7 @@ type Controller struct {
 	workqueue            workqueue.RateLimitingInterface
 
 	grpcConn   *grpc.ClientConn
-	grpcClient pb.XASControlPlaneClient
+	grpcClient pb.XASServerClient
 
 	clusterName string
 }
@@ -76,7 +76,7 @@ func NewController(
 		slog.Error("did not connect", "error", err)
 		os.Exit(1)
 	}
-	client := pb.NewXASControlPlaneClient(conn)
+	client := pb.NewXASServerClient(conn)
 
 	c := &Controller{
 		kubeclientset:        kubeclientset,
@@ -200,7 +200,7 @@ func (c *Controller) validateReferences(p *xasv1.ScalingPolicy) error {
 }
 
 func (c *Controller) reconcileDelete(namespace, name string) error {
-	slog.Info("Policy deleted in K8s, syncing deletion to Control Plane", "namespace", namespace, "name", name)
+	slog.Info("Policy deleted in K8s, syncing deletion to Server", "namespace", namespace, "name", name)
 	req := &pb.DeletePolicyRequest{
 		Id: &pb.PolicyId{
 			ClusterName: c.clusterName,
@@ -260,19 +260,19 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		return err
 	}
 
-	// 2. Push Policy to Control Plane
+	// 2. Push Policy to Server
 	if err := c.pushPolicy(policy, deployment); err != nil {
-		slog.Error("Failed to push policy to control plane", "error", err)
+		slog.Error("Failed to push policy to server", "error", err)
 		return nil
 	}
 
-	// 3. Sync Workload State (Topology) to Control Plane
+	// 3. Sync Workload State (Topology) to Server
 	if err := c.syncWorkload(policy, deployment); err != nil {
 		slog.Error("Failed to sync workload", "error", err)
 		return nil
 	}
 
-	// 4. Poll Control Plane
+	// 4. Poll Server
 	resp, err := c.getRecommendation(policy.Namespace, policy.Name)
 	if err != nil {
 		slog.Error("Failed to get recommendation", "deployment", deploymentName, "error", err)

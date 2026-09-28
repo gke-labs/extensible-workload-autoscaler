@@ -19,16 +19,16 @@ import (
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 )
 
-// fakeControlPlaneClient records the policy updates the engine pushes. Only
+// fakeXASServerClient records the policy updates the engine pushes. Only
 // UpdatePolicy is exercised here; the embedded interface makes the other
 // methods panic if they are ever called.
-type fakeControlPlaneClient struct {
-	pb.XASControlPlaneClient
+type fakeXASServerClient struct {
+	pb.XASServerClient
 	requests []*pb.UpdatePolicyRequest
 	err      error
 }
 
-func (c *fakeControlPlaneClient) UpdatePolicy(_ context.Context, req *pb.UpdatePolicyRequest, _ ...grpc.CallOption) (*pb.Policy, error) {
+func (c *fakeXASServerClient) UpdatePolicy(_ context.Context, req *pb.UpdatePolicyRequest, _ ...grpc.CallOption) (*pb.Policy, error) {
 	c.requests = append(c.requests, proto.Clone(req).(*pb.UpdatePolicyRequest))
 	if c.err != nil {
 		return nil, c.err
@@ -59,7 +59,7 @@ func (plainRecommender) Recommend(*pb.RecommenderDefinition, *pb.ControlMetrics,
 
 // newTestEngine builds an engine backed by fakes. classes maps the name of a
 // RecommenderClass to its type, recommenders maps a type to its implementation.
-func newTestEngine(t *testing.T, client pb.XASControlPlaneClient, classes map[string]string, recommenders map[string]Recommender) *Engine {
+func newTestEngine(t *testing.T, client pb.XASServerClient, classes map[string]string, recommenders map[string]Recommender) *Engine {
 	t.Helper()
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 	for name, typ := range classes {
@@ -204,7 +204,7 @@ func TestSyncRecommenderMetrics(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			client := &fakeControlPlaneClient{err: tc.clientErr}
+			client := &fakeXASServerClient{err: tc.clientErr}
 			e := newTestEngine(t, client, classes, map[string]Recommender{
 				"Owning": &owningRecommender{metrics: tc.owned},
 				"Plain":  plainRecommender{},
@@ -227,7 +227,7 @@ func TestSyncRecommenderMetrics(t *testing.T) {
 // rewrite the entries of the other recommenders it manages.
 func TestSyncRecommenderMetricsSendsOnlyChangedEntries(t *testing.T) {
 	id := &pb.PolicyId{ClusterName: "default", Namespace: "prod", Name: "web"}
-	client := &fakeControlPlaneClient{}
+	client := &fakeXASServerClient{}
 	e := newTestEngine(t, client,
 		map[string]string{"owning-class": "Owning"},
 		map[string]Recommender{"Owning": &owningRecommender{metrics: map[string][]*pb.MetricDefinition{
@@ -274,7 +274,7 @@ func TestSyncRecommenderMetricsSendsOnlyChangedEntries(t *testing.T) {
 // fails.
 func TestSyncRecommenderMetricsDoesNotMutateInput(t *testing.T) {
 	id := &pb.PolicyId{ClusterName: "default", Namespace: "prod", Name: "web"}
-	client := &fakeControlPlaneClient{}
+	client := &fakeXASServerClient{}
 	e := newTestEngine(t, client,
 		map[string]string{"owning-class": "Owning"},
 		map[string]Recommender{"Owning": &owningRecommender{metrics: map[string][]*pb.MetricDefinition{

@@ -61,10 +61,10 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-	pb.RegisterXASControlPlaneServer(grpcServer, servergrpc.NewServer(metricsStore, clock.RealClock{}))
+	pb.RegisterXASServerServer(grpcServer, servergrpc.NewServer(metricsStore, clock.RealClock{}))
 	reflection.Register(grpcServer)
 
-	slog.Info("XAS Control Plane gRPC starting", "port", port)
+	slog.Info("XAS Server gRPC starting", "port", port)
 	go func() {
 		if err := grpcServer.Serve(lis); err != nil {
 			slog.Error("gRPC server stopped", "error", err)

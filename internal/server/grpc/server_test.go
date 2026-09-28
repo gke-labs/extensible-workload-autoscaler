@@ -34,13 +34,13 @@ func init() {
 // FakeClock for deterministic time testing
 // We use internal/clock.FakeClock directly
 
-func setupGRPCServer(t *testing.T, c clock.Clock) (*store.MemoryStore, pb.XASControlPlaneClient, func()) {
+func setupGRPCServer(t *testing.T, c clock.Clock) (*store.MemoryStore, pb.XASServerClient, func()) {
 	lis := bufconn.Listen(bufSize)
 	memStore := store.NewMemoryStoreWithClock(c)
 	srv := servergrpc.NewServer(memStore, c)
 
 	s := grpc.NewServer()
-	pb.RegisterXASControlPlaneServer(s, srv)
+	pb.RegisterXASServerServer(s, srv)
 	go func() {
 		if err := s.Serve(lis); err != nil {
 			// s.Serve returns error on Stop/Close, which is expected
@@ -56,7 +56,7 @@ func setupGRPCServer(t *testing.T, c clock.Clock) (*store.MemoryStore, pb.XASCon
 	if err != nil {
 		t.Fatalf("Failed to dial bufnet: %v", err)
 	}
-	client := pb.NewXASControlPlaneClient(conn)
+	client := pb.NewXASServerClient(conn)
 
 	cleanup := func() {
 		conn.Close()
@@ -75,7 +75,7 @@ func setupGRPCServer(t *testing.T, c clock.Clock) (*store.MemoryStore, pb.XASCon
 // 4. Update Workload state to indicate 2 ready pods.
 // 5. Calculate Control Metrics and verify the aggregated CPU rate is 0.8.
 // 6. Simulate the Recommender calculating a target of 4 replicas based on this rate.
-// 7. Verify the final Recommendation from the Control Plane matches the Recommender's output.
+// 7. Verify the final Recommendation from the Server matches the Recommender's output.
 func TestServerEndToEndGRPC(t *testing.T) {
 	start := time.Unix(1000, 0)
 	clk := &clock.FakeClock{CurrentTime: start}
@@ -549,7 +549,7 @@ func TestScaleToZeroGRPC(t *testing.T) {
 
 	wantCooldown := &pb.GetRecommendationResponse{
 		Recommendation: &pb.Recommendation{
-			Replicas: proto.Int32(1), // MinReplicas (Control Plane kept active due to window)
+			Replicas: proto.Int32(1), // MinReplicas (Server kept active due to window)
 		},
 		Explanation: []*pb.RecommenderStatus{
 			{Replicas: proto.Int32(0), IsActive: true, Phase: "Scaling", Name: "target", Type: "Linear", LastUpdated: timestamppb.New(time.Unix(1003, 0))},

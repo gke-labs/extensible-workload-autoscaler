@@ -3,11 +3,11 @@
   <defs/>
   <g>
     <g>
-      <title>xAS Control Plane</title>
+      <title>xAS Server</title>
       <rect fill="#FFFFFF" height="29.2344" style="stroke:#181818;stroke-width:1;" width="10" x="554.5645" y="241.8125"/>
     </g>
     <g>
-      <title>xAS Control Plane</title>
+      <title>xAS Server</title>
       <rect fill="#FFFFFF" height="29.2344" style="stroke:#181818;stroke-width:1;" width="10" x="554.5645" y="329.5156"/>
     </g>
     <g class="participant-lifeline" data-entity-uid="part1" data-qualified-name="MetricsProv" id="part1-lifeline">
@@ -33,7 +33,7 @@
     </g>
     <g class="participant-lifeline" data-entity-uid="part4" data-qualified-name="xAS" id="part4-lifeline">
       <g>
-        <title>xAS Control Plane</title>
+        <title>xAS Server</title>
         <rect fill="#000000" fill-opacity="0.00000" height="369.5781" width="8" x="555.5645" y="36.4063"/>
         <line style="stroke:#181818;stroke-width:0.5;stroke-dasharray:5,5;" x1="558.6602" x2="558.6602" y1="36.4063" y2="405.9844"/>
       </g>
@@ -71,11 +71,11 @@
     </g>
     <g class="participant participant-head" data-entity-uid="part4" data-qualified-name="xAS" id="part4-head">
       <rect fill="#E2E2F0" height="30.4063" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="125.8086" x="496.6602" y="5"/>
-      <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="111.8086" x="503.6602" y="24.9883">xAS Control Plane</text>
+      <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="77.1094" x="521.0098" y="24.9883">xAS Server</text>
     </g>
     <g class="participant participant-tail" data-entity-uid="part4" data-qualified-name="xAS" id="part4-tail">
       <rect fill="#E2E2F0" height="30.4063" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="125.8086" x="496.6602" y="404.9844"/>
-      <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="111.8086" x="503.6602" y="424.9727">xAS Control Plane</text>
+      <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="77.1094" x="521.0098" y="424.9727">xAS Server</text>
     </g>
     <g class="participant participant-head" data-entity-uid="part5" data-qualified-name="APIServer" id="part5-head">
       <rect fill="#E2E2F0" height="30.4063" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="105.957" x="632.4688" y="5"/>
@@ -86,11 +86,11 @@
       <text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="91.957" x="639.4688" y="424.9727">K8s API Server</text>
     </g>
     <g>
-      <title>xAS Control Plane</title>
+      <title>xAS Server</title>
       <rect fill="#FFFFFF" height="29.2344" style="stroke:#181818;stroke-width:1;" width="10" x="554.5645" y="241.8125"/>
     </g>
     <g>
-      <title>xAS Control Plane</title>
+      <title>xAS Server</title>
       <rect fill="#FFFFFF" height="29.2344" style="stroke:#181818;stroke-width:1;" width="10" x="554.5645" y="329.5156"/>
     </g>
     <rect fill="#EEEEEE" height="3" style="stroke:#EEEEEE;stroke-width:1;" width="743.4258" x="0" y="67.0234"/>

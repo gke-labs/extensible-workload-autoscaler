@@ -168,7 +168,7 @@ type ScalingPolicyStatus struct {
 	// CurrentReplicas is the current number of replicas of the target workload.
 	CurrentReplicas int32 `json:"currentReplicas"`
 
-	// DesiredReplicas is the number of replicas calculated by the XAS control plane.
+	// DesiredReplicas is the number of replicas calculated by the XAS Server.
 	DesiredReplicas int32 `json:"desiredReplicas"`
 
 	// Selector is the label selector resolved from the target workload.

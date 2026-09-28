@@ -24,7 +24,7 @@ type CoreClusterMetricsProvider struct {
 	providerLister        listers.MetricProviderClassLister
 
 	grpcConn   *grpc.ClientConn
-	grpcClient pb.XASControlPlaneClient
+	grpcClient pb.XASServerClient
 
 	clusterName string
 }
@@ -41,7 +41,7 @@ func NewCoreClusterMetricsProvider(
 		slog.Error("Cannot connect to xAS server", "error", err)
 		os.Exit(1)
 	}
-	client := pb.NewXASControlPlaneClient(conn)
+	client := pb.NewXASServerClient(conn)
 
 	return &CoreClusterMetricsProvider{
 		kubeClient:            kubeClient,

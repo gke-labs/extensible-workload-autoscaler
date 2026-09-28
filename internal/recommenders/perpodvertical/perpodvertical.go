@@ -46,7 +46,7 @@ type config struct {
 // pod-level resources.
 //
 // In both modes, the metric must be defined with scope "PodContainer" so that
-// the Control Plane keeps the raw per-container breakdown in
+// the Server keeps the raw per-container breakdown in
 // ControlMetrics.pod_container_metrics. The pod-level values in pod_metrics are
 // not used: for resource metrics they are a request-weighted average of the
 // pod's containers, which is neither a single container's usage nor the pod's

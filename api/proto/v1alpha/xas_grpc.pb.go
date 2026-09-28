@@ -20,24 +20,24 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	XASControlPlane_UpdatePolicy_FullMethodName           = "/xas.v1alpha.XASControlPlane/UpdatePolicy"
-	XASControlPlane_DeletePolicy_FullMethodName           = "/xas.v1alpha.XASControlPlane/DeletePolicy"
-	XASControlPlane_ListPolicies_FullMethodName           = "/xas.v1alpha.XASControlPlane/ListPolicies"
-	XASControlPlane_UpdateWorkload_FullMethodName         = "/xas.v1alpha.XASControlPlane/UpdateWorkload"
-	XASControlPlane_GetControlMetrics_FullMethodName      = "/xas.v1alpha.XASControlPlane/GetControlMetrics"
-	XASControlPlane_UpdateRecommenderState_FullMethodName = "/xas.v1alpha.XASControlPlane/UpdateRecommenderState"
-	XASControlPlane_GetRecommendation_FullMethodName      = "/xas.v1alpha.XASControlPlane/GetRecommendation"
-	XASControlPlane_IngestMetrics_FullMethodName          = "/xas.v1alpha.XASControlPlane/IngestMetrics"
+	XASServer_UpdatePolicy_FullMethodName           = "/xas.v1alpha.XASServer/UpdatePolicy"
+	XASServer_DeletePolicy_FullMethodName           = "/xas.v1alpha.XASServer/DeletePolicy"
+	XASServer_ListPolicies_FullMethodName           = "/xas.v1alpha.XASServer/ListPolicies"
+	XASServer_UpdateWorkload_FullMethodName         = "/xas.v1alpha.XASServer/UpdateWorkload"
+	XASServer_GetControlMetrics_FullMethodName      = "/xas.v1alpha.XASServer/GetControlMetrics"
+	XASServer_UpdateRecommenderState_FullMethodName = "/xas.v1alpha.XASServer/UpdateRecommenderState"
+	XASServer_GetRecommendation_FullMethodName      = "/xas.v1alpha.XASServer/GetRecommendation"
+	XASServer_IngestMetrics_FullMethodName          = "/xas.v1alpha.XASServer/IngestMetrics"
 )
 
-// XASControlPlaneClient is the client API for XASControlPlane service.
+// XASServerClient is the client API for XASServer service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// XASControlPlane defines the gRPC interface for the Control Plane (Server).
+// XASServer defines the gRPC interface for the XAS Server.
 // It acts as the central state manager for autoscaling policies, workload state,
 // metric ingestion, and decision making.
-type XASControlPlaneClient interface {
+type XASServerClient interface {
 	// --- Policy Management ---
 	// Create or Update a ScalingPolicy. This is an idempotent "Upsert".
 	UpdatePolicy(ctx context.Context, in *UpdatePolicyRequest, opts ...grpc.CallOption) (*Policy, error)
@@ -45,124 +45,124 @@ type XASControlPlaneClient interface {
 	DeletePolicy(ctx context.Context, in *DeletePolicyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// List all known policies, optionally filtered by cluster.
 	ListPolicies(ctx context.Context, in *ListPoliciesRequest, opts ...grpc.CallOption) (*ListPoliciesResponse, error)
-	// --- Workload Management (Controller -> Control Plane) ---
-	// Update the Control Plane's view of the workload (Pods) for a specific policy.
+	// --- Workload Management (Controller -> Server) ---
+	// Update the Server's view of the workload (Pods) for a specific policy.
 	// This is a full replacement of the pod list.
 	// TODO(): This method should probably just return an empty response (google.protobuf.Empty).
 	UpdateWorkload(ctx context.Context, in *UpdateWorkloadRequest, opts ...grpc.CallOption) (*Workload, error)
-	// --- Control Metrics (Recommender -> Control Plane) ---
+	// --- Control Metrics (Recommender -> Server) ---
 	// Read the current aggregated metric values ("Control Metrics") for a policy.
 	// Recommenders use this to make scaling decisions.
 	GetControlMetrics(ctx context.Context, in *GetControlMetricsRequest, opts ...grpc.CallOption) (*ControlMetrics, error)
-	// --- Recommender State (Plugin -> Control Plane) ---
+	// --- Recommender State (Plugin -> Server) ---
 	// Update Status (Decision) for a specific recommender.
 	// Recommenders push their calculated vote here.
 	UpdateRecommenderState(ctx context.Context, in *UpdateRecommenderStateRequest, opts ...grpc.CallOption) (*RecommenderState, error)
-	// --- Recommendation (Controller -> Control Plane) ---
+	// --- Recommendation (Controller -> Server) ---
 	// Retrieve the final arbitrated recommendation for a policy.
 	// The Controller uses this to scale the target workload.
 	GetRecommendation(ctx context.Context, in *GetRecommendationRequest, opts ...grpc.CallOption) (*GetRecommendationResponse, error)
-	// --- Ingestion (Agent -> Control Plane) ---
+	// --- Ingestion (Agent -> Server) ---
 	// Push raw metric samples from an Agent (Node).
 	IngestMetrics(ctx context.Context, in *IngestMetricsRequest, opts ...grpc.CallOption) (*IngestMetricsResponse, error)
 }
 
-type xASControlPlaneClient struct {
+type xASServerClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewXASControlPlaneClient(cc grpc.ClientConnInterface) XASControlPlaneClient {
-	return &xASControlPlaneClient{cc}
+func NewXASServerClient(cc grpc.ClientConnInterface) XASServerClient {
+	return &xASServerClient{cc}
 }
 
-func (c *xASControlPlaneClient) UpdatePolicy(ctx context.Context, in *UpdatePolicyRequest, opts ...grpc.CallOption) (*Policy, error) {
+func (c *xASServerClient) UpdatePolicy(ctx context.Context, in *UpdatePolicyRequest, opts ...grpc.CallOption) (*Policy, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Policy)
-	err := c.cc.Invoke(ctx, XASControlPlane_UpdatePolicy_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, XASServer_UpdatePolicy_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *xASControlPlaneClient) DeletePolicy(ctx context.Context, in *DeletePolicyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *xASServerClient) DeletePolicy(ctx context.Context, in *DeletePolicyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, XASControlPlane_DeletePolicy_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, XASServer_DeletePolicy_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *xASControlPlaneClient) ListPolicies(ctx context.Context, in *ListPoliciesRequest, opts ...grpc.CallOption) (*ListPoliciesResponse, error) {
+func (c *xASServerClient) ListPolicies(ctx context.Context, in *ListPoliciesRequest, opts ...grpc.CallOption) (*ListPoliciesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListPoliciesResponse)
-	err := c.cc.Invoke(ctx, XASControlPlane_ListPolicies_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, XASServer_ListPolicies_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *xASControlPlaneClient) UpdateWorkload(ctx context.Context, in *UpdateWorkloadRequest, opts ...grpc.CallOption) (*Workload, error) {
+func (c *xASServerClient) UpdateWorkload(ctx context.Context, in *UpdateWorkloadRequest, opts ...grpc.CallOption) (*Workload, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Workload)
-	err := c.cc.Invoke(ctx, XASControlPlane_UpdateWorkload_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, XASServer_UpdateWorkload_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *xASControlPlaneClient) GetControlMetrics(ctx context.Context, in *GetControlMetricsRequest, opts ...grpc.CallOption) (*ControlMetrics, error) {
+func (c *xASServerClient) GetControlMetrics(ctx context.Context, in *GetControlMetricsRequest, opts ...grpc.CallOption) (*ControlMetrics, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ControlMetrics)
-	err := c.cc.Invoke(ctx, XASControlPlane_GetControlMetrics_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, XASServer_GetControlMetrics_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *xASControlPlaneClient) UpdateRecommenderState(ctx context.Context, in *UpdateRecommenderStateRequest, opts ...grpc.CallOption) (*RecommenderState, error) {
+func (c *xASServerClient) UpdateRecommenderState(ctx context.Context, in *UpdateRecommenderStateRequest, opts ...grpc.CallOption) (*RecommenderState, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RecommenderState)
-	err := c.cc.Invoke(ctx, XASControlPlane_UpdateRecommenderState_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, XASServer_UpdateRecommenderState_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *xASControlPlaneClient) GetRecommendation(ctx context.Context, in *GetRecommendationRequest, opts ...grpc.CallOption) (*GetRecommendationResponse, error) {
+func (c *xASServerClient) GetRecommendation(ctx context.Context, in *GetRecommendationRequest, opts ...grpc.CallOption) (*GetRecommendationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetRecommendationResponse)
-	err := c.cc.Invoke(ctx, XASControlPlane_GetRecommendation_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, XASServer_GetRecommendation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *xASControlPlaneClient) IngestMetrics(ctx context.Context, in *IngestMetricsRequest, opts ...grpc.CallOption) (*IngestMetricsResponse, error) {
+func (c *xASServerClient) IngestMetrics(ctx context.Context, in *IngestMetricsRequest, opts ...grpc.CallOption) (*IngestMetricsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(IngestMetricsResponse)
-	err := c.cc.Invoke(ctx, XASControlPlane_IngestMetrics_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, XASServer_IngestMetrics_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// XASControlPlaneServer is the server API for XASControlPlane service.
-// All implementations must embed UnimplementedXASControlPlaneServer
+// XASServerServer is the server API for XASServer service.
+// All implementations must embed UnimplementedXASServerServer
 // for forward compatibility.
 //
-// XASControlPlane defines the gRPC interface for the Control Plane (Server).
+// XASServer defines the gRPC interface for the XAS Server.
 // It acts as the central state manager for autoscaling policies, workload state,
 // metric ingestion, and decision making.
-type XASControlPlaneServer interface {
+type XASServerServer interface {
 	// --- Policy Management ---
 	// Create or Update a ScalingPolicy. This is an idempotent "Upsert".
 	UpdatePolicy(context.Context, *UpdatePolicyRequest) (*Policy, error)
@@ -170,263 +170,263 @@ type XASControlPlaneServer interface {
 	DeletePolicy(context.Context, *DeletePolicyRequest) (*emptypb.Empty, error)
 	// List all known policies, optionally filtered by cluster.
 	ListPolicies(context.Context, *ListPoliciesRequest) (*ListPoliciesResponse, error)
-	// --- Workload Management (Controller -> Control Plane) ---
-	// Update the Control Plane's view of the workload (Pods) for a specific policy.
+	// --- Workload Management (Controller -> Server) ---
+	// Update the Server's view of the workload (Pods) for a specific policy.
 	// This is a full replacement of the pod list.
 	// TODO(): This method should probably just return an empty response (google.protobuf.Empty).
 	UpdateWorkload(context.Context, *UpdateWorkloadRequest) (*Workload, error)
-	// --- Control Metrics (Recommender -> Control Plane) ---
+	// --- Control Metrics (Recommender -> Server) ---
 	// Read the current aggregated metric values ("Control Metrics") for a policy.
 	// Recommenders use this to make scaling decisions.
 	GetControlMetrics(context.Context, *GetControlMetricsRequest) (*ControlMetrics, error)
-	// --- Recommender State (Plugin -> Control Plane) ---
+	// --- Recommender State (Plugin -> Server) ---
 	// Update Status (Decision) for a specific recommender.
 	// Recommenders push their calculated vote here.
 	UpdateRecommenderState(context.Context, *UpdateRecommenderStateRequest) (*RecommenderState, error)
-	// --- Recommendation (Controller -> Control Plane) ---
+	// --- Recommendation (Controller -> Server) ---
 	// Retrieve the final arbitrated recommendation for a policy.
 	// The Controller uses this to scale the target workload.
 	GetRecommendation(context.Context, *GetRecommendationRequest) (*GetRecommendationResponse, error)
-	// --- Ingestion (Agent -> Control Plane) ---
+	// --- Ingestion (Agent -> Server) ---
 	// Push raw metric samples from an Agent (Node).
 	IngestMetrics(context.Context, *IngestMetricsRequest) (*IngestMetricsResponse, error)
-	mustEmbedUnimplementedXASControlPlaneServer()
+	mustEmbedUnimplementedXASServerServer()
 }
 
-// UnimplementedXASControlPlaneServer must be embedded to have
+// UnimplementedXASServerServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedXASControlPlaneServer struct{}
+type UnimplementedXASServerServer struct{}
 
-func (UnimplementedXASControlPlaneServer) UpdatePolicy(context.Context, *UpdatePolicyRequest) (*Policy, error) {
+func (UnimplementedXASServerServer) UpdatePolicy(context.Context, *UpdatePolicyRequest) (*Policy, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdatePolicy not implemented")
 }
-func (UnimplementedXASControlPlaneServer) DeletePolicy(context.Context, *DeletePolicyRequest) (*emptypb.Empty, error) {
+func (UnimplementedXASServerServer) DeletePolicy(context.Context, *DeletePolicyRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeletePolicy not implemented")
 }
-func (UnimplementedXASControlPlaneServer) ListPolicies(context.Context, *ListPoliciesRequest) (*ListPoliciesResponse, error) {
+func (UnimplementedXASServerServer) ListPolicies(context.Context, *ListPoliciesRequest) (*ListPoliciesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListPolicies not implemented")
 }
-func (UnimplementedXASControlPlaneServer) UpdateWorkload(context.Context, *UpdateWorkloadRequest) (*Workload, error) {
+func (UnimplementedXASServerServer) UpdateWorkload(context.Context, *UpdateWorkloadRequest) (*Workload, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateWorkload not implemented")
 }
-func (UnimplementedXASControlPlaneServer) GetControlMetrics(context.Context, *GetControlMetricsRequest) (*ControlMetrics, error) {
+func (UnimplementedXASServerServer) GetControlMetrics(context.Context, *GetControlMetricsRequest) (*ControlMetrics, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetControlMetrics not implemented")
 }
-func (UnimplementedXASControlPlaneServer) UpdateRecommenderState(context.Context, *UpdateRecommenderStateRequest) (*RecommenderState, error) {
+func (UnimplementedXASServerServer) UpdateRecommenderState(context.Context, *UpdateRecommenderStateRequest) (*RecommenderState, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateRecommenderState not implemented")
 }
-func (UnimplementedXASControlPlaneServer) GetRecommendation(context.Context, *GetRecommendationRequest) (*GetRecommendationResponse, error) {
+func (UnimplementedXASServerServer) GetRecommendation(context.Context, *GetRecommendationRequest) (*GetRecommendationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRecommendation not implemented")
 }
-func (UnimplementedXASControlPlaneServer) IngestMetrics(context.Context, *IngestMetricsRequest) (*IngestMetricsResponse, error) {
+func (UnimplementedXASServerServer) IngestMetrics(context.Context, *IngestMetricsRequest) (*IngestMetricsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method IngestMetrics not implemented")
 }
-func (UnimplementedXASControlPlaneServer) mustEmbedUnimplementedXASControlPlaneServer() {}
-func (UnimplementedXASControlPlaneServer) testEmbeddedByValue()                         {}
+func (UnimplementedXASServerServer) mustEmbedUnimplementedXASServerServer() {}
+func (UnimplementedXASServerServer) testEmbeddedByValue()                   {}
 
-// UnsafeXASControlPlaneServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to XASControlPlaneServer will
+// UnsafeXASServerServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to XASServerServer will
 // result in compilation errors.
-type UnsafeXASControlPlaneServer interface {
-	mustEmbedUnimplementedXASControlPlaneServer()
+type UnsafeXASServerServer interface {
+	mustEmbedUnimplementedXASServerServer()
 }
 
-func RegisterXASControlPlaneServer(s grpc.ServiceRegistrar, srv XASControlPlaneServer) {
-	// If the following call panics, it indicates UnimplementedXASControlPlaneServer was
+func RegisterXASServerServer(s grpc.ServiceRegistrar, srv XASServerServer) {
+	// If the following call panics, it indicates UnimplementedXASServerServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&XASControlPlane_ServiceDesc, srv)
+	s.RegisterService(&XASServer_ServiceDesc, srv)
 }
 
-func _XASControlPlane_UpdatePolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _XASServer_UpdatePolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdatePolicyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(XASControlPlaneServer).UpdatePolicy(ctx, in)
+		return srv.(XASServerServer).UpdatePolicy(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: XASControlPlane_UpdatePolicy_FullMethodName,
+		FullMethod: XASServer_UpdatePolicy_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(XASControlPlaneServer).UpdatePolicy(ctx, req.(*UpdatePolicyRequest))
+		return srv.(XASServerServer).UpdatePolicy(ctx, req.(*UpdatePolicyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _XASControlPlane_DeletePolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _XASServer_DeletePolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeletePolicyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(XASControlPlaneServer).DeletePolicy(ctx, in)
+		return srv.(XASServerServer).DeletePolicy(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: XASControlPlane_DeletePolicy_FullMethodName,
+		FullMethod: XASServer_DeletePolicy_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(XASControlPlaneServer).DeletePolicy(ctx, req.(*DeletePolicyRequest))
+		return srv.(XASServerServer).DeletePolicy(ctx, req.(*DeletePolicyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _XASControlPlane_ListPolicies_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _XASServer_ListPolicies_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListPoliciesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(XASControlPlaneServer).ListPolicies(ctx, in)
+		return srv.(XASServerServer).ListPolicies(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: XASControlPlane_ListPolicies_FullMethodName,
+		FullMethod: XASServer_ListPolicies_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(XASControlPlaneServer).ListPolicies(ctx, req.(*ListPoliciesRequest))
+		return srv.(XASServerServer).ListPolicies(ctx, req.(*ListPoliciesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _XASControlPlane_UpdateWorkload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _XASServer_UpdateWorkload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateWorkloadRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(XASControlPlaneServer).UpdateWorkload(ctx, in)
+		return srv.(XASServerServer).UpdateWorkload(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: XASControlPlane_UpdateWorkload_FullMethodName,
+		FullMethod: XASServer_UpdateWorkload_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(XASControlPlaneServer).UpdateWorkload(ctx, req.(*UpdateWorkloadRequest))
+		return srv.(XASServerServer).UpdateWorkload(ctx, req.(*UpdateWorkloadRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _XASControlPlane_GetControlMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _XASServer_GetControlMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetControlMetricsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(XASControlPlaneServer).GetControlMetrics(ctx, in)
+		return srv.(XASServerServer).GetControlMetrics(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: XASControlPlane_GetControlMetrics_FullMethodName,
+		FullMethod: XASServer_GetControlMetrics_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(XASControlPlaneServer).GetControlMetrics(ctx, req.(*GetControlMetricsRequest))
+		return srv.(XASServerServer).GetControlMetrics(ctx, req.(*GetControlMetricsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _XASControlPlane_UpdateRecommenderState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _XASServer_UpdateRecommenderState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateRecommenderStateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(XASControlPlaneServer).UpdateRecommenderState(ctx, in)
+		return srv.(XASServerServer).UpdateRecommenderState(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: XASControlPlane_UpdateRecommenderState_FullMethodName,
+		FullMethod: XASServer_UpdateRecommenderState_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(XASControlPlaneServer).UpdateRecommenderState(ctx, req.(*UpdateRecommenderStateRequest))
+		return srv.(XASServerServer).UpdateRecommenderState(ctx, req.(*UpdateRecommenderStateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _XASControlPlane_GetRecommendation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _XASServer_GetRecommendation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetRecommendationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(XASControlPlaneServer).GetRecommendation(ctx, in)
+		return srv.(XASServerServer).GetRecommendation(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: XASControlPlane_GetRecommendation_FullMethodName,
+		FullMethod: XASServer_GetRecommendation_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(XASControlPlaneServer).GetRecommendation(ctx, req.(*GetRecommendationRequest))
+		return srv.(XASServerServer).GetRecommendation(ctx, req.(*GetRecommendationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _XASControlPlane_IngestMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _XASServer_IngestMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(IngestMetricsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(XASControlPlaneServer).IngestMetrics(ctx, in)
+		return srv.(XASServerServer).IngestMetrics(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: XASControlPlane_IngestMetrics_FullMethodName,
+		FullMethod: XASServer_IngestMetrics_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(XASControlPlaneServer).IngestMetrics(ctx, req.(*IngestMetricsRequest))
+		return srv.(XASServerServer).IngestMetrics(ctx, req.(*IngestMetricsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// XASControlPlane_ServiceDesc is the grpc.ServiceDesc for XASControlPlane service.
+// XASServer_ServiceDesc is the grpc.ServiceDesc for XASServer service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var XASControlPlane_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "xas.v1alpha.XASControlPlane",
-	HandlerType: (*XASControlPlaneServer)(nil),
+var XASServer_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "xas.v1alpha.XASServer",
+	HandlerType: (*XASServerServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "UpdatePolicy",
-			Handler:    _XASControlPlane_UpdatePolicy_Handler,
+			Handler:    _XASServer_UpdatePolicy_Handler,
 		},
 		{
 			MethodName: "DeletePolicy",
-			Handler:    _XASControlPlane_DeletePolicy_Handler,
+			Handler:    _XASServer_DeletePolicy_Handler,
 		},
 		{
 			MethodName: "ListPolicies",
-			Handler:    _XASControlPlane_ListPolicies_Handler,
+			Handler:    _XASServer_ListPolicies_Handler,
 		},
 		{
 			MethodName: "UpdateWorkload",
-			Handler:    _XASControlPlane_UpdateWorkload_Handler,
+			Handler:    _XASServer_UpdateWorkload_Handler,
 		},
 		{
 			MethodName: "GetControlMetrics",
-			Handler:    _XASControlPlane_GetControlMetrics_Handler,
+			Handler:    _XASServer_GetControlMetrics_Handler,
 		},
 		{
 			MethodName: "UpdateRecommenderState",
-			Handler:    _XASControlPlane_UpdateRecommenderState_Handler,
+			Handler:    _XASServer_UpdateRecommenderState_Handler,
 		},
 		{
 			MethodName: "GetRecommendation",
-			Handler:    _XASControlPlane_GetRecommendation_Handler,
+			Handler:    _XASServer_GetRecommendation_Handler,
 		},
 		{
 			MethodName: "IngestMetrics",
-			Handler:    _XASControlPlane_IngestMetrics_Handler,
+			Handler:    _XASServer_IngestMetrics_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

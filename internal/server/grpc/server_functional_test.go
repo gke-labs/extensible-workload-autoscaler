@@ -24,13 +24,13 @@ import (
 
 const bufSizeFunctional = 1024 * 1024
 
-func setupFunctionalGRPCServer(t *testing.T, c clock.Clock) (*store.MemoryStore, pb.XASControlPlaneClient, func()) {
+func setupFunctionalGRPCServer(t *testing.T, c clock.Clock) (*store.MemoryStore, pb.XASServerClient, func()) {
 	lis := bufconn.Listen(bufSizeFunctional)
 	memStore := store.NewMemoryStoreWithClock(c)
 	srv := servergrpc.NewServer(memStore, c)
 
 	s := grpc.NewServer()
-	pb.RegisterXASControlPlaneServer(s, srv)
+	pb.RegisterXASServerServer(s, srv)
 	go func() {
 		if err := s.Serve(lis); err != nil {
 			// s.Serve returns error on Stop/Close, which is expected
@@ -46,7 +46,7 @@ func setupFunctionalGRPCServer(t *testing.T, c clock.Clock) (*store.MemoryStore,
 	if err != nil {
 		t.Fatalf("Failed to dial bufnet: %v", err)
 	}
-	client := pb.NewXASControlPlaneClient(conn)
+	client := pb.NewXASServerClient(conn)
 
 	cleanup := func() {
 		conn.Close()

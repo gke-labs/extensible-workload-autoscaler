@@ -968,7 +968,7 @@ func (x *RecommenderDefinition) GetType() string {
 	return ""
 }
 
-// UpdateWorkloadRequest synchronizes the Control Plane's view of the workload.
+// UpdateWorkloadRequest synchronizes the Server's view of the workload.
 type UpdateWorkloadRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The policy this workload belongs to.
@@ -1347,7 +1347,7 @@ func (x *ContainerMetrics) GetContainerMetrics() map[string]*MetricValues {
 	return nil
 }
 
-// ControlMetrics contains the aggregated values calculated by the Control Plane.
+// ControlMetrics contains the aggregated values calculated by the Server.
 type ControlMetrics struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Timestamp of the calculation (Unix seconds).
@@ -2084,7 +2084,7 @@ func (x *MetricStatus) GetError() string {
 	return ""
 }
 
-// IngestMetricsRequest pushes a batch of raw metrics to the Control Plane.
+// IngestMetricsRequest pushes a batch of raw metrics to the Server.
 type IngestMetricsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The cluster name where metrics originated.
@@ -2662,8 +2662,8 @@ const file_xas_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x04R\x05value:\x028\x01\"1\n" +
 	"\x15IngestMetricsResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess2\xbe\x05\n" +
-	"\x0fXASControlPlane\x12E\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess2\xb8\x05\n" +
+	"\tXASServer\x12E\n" +
 	"\fUpdatePolicy\x12 .xas.v1alpha.UpdatePolicyRequest\x1a\x13.xas.v1alpha.Policy\x12H\n" +
 	"\fDeletePolicy\x12 .xas.v1alpha.DeletePolicyRequest\x1a\x16.google.protobuf.Empty\x12S\n" +
 	"\fListPolicies\x12 .xas.v1alpha.ListPoliciesRequest\x1a!.xas.v1alpha.ListPoliciesResponse\x12K\n" +
@@ -2798,22 +2798,22 @@ var file_xas_proto_depIdxs = []int32{
 	19, // 52: xas.v1alpha.ContainerMetrics.ContainerMetricsEntry.value:type_name -> xas.v1alpha.MetricValues
 	19, // 53: xas.v1alpha.ControlMetrics.PodMetricsEntry.value:type_name -> xas.v1alpha.MetricValues
 	20, // 54: xas.v1alpha.ControlMetrics.PodContainerMetricsEntry.value:type_name -> xas.v1alpha.ContainerMetrics
-	1,  // 55: xas.v1alpha.XASControlPlane.UpdatePolicy:input_type -> xas.v1alpha.UpdatePolicyRequest
-	2,  // 56: xas.v1alpha.XASControlPlane.DeletePolicy:input_type -> xas.v1alpha.DeletePolicyRequest
-	3,  // 57: xas.v1alpha.XASControlPlane.ListPolicies:input_type -> xas.v1alpha.ListPoliciesRequest
-	14, // 58: xas.v1alpha.XASControlPlane.UpdateWorkload:input_type -> xas.v1alpha.UpdateWorkloadRequest
-	18, // 59: xas.v1alpha.XASControlPlane.GetControlMetrics:input_type -> xas.v1alpha.GetControlMetricsRequest
-	22, // 60: xas.v1alpha.XASControlPlane.UpdateRecommenderState:input_type -> xas.v1alpha.UpdateRecommenderStateRequest
-	28, // 61: xas.v1alpha.XASControlPlane.GetRecommendation:input_type -> xas.v1alpha.GetRecommendationRequest
-	31, // 62: xas.v1alpha.XASControlPlane.IngestMetrics:input_type -> xas.v1alpha.IngestMetricsRequest
-	5,  // 63: xas.v1alpha.XASControlPlane.UpdatePolicy:output_type -> xas.v1alpha.Policy
-	53, // 64: xas.v1alpha.XASControlPlane.DeletePolicy:output_type -> google.protobuf.Empty
-	4,  // 65: xas.v1alpha.XASControlPlane.ListPolicies:output_type -> xas.v1alpha.ListPoliciesResponse
-	15, // 66: xas.v1alpha.XASControlPlane.UpdateWorkload:output_type -> xas.v1alpha.Workload
-	21, // 67: xas.v1alpha.XASControlPlane.GetControlMetrics:output_type -> xas.v1alpha.ControlMetrics
-	26, // 68: xas.v1alpha.XASControlPlane.UpdateRecommenderState:output_type -> xas.v1alpha.RecommenderState
-	29, // 69: xas.v1alpha.XASControlPlane.GetRecommendation:output_type -> xas.v1alpha.GetRecommendationResponse
-	35, // 70: xas.v1alpha.XASControlPlane.IngestMetrics:output_type -> xas.v1alpha.IngestMetricsResponse
+	1,  // 55: xas.v1alpha.XASServer.UpdatePolicy:input_type -> xas.v1alpha.UpdatePolicyRequest
+	2,  // 56: xas.v1alpha.XASServer.DeletePolicy:input_type -> xas.v1alpha.DeletePolicyRequest
+	3,  // 57: xas.v1alpha.XASServer.ListPolicies:input_type -> xas.v1alpha.ListPoliciesRequest
+	14, // 58: xas.v1alpha.XASServer.UpdateWorkload:input_type -> xas.v1alpha.UpdateWorkloadRequest
+	18, // 59: xas.v1alpha.XASServer.GetControlMetrics:input_type -> xas.v1alpha.GetControlMetricsRequest
+	22, // 60: xas.v1alpha.XASServer.UpdateRecommenderState:input_type -> xas.v1alpha.UpdateRecommenderStateRequest
+	28, // 61: xas.v1alpha.XASServer.GetRecommendation:input_type -> xas.v1alpha.GetRecommendationRequest
+	31, // 62: xas.v1alpha.XASServer.IngestMetrics:input_type -> xas.v1alpha.IngestMetricsRequest
+	5,  // 63: xas.v1alpha.XASServer.UpdatePolicy:output_type -> xas.v1alpha.Policy
+	53, // 64: xas.v1alpha.XASServer.DeletePolicy:output_type -> google.protobuf.Empty
+	4,  // 65: xas.v1alpha.XASServer.ListPolicies:output_type -> xas.v1alpha.ListPoliciesResponse
+	15, // 66: xas.v1alpha.XASServer.UpdateWorkload:output_type -> xas.v1alpha.Workload
+	21, // 67: xas.v1alpha.XASServer.GetControlMetrics:output_type -> xas.v1alpha.ControlMetrics
+	26, // 68: xas.v1alpha.XASServer.UpdateRecommenderState:output_type -> xas.v1alpha.RecommenderState
+	29, // 69: xas.v1alpha.XASServer.GetRecommendation:output_type -> xas.v1alpha.GetRecommendationResponse
+	35, // 70: xas.v1alpha.XASServer.IngestMetrics:output_type -> xas.v1alpha.IngestMetricsResponse
 	63, // [63:71] is the sub-list for method output_type
 	55, // [55:63] is the sub-list for method input_type
 	55, // [55:55] is the sub-list for extension type_name

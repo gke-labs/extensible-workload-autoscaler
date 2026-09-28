@@ -1,5 +1,5 @@
 // Package policy provides helpers to interpret the policies served by the XAS
-// Control Plane.
+// Server.
 package policy
 
 import (

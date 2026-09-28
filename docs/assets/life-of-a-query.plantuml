@@ -4,7 +4,7 @@
 participant "My Metrics Provider" as MetricsProv
 participant "My Recommender" as Recommender
 participant "xAS Controller" as Controller
-participant "xAS Control Plane" as xAS
+participant "xAS Server" as xAS
 participant "K8s API Server" as APIServer
 
 

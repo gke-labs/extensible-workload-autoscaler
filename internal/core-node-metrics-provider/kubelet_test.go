@@ -66,7 +66,7 @@ func TestProcessKubeletMetric(t *testing.T) {
 			metrics2: &KubeletPodMetrics{Containers: map[string]*KubeletContainerMetrics{
 				// Main: +1.0s in 10s -> 0.1 cores.
 				// Sidecar: +0.5s in 10s -> 0.05 cores.
-				// The Control Plane sums them back to 0.15 cores for the pod.
+				// The Server sums them back to 0.15 cores for the pod.
 				"main":    {CPUUsageSeconds: floatPtr(11.0), Timestamp: intPtr(1000010000)},
 				"sidecar": {CPUUsageSeconds: floatPtr(5.5), Timestamp: intPtr(1000010000)},
 			}},

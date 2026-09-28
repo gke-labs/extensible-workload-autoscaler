@@ -8,10 +8,10 @@ import "google/protobuf/field_mask.proto";
 
 option go_package = "github.com/gke-labs/extensible-workload-autoscaler/api/v1alpha";
 
-// XASControlPlane defines the gRPC interface for the Control Plane (Server).
+// XASServer defines the gRPC interface for the XAS Server.
 // It acts as the central state manager for autoscaling policies, workload state,
 // metric ingestion, and decision making.
-service XASControlPlane {
+service XASServer {
   
   // --- Policy Management ---
   // Create or Update a ScalingPolicy. This is an idempotent "Upsert".
@@ -23,28 +23,28 @@ service XASControlPlane {
   // List all known policies, optionally filtered by cluster.
   rpc ListPolicies(ListPoliciesRequest) returns (ListPoliciesResponse);
 
-  // --- Workload Management (Controller -> Control Plane) ---
-  // Update the Control Plane's view of the workload (Pods) for a specific policy.
+  // --- Workload Management (Controller -> Server) ---
+  // Update the Server's view of the workload (Pods) for a specific policy.
   // This is a full replacement of the pod list.
   // TODO(): This method should probably just return an empty response (google.protobuf.Empty).
   rpc UpdateWorkload(UpdateWorkloadRequest) returns (Workload);
 
-  // --- Control Metrics (Recommender -> Control Plane) ---
+  // --- Control Metrics (Recommender -> Server) ---
   // Read the current aggregated metric values ("Control Metrics") for a policy.
   // Recommenders use this to make scaling decisions.
   rpc GetControlMetrics(GetControlMetricsRequest) returns (ControlMetrics);
 
-  // --- Recommender State (Plugin -> Control Plane) ---
+  // --- Recommender State (Plugin -> Server) ---
   // Update Status (Decision) for a specific recommender.
   // Recommenders push their calculated vote here.
   rpc UpdateRecommenderState(UpdateRecommenderStateRequest) returns (RecommenderState);
 
-  // --- Recommendation (Controller -> Control Plane) ---
+  // --- Recommendation (Controller -> Server) ---
   // Retrieve the final arbitrated recommendation for a policy.
   // The Controller uses this to scale the target workload.
   rpc GetRecommendation(GetRecommendationRequest) returns (GetRecommendationResponse);
 
-  // --- Ingestion (Agent -> Control Plane) ---
+  // --- Ingestion (Agent -> Server) ---
   // Push raw metric samples from an Agent (Node).
   rpc IngestMetrics(IngestMetricsRequest) returns (IngestMetricsResponse);
 }
@@ -222,7 +222,7 @@ message RecommenderDefinition {
 
 // --- Workload ---
 
-// UpdateWorkloadRequest synchronizes the Control Plane's view of the workload.
+// UpdateWorkloadRequest synchronizes the Server's view of the workload.
 message UpdateWorkloadRequest {
   // The policy this workload belongs to.
   PolicyId id = 1;
@@ -282,7 +282,7 @@ message ContainerMetrics {
   map<string, MetricValues> container_metrics = 1;
 }
 
-// ControlMetrics contains the aggregated values calculated by the Control Plane.
+// ControlMetrics contains the aggregated values calculated by the Server.
 message ControlMetrics {
   // Timestamp of the calculation (Unix seconds).
   int64 timestamp = 2;
@@ -424,7 +424,7 @@ message MetricStatus {
 
 // --- Ingestion ---
 
-// IngestMetricsRequest pushes a batch of raw metrics to the Control Plane.
+// IngestMetricsRequest pushes a batch of raw metrics to the Server.
 message IngestMetricsRequest {
   // The cluster name where metrics originated.
   string cluster_name = 1;
