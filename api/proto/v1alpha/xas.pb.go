@@ -760,7 +760,7 @@ func (x *MetricDefinition) GetScope() string {
 
 type Gauge struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Aggregation method: "Avg", "Sum", "Max", "Min".
+	// Pod aggregation method: "Avg", "Sum", "Max", "Min".
 	Aggregation   string `protobuf:"bytes,1,opt,name=aggregation,proto3" json:"aggregation,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -807,7 +807,7 @@ type Rate struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The temporal period for rate calculation.
 	Window *durationpb.Duration `protobuf:"bytes,1,opt,name=window,proto3" json:"window,omitempty"`
-	// Aggregation method: "Avg", "Sum", "Max", "Min".
+	// Pod aggregation method: "Avg", "Sum", "Max", "Min".
 	Aggregation   string `protobuf:"bytes,2,opt,name=aggregation,proto3" json:"aggregation,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -861,7 +861,7 @@ type Distribution struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The percentile to extract (e.g. "p99").
 	Percentile string `protobuf:"bytes,1,opt,name=percentile,proto3" json:"percentile,omitempty"`
-	// Aggregation method: "Avg", "Sum", "Max", "Min".
+	// Pod aggregation method: "Avg", "Sum", "Max", "Min".
 	Aggregation   string `protobuf:"bytes,2,opt,name=aggregation,proto3" json:"aggregation,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

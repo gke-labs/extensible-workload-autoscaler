@@ -74,15 +74,3 @@ func (ps PolicyState) MarshalJSON() ([]byte, error) {
 		RecommenderControlMetrics: protoJSONMap(ps.RecommenderControlMetrics),
 	})
 }
-
-func (s Sample) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Timestamp int64
-		Value     float64
-		Histogram protoJSON
-	}{
-		Timestamp: s.Timestamp,
-		Value:     s.Value,
-		Histogram: protoJSON{s.Histogram},
-	})
-}

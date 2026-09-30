@@ -588,8 +588,8 @@ func TestGetControlMetrics_PodContainerScope(t *testing.T) {
 	wantCM := &pb.ControlMetrics{
 		Values: map[string]float64{},
 		PodMetrics: map[string]*pb.MetricValues{
-			// Container samples are summed into the pod value.
-			"pod1": {Values: map[string]float64{"cpu": 12.0}},
+			// pod1's container samples are only reported per container, not per-pod.
+			// pod2's sample has no container, so it stays pod-level.
 			"pod2": {Values: map[string]float64{"cpu": 30.0}},
 		},
 		PodContainerMetrics: map[string]*pb.ContainerMetrics{
@@ -1699,6 +1699,17 @@ func TestGetControlMetrics_AggregatedDecayingHistogram(t *testing.T) {
 		},
 		Etag: stored.GetEtag(),
 	})
+	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
+		ClusterName: "c1",
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
+		Policies: []*pb.PolicyBatch{{
+			Namespace: "ns", Name: "p1",
+			Batches: []*pb.MetricBatch{
+				{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m_hist", Value: 10}}},
+				{PodName: "p2", Samples: []*pb.MetricSample{{Name: "m_hist", Value: 20}}},
+			},
+		}},
+	})
 
 	memStore.CalculateAll()
 	cm, _ = client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: id})
@@ -1710,33 +1721,20 @@ func TestGetControlMetrics_AggregatedDecayingHistogram(t *testing.T) {
 		t.Errorf("Aggregated Histogram (P95): Expected 21.0 (upper bound of bucket 20), got %f", val)
 	}
 
-	// Verify time decay on aggregated histogram
-	// Advance by 1 hour (one half-life)
-	clk.Advance(1 * time.Hour)
+	// Verify time decay on aggregated histogram. The definition is left as is
+	// (changing it would reset the state) and both pods keep reporting (a
+	// series silent for too long is garbage-collected).
+	// Advance by 5 hours (five half-lives): old samples weigh 1/32 each.
+	clk.Advance(5 * time.Hour)
 	ts = clk.Now().Unix()
 
-	// Update policy back to p50 for decay check
-	mustUpdatePolicy(t, client, &pb.Policy{
-		Id: id,
-		Metrics: []*pb.MetricDefinition{
-			{
-				Name: "m_hist", DecayingDistribution: &pb.DecayingDistribution{
-					HalfLife:   durationpb.New(time.Hour),
-					BucketSize: "1.0",
-					Percentile: "p50",
-				},
-			},
-		},
-		Etag: stored.GetEtag(),
-	})
-
-	// Ingest a new large sample (weight 1.0, vs old samples now weight 0.5 each -> total 1.0)
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "c1", Timestamp: timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{{
 			Namespace: "ns", Name: "p1",
 			Batches: []*pb.MetricBatch{
-				{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m_hist", Value: 100}}},
+				{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m_hist", Value: 1}}},
+				{PodName: "p2", Samples: []*pb.MetricSample{{Name: "m_hist", Value: 1}}},
 			},
 		}},
 	})
@@ -1744,16 +1742,19 @@ func TestGetControlMetrics_AggregatedDecayingHistogram(t *testing.T) {
 	memStore.CalculateAll()
 	cm, _ = client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: id})
 
-	// New total weight = 1.0 (new) + 0.5 (old 10) + 0.5 (old 20) = 2.0.
-	// Target p50 Rank = 1.0.
-	// Bucket 10 has weight 0.5.
-	// Bucket 20 has weight 0.5. (Cumulative = 1.0). Target met.
-	if val := cm.Values["m_hist"]; val != 21.0 {
-		t.Errorf("Aggregated Histogram (Decay): Expected 21.0, got %f", val)
+	// Weights: bucket 1 = 2.0, bucket 10 = 1/32, bucket 20 = 1/32.
+	// Total = 2.0625. Target p95 Rank = 1.959. Bucket 1 reaches 2.0: target
+	// met, upper bound 2.0. Without decay the total would be 4.0 and the
+	// p95 (rank 3.8) would still land on bucket 20.
+	if val := cm.Values["m_hist"]; val != 2.0 {
+		t.Errorf("Aggregated Histogram (Decay): Expected 2.0, got %f", val)
 	}
 }
 
-func TestGetControlMetrics_DecayingHistogramCrossPod(t *testing.T) {
+// TestGetControlMetrics_DecayingHistogramPodChurn verifies that the memory of
+// a decaying distribution does not outlive the pod that reported it: once a
+// pod leaves the workload, its series stops taking part in the result.
+func TestGetControlMetrics_DecayingHistogramPodChurn(t *testing.T) {
 	clk := &clock.FakeClock{CurrentTime: time.Unix(1000, 0)}
 	memStore, client, cleanup := setupFunctionalGRPCServer(t, clk)
 	defer cleanup()
@@ -1801,7 +1802,7 @@ func TestGetControlMetrics_DecayingHistogramCrossPod(t *testing.T) {
 	}
 
 	// Step 2: Update workload (delete pod-1, add pod-2) and ingest low value.
-	// The high value from pod-1 should persist in the global decaying histogram.
+	// pod-1 left the workload: its high value is not carried over to pod-2.
 	clk.Advance(10 * time.Second)
 	ts1 := clk.Now().Unix()
 	client.UpdateWorkload(ctx, &pb.UpdateWorkloadRequest{

@@ -198,21 +198,21 @@ message MetricDefinition {
 }
 
 message Gauge {
-  // Aggregation method: "Avg", "Sum", "Max", "Min".
+  // Pod aggregation method: "Avg", "Sum", "Max", "Min".
   string aggregation = 1;
 }
 
 message Rate {
   // The temporal period for rate calculation.
   google.protobuf.Duration window = 1;
-  // Aggregation method: "Avg", "Sum", "Max", "Min".
+  // Pod aggregation method: "Avg", "Sum", "Max", "Min".
   string aggregation = 2;
 }
 
 message Distribution {
   // The percentile to extract (e.g. "p99").
   string percentile = 1;
-  // Aggregation method: "Avg", "Sum", "Max", "Min".
+  // Pod aggregation method: "Avg", "Sum", "Max", "Min".
   string aggregation = 2;
 }
 

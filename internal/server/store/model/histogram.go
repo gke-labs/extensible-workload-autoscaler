@@ -1,4 +1,4 @@
-package store
+package model
 
 import (
 	"fmt"
@@ -92,6 +92,30 @@ func (h *DecayingHistogram) decay(now time.Time) {
 	}
 
 	h.ReferenceTime = now
+}
+
+// Merge adds the samples of other into h. Both histograms must share the same
+// bucket size and half-life.
+//
+// The weights of the histogram with the oldest reference time are first
+// decayed to the reference time of the other one, so that the weights of both
+// histograms are comparable.
+func (h *DecayingHistogram) Merge(other *DecayingHistogram) {
+	if h.TotalWeight == 0 {
+		// Nothing to decay in h: it simply adopts other's reference time.
+		h.ReferenceTime = other.ReferenceTime
+	}
+	// No-op unless other is more recent than h.
+	h.decay(other.ReferenceTime)
+
+	factor := 1.0
+	if elapsed := h.ReferenceTime.Sub(other.ReferenceTime); elapsed > 0 {
+		factor = math.Pow(0.5, float64(elapsed)/float64(h.HalfLife))
+	}
+	for idx, w := range other.Buckets {
+		h.Buckets[idx] += w * factor
+	}
+	h.TotalWeight += other.TotalWeight * factor
 }
 
 // Percentile calculates the approximate percentile value.

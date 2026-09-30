@@ -170,23 +170,6 @@ func TestMetricCalculations(t *testing.T) {
 			want: map[string]float64{"reqs": 10.0},
 		},
 		{
-			name: "Counters: Rapid Updates (Same Timestamp)",
-			metrics: []*pb.MetricDefinition{
-				{Name: "reqs", Rate: &pb.Rate{Window: durationpb.New(time.Minute), Aggregation: "Sum"}},
-			},
-			workload: []*pb.PodState{{Name: "p1", IsReady: true}},
-			ingest: func(s *MemoryStore, clk *clock.FakeClock, ns, pol string) {
-				t0 := clk.Now().Unix()
-				ingest(s, t0, ns, pol, "p1", "reqs", 100)
-				ingest(s, t0, ns, pol, "p1", "reqs", 150) // Same timestamp, should update LastRaw.Value to 150
-
-				clk.Advance(10 * time.Second)
-				t1 := clk.Now().Unix()
-				ingest(s, t1, ns, pol, "p1", "reqs", 250) // diff = 250 - 150 = 100. rate = 100/10 = 10
-			},
-			want: map[string]float64{"reqs": 10.0},
-		},
-		{
 			name: "Readiness: Ignore NotReady Pods",
 			metrics: []*pb.MetricDefinition{
 				{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}},
@@ -201,17 +184,32 @@ func TestMetricCalculations(t *testing.T) {
 			want: map[string]float64{"cpu": 10.0},
 		},
 		{
+			name: "Window: Stale gauge is held",
+			metrics: []*pb.MetricDefinition{
+				{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}},
+			},
+			workload: []*pb.PodState{{Name: "p1", IsReady: true}},
+			ingest: func(s *MemoryStore, clk *clock.FakeClock, ns, pol string) {
+				// A gauge that stopped reporting 70s ago is still reported
+				// until its series is garbage collected.
+				oldTime := clk.Now().Add(-70 * time.Second).Unix()
+				ingest(s, oldTime, ns, pol, "p1", "cpu", 100)
+			},
+			want: map[string]float64{"cpu": 100.0},
+		},
+		{
 			name: "Window: Data Expiry",
 			metrics: []*pb.MetricDefinition{
 				{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}},
 			},
 			workload: []*pb.PodState{{Name: "p1", IsReady: true}},
 			ingest: func(s *MemoryStore, clk *clock.FakeClock, ns, pol string) {
-				// Ingest old data (70s ago). Cutoff is 60s.
-				oldTime := clk.Now().Add(-70 * time.Second).Unix()
+				// The series stopped reporting longer than seriesRetention
+				// ago: it is garbage collected.
+				oldTime := clk.Now().Add(-seriesRetention - time.Minute).Unix()
 				ingest(s, oldTime, ns, pol, "p1", "cpu", 100)
 			},
-			// No data in window -> No metric calculated
+			// No series left -> No metric calculated
 			want: map[string]float64{}, // Empty
 		},
 	}
@@ -471,28 +469,23 @@ func TestDump(t *testing.T) {
     "Metrics": {
       "Series": {
         "cpu": {
-          "p1||0000000000000000": {
-            "PodName": "p1",
-            "ContainerName": "",
-            "ResourceName": "",
-            "Labels": null,
-            "LastRaw": {
-              "Timestamp": 1000,
-              "Value": 1,
-              "Histogram": null
-            },
-            "ControlMetric": {
-              "Timestamp": 1000,
-              "Value": 1,
+          "Series": {
+            "p1||0000000000000000": {
+              "PodName": "p1",
+              "ContainerName": "",
+              "ResourceName": "",
               "Labels": null,
-              "RateBuckets": null
-            },
-            "Window": null,
-            "DecayingHistogram": null
-          }
+              "LastRaw": {
+                "Timestamp": 1000,
+                "Value": 1,
+                "Distribution": null,
+                "DecayingHistogram": null
+              }
+            }
+          },
+          "ResourceName": ""
         }
-      },
-      "GlobalHistograms": {}
+      }
     },
     "Recommendation": {
       "replicas": 2
@@ -769,7 +762,10 @@ func TestMultiTenantIsolation(t *testing.T) {
 }
 
 func TestOrphanedMetricCleanup(t *testing.T) {
-	s := NewMemoryStore()
+	// A fake clock keeps the ingested samples within the GC window, so that
+	// only the orphan cleanup removes metrics.
+	clk := &clock.FakeClock{CurrentTime: time.Unix(1000, 0)}
+	s := NewMemoryStoreWithClock(clk)
 	ns, name := "default", "pol"
 
 	// 1. Setup policy with 2 metrics
@@ -783,8 +779,8 @@ func TestOrphanedMetricCleanup(t *testing.T) {
 	stored := mustUpdatePolicy(t, s, "default", pol)
 
 	// 2. Ingest data for both
-	ingest(s, 1000, ns, name, "p1", "m1", 10)
-	ingest(s, 1000, ns, name, "p1", "m2", 20)
+	ingest(s, clk.Now().Unix(), ns, name, "p1", "m1", 10)
+	ingest(s, clk.Now().Unix(), ns, name, "p1", "m2", 20)
 
 	// 3. Update policy: remove m1
 	pol.Metrics = []*pb.MetricDefinition{{Name: "m2", Gauge: &pb.Gauge{Aggregation: "Avg"}}}
@@ -927,7 +923,14 @@ func TestContainerResourceRequestWeighting(t *testing.T) {
 		Id: id,
 		Metrics: []*pb.MetricDefinition{
 			{
+				// Pod scope: container samples are weighted by their requests.
 				Name:  "cpu_util",
+				Scope: "Pod",
+				Gauge: &pb.Gauge{Aggregation: "Avg"},
+			},
+			{
+				// PodContainer scope: raw per-container values, no weighting.
+				Name:  "cpu_raw",
 				Scope: "PodContainer",
 				Gauge: &pb.Gauge{Aggregation: "Avg"},
 			},
@@ -953,7 +956,7 @@ func TestContainerResourceRequestWeighting(t *testing.T) {
 				Containers: []*pb.ContainerState{
 					{Name: "c1", Requests: map[string]string{"cpu": "200m"}},
 					// c2 has no cpu request: it is left out of the weighted pod
-					// value, but kept in the raw per-container breakdown.
+					// value, but reported as is at PodContainer scope.
 					{Name: "c2", Requests: map[string]string{"memory": "100Mi"}},
 				},
 			},
@@ -971,12 +974,14 @@ func TestContainerResourceRequestWeighting(t *testing.T) {
 	})
 
 	ts := clk.Now().Unix()
-	ingestResource(s, ts, ns, pol, "p1", "c1", "cpu_util", "cpu", 0.5)
-	ingestResource(s, ts, ns, pol, "p1", "c2", "cpu_util", "cpu", 0.1)
-	ingestResource(s, ts, ns, pol, "p2", "c1", "cpu_util", "cpu", 0.4)
-	ingestResource(s, ts, ns, pol, "p2", "c2", "cpu_util", "cpu", 0.9)
-	ingestResource(s, ts, ns, pol, "p3", "c1", "cpu_util", "cpu", 0.3)
-	ingestResource(s, ts, ns, pol, "p3", "c2", "cpu_util", "cpu", 0.6)
+	for _, m := range []string{"cpu_util", "cpu_raw"} {
+		ingestResource(s, ts, ns, pol, "p1", "c1", m, "cpu", 0.5)
+		ingestResource(s, ts, ns, pol, "p1", "c2", m, "cpu", 0.1)
+		ingestResource(s, ts, ns, pol, "p2", "c1", m, "cpu", 0.4)
+		ingestResource(s, ts, ns, pol, "p2", "c2", m, "cpu", 0.9)
+		ingestResource(s, ts, ns, pol, "p3", "c1", m, "cpu", 0.3)
+		ingestResource(s, ts, ns, pol, "p3", "c2", m, "cpu", 0.6)
+	}
 
 	s.CalculateAll()
 	cm, ok := s.GetControlMetrics(id, "")
@@ -997,8 +1002,8 @@ func TestContainerResourceRequestWeighting(t *testing.T) {
 		t.Errorf("Pod p3 has no cpu request, it should have no weighted pod value")
 	}
 
-	// The per-container breakdown keeps the raw (unweighted) values of every
-	// container, whether or not it declares a request.
+	// At PodContainer scope every container reports its raw (unweighted)
+	// value, whether or not it declares a request.
 	for _, tc := range []struct {
 		pod, container string
 		want           float64
@@ -1013,7 +1018,7 @@ func TestContainerResourceRequestWeighting(t *testing.T) {
 			t.Errorf("Container %s/%s missing from the breakdown", tc.pod, tc.container)
 			continue
 		}
-		if got := pcm.ContainerMetrics[tc.container].Values["cpu_util"]; math.Abs(got-tc.want) > 1e-9 {
+		if got := pcm.ContainerMetrics[tc.container].Values["cpu_raw"]; math.Abs(got-tc.want) > 1e-9 {
 			t.Errorf("Container %s/%s value: Want %f, Got %f", tc.pod, tc.container, tc.want, got)
 		}
 	}

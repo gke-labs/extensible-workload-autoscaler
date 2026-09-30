@@ -853,7 +853,7 @@ func TestHistogramLatencyScalingGRPC(t *testing.T) {
 	}
 }
 
-// TestWindowedMetricsGRPC validates temporal aggregation (Windows).
+// TestWindowedMetricsGRPC validates time windows.
 // Scenario: Use a DecayingHistogram to smooth out bursty metrics.
 // Steps:
 // 1. Create Policy with a DecayingHistogram window (24h half-life).
@@ -1748,19 +1748,32 @@ func TestPolicyMutationGRPC(t *testing.T) {
 		Etag: stored.GetEtag(),
 	})
 
-	// 3. Ingest next sample (Counter logic: Rate)
-	// T1 (10s later): Value 20. Diff=10. Rate=1.
+	// 3. The state built from the previous definition is dropped: the gauge
+	// sample does not seed the rate, which needs two counter samples.
 	clk.Advance(10 * time.Second)
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default", Timestamp: timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
 	})
-
 	memStore.CalculateAll()
 
 	cm, _ = client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: pid})
-	// Rate = (20-10)/10 = 1.0
+	if _, ok := cm.Values["m"]; ok {
+		t.Errorf("Mutation Counter: want no value from a single sample, got %v", cm.Values["m"])
+	}
+
+	// 4. T2 (10s later): Value 30. Diff=10. Rate=1.
+	clk.Advance(10 * time.Second)
+	ts = clk.Now().Unix()
+	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
+		ClusterName: "default", Timestamp: timestamppb.New(time.Unix(ts, 0)),
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 30, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
+	})
+	memStore.CalculateAll()
+
+	cm, _ = client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: pid})
+	// Rate = (30-20)/10 = 1.0
 	if cm.Values["m"] != 1.0 {
 		t.Errorf("Mutation Counter mismatch: Want 1.0, Got %v", cm.Values["m"])
 	}

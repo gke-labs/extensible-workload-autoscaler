@@ -654,8 +654,9 @@ const pageTemplate = `
                     let metricCells = '';
                     metrics.forEach(m => {
                          let val = '-';
-                         if (ps.Metrics && ps.Metrics.Series && ps.Metrics.Series[m.key]) {
-                             for (const series of Object.values(ps.Metrics.Series[m.key])) {
+                         const metric = ps.Metrics && ps.Metrics.Series && ps.Metrics.Series[m.key];
+                         if (metric && metric.Series) {
+                             for (const series of Object.values(metric.Series)) {
                                  // Note: Internal structs (Series) use Capitalized fields
                                  if (series.PodName === pod.name) {
                                      val = formatFloat(series.ControlMetric.Value);
