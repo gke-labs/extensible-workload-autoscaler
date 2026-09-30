@@ -788,10 +788,10 @@ func TestOrphanedMetricCleanup(t *testing.T) {
 	dump := s.Dump().(map[string]*store.PolicyState)
 	policySeries := dump["default/default/pol"].Series
 
-	if _, exists := policySeries["m1"]; exists {
+	if _, exists := policySeries[store.NewMetricIDForTesting("m1", "")]; exists {
 		t.Error("Orphaned metric m1 still exists in series map")
 	}
-	if _, exists := policySeries["m2"]; !exists {
+	if _, exists := policySeries[store.NewMetricIDForTesting("m2", "")]; !exists {
 		t.Error("Active metric m2 was incorrectly deleted")
 	}
 }
@@ -1219,7 +1219,7 @@ func TestRecommenderOwnedMetricsCleanup(t *testing.T) {
 	ingestOwned(s, now, ns, name, "p1", "vpa", "cpu", 10)
 
 	dump := s.Dump().(map[string]*store.PolicyState)
-	if _, ok := dump["default/default/pol"].Series["vpa/cpu"]; !ok {
+	if _, ok := dump["default/default/pol"].Series[store.NewMetricIDForTesting("cpu", "vpa")]; !ok {
 		t.Fatal("Owned metric series was not tracked under its metric key")
 	}
 
@@ -1229,10 +1229,10 @@ func TestRecommenderOwnedMetricsCleanup(t *testing.T) {
 	s.CalculateAll()
 
 	series := s.Dump().(map[string]*store.PolicyState)["default/default/pol"].Series
-	if _, ok := series["vpa/cpu"]; ok {
+	if _, ok := series[store.NewMetricIDForTesting("cpu", "vpa")]; ok {
 		t.Error("Orphaned owned metric still exists in series map")
 	}
-	if _, ok := series["cpu"]; !ok {
+	if _, ok := series[store.NewMetricIDForTesting("cpu", "")]; !ok {
 		t.Error("Policy-wide metric was incorrectly deleted")
 	}
 }

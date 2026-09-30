@@ -59,10 +59,10 @@ func isGlobalScope(scope string) bool {
 
 // DataPoint represents a single calculated value (ControlMetric)
 type DataPoint struct {
-	Timestamp int64 // Freshness Timestamp (Ingest Time)
-	Value     float64
-	Labels    map[string]string
-	Buckets   map[string]float64 // Rate buckets
+	Timestamp   int64 // Freshness Timestamp (Ingest Time)
+	Value       float64
+	Labels      map[string]string
+	RateBuckets map[string]float64 // Rate buckets
 }
 
 // Sample represents the raw data from the source
@@ -122,10 +122,10 @@ type MetricStore interface {
 type PolicyState struct {
 	Policy   *pb.Policy
 	Workload map[string]*pb.PodState
-	// Series and GlobalHistograms are keyed by the metric key returned by
-	// metricKey, which identifies a metric by name and owner.
-	Series              map[string]map[string]*Series // MetricKey -> SeriesID -> Series
-	GlobalHistograms    map[string]*DecayingHistogram // MetricKey -> Histogram
+	// Series and GlobalHistograms are keyed by metricID, which identifies a
+	// metric by name and owner.
+	Series              map[metricID]map[string]*Series // MetricID -> SeriesID -> Series
+	GlobalHistograms    map[metricID]*DecayingHistogram // MetricID -> Histogram
 	Recommendation      *pb.Recommendation
 	Explanation         []*pb.RecommenderStatus
 	LastActive          int64
@@ -136,15 +136,35 @@ type PolicyState struct {
 	RecommenderControlMetrics map[string]*pb.ControlMetrics
 }
 
-// metricKey returns the key under which the state of a metric is tracked. A
-// metric is identified by the <name, recommender_name> pair: its name is only
-// unique within its owner. Policy-wide metrics have no owner and keep their
-// bare name as key.
-func metricKey(def *pb.MetricDefinition) string {
-	if def.GetRecommenderName() == "" {
-		return def.GetName()
+// metricID identifies the metric whose state is tracked. A metric is
+// identified by the <name, recommenderName> pair: its name is only unique
+// within its owner. Policy-wide metrics have no owner.
+type metricID struct {
+	// name is the name of the metric.
+	name string
+	// recommenderName is the name of the recommender owning the metric, or
+	// empty for policy-wide metrics.
+	recommenderName string
+}
+
+// newMetricID returns the ID of the metric defined by def.
+func newMetricID(def *pb.MetricDefinition) metricID {
+	return metricID{name: def.GetName(), recommenderName: def.GetRecommenderName()}
+}
+
+// String returns "<recommenderName>/<name>" for owned metrics and the bare
+// name for policy-wide metrics.
+func (id metricID) String() string {
+	if id.recommenderName == "" {
+		return id.name
 	}
-	return def.GetRecommenderName() + "/" + def.GetName()
+	return id.recommenderName + "/" + id.name
+}
+
+// MarshalText implements encoding.TextMarshaler so that maps keyed by metricID
+// can be serialized to JSON (e.g. by the state dump).
+func (id metricID) MarshalText() ([]byte, error) {
+	return []byte(id.String()), nil
 }
 
 type MemoryStore struct {
@@ -194,8 +214,8 @@ func (s *MemoryStore) UpdatePolicy(clusterName string, p *pb.Policy, updateMask 
 	if ps == nil {
 		ps = &PolicyState{
 			Workload:            make(map[string]*pb.PodState),
-			Series:              make(map[string]map[string]*Series),
-			GlobalHistograms:    make(map[string]*DecayingHistogram),
+			Series:              make(map[metricID]map[string]*Series),
+			GlobalHistograms:    make(map[metricID]*DecayingHistogram),
 			RecommenderStatuses: make(map[string]*pb.RecommenderStatus),
 		}
 		s.state[key] = ps
@@ -326,9 +346,9 @@ func (s *MemoryStore) processSample(ps *PolicyState, podName, containerName stri
 		return nil
 	}
 
-	key := metricKey(def)
-	if _, ok := ps.Series[key]; !ok {
-		ps.Series[key] = make(map[string]*Series)
+	id := newMetricID(def)
+	if _, ok := ps.Series[id]; !ok {
+		ps.Series[id] = make(map[string]*Series)
 	}
 
 	labelHash := hashLabels(m.Labels)
@@ -336,7 +356,7 @@ func (s *MemoryStore) processSample(ps *PolicyState, podName, containerName stri
 	// from different containers of the same pod are tracked independently.
 	seriesID := fmt.Sprintf("%s|%s|%s", podName, containerName, labelHash)
 
-	ser, ok := ps.Series[key][seriesID]
+	ser, ok := ps.Series[id][seriesID]
 	if !ok {
 		ser = &Series{
 			PodName:       podName,
@@ -357,7 +377,7 @@ func (s *MemoryStore) processSample(ps *PolicyState, podName, containerName stri
 			ser.Window = NewSlidingWindow(d, "Avg")
 		}
 
-		ps.Series[key][seriesID] = ser
+		ps.Series[id][seriesID] = ser
 	}
 
 	var gh *DecayingHistogram
@@ -369,14 +389,14 @@ func (s *MemoryStore) processSample(ps *PolicyState, podName, containerName stri
 			}
 		} else {
 			if ps.GlobalHistograms == nil {
-				ps.GlobalHistograms = make(map[string]*DecayingHistogram)
+				ps.GlobalHistograms = make(map[metricID]*DecayingHistogram)
 			}
 			var ok bool
-			gh, ok = ps.GlobalHistograms[key]
+			gh, ok = ps.GlobalHistograms[id]
 			if !ok {
 				hl, _ := time.ParseDuration(def.DecayingDistribution.HalfLife)
 				gh, _ = NewDecayingHistogram(time.Unix(ingestTime, 0), hl, def.DecayingDistribution.BucketSize)
-				ps.GlobalHistograms[key] = gh
+				ps.GlobalHistograms[id] = gh
 			}
 		}
 	}
@@ -419,7 +439,7 @@ func (s *MemoryStore) updateSeries(ser *Series, def *pb.MetricDefinition, m *pb.
 		} else if ts > ser.LastRaw.Timestamp {
 			dt := float64(ts - ser.LastRaw.Timestamp)
 			rateBuckets := calculateBucketRates(hist.GetBuckets(), ser.LastRaw.Histogram.GetBuckets(), dt)
-			ser.ControlMetric = DataPoint{Timestamp: ingestTime, Value: 0, Labels: m.Labels, Buckets: rateBuckets}
+			ser.ControlMetric = DataPoint{Timestamp: ingestTime, Value: 0, Labels: m.Labels, RateBuckets: rateBuckets}
 			ser.LastRaw = Sample{Timestamp: ts, Value: 0, Histogram: hist}
 		} else if ts == ser.LastRaw.Timestamp {
 			ser.ControlMetric.Timestamp = ingestTime
@@ -679,8 +699,8 @@ func (s *MemoryStore) calculateControlMetrics(ps *PolicyState, defs []*pb.Metric
 	currentContainerMetrics := make(map[string]*pb.MetricValues)
 
 	for _, def := range defs {
-		key := metricKey(def)
-		res, ok := s.calculateMetric(ps, key, def, ps.Series[key], workload, readyReplicas, now, cutoff, gcCutoff)
+		id := newMetricID(def)
+		res, ok := s.calculateMetric(ps, id, def, ps.Series[id], workload, readyReplicas, now, cutoff, gcCutoff)
 		if !ok {
 			continue
 		}
@@ -702,9 +722,9 @@ func (s *MemoryStore) calculateControlMetrics(ps *PolicyState, defs []*pb.Metric
 			currentControlMetrics[def.Name] = res.global
 			if policy.Workload != nil {
 				// Metrics owned by a recommender are exported under their
-				// metric key, as their name is only unique within their
+				// metric ID, as their name is only unique within their
 				// owner.
-				metrics.RecordControlMetric(policy.Id.ClusterName, policy.Id.Namespace, policy.Id.Name, policy.Workload.Group, policy.Workload.Version, policy.Workload.Kind, policy.Workload.Name, key, res.global)
+				metrics.RecordControlMetric(policy.Id.ClusterName, policy.Id.Namespace, policy.Id.Name, policy.Workload.Group, policy.Workload.Version, policy.Workload.Kind, policy.Workload.Name, id.String(), res.global)
 			}
 		}
 	}
@@ -753,35 +773,35 @@ func podContainerMetrics(all map[string]*pb.ContainerMetrics, podName, container
 	return cm
 }
 
-// definedMetricKeys returns the keys of all the metrics a policy defines,
+// definedMetricIDs returns the IDs of all the metrics a policy defines,
 // including the ones owned by its recommenders.
-func definedMetricKeys(policy *pb.Policy) map[string]bool {
-	keys := make(map[string]bool)
+func definedMetricIDs(policy *pb.Policy) map[metricID]bool {
+	ids := make(map[metricID]bool)
 	for _, m := range policy.Metrics {
-		keys[metricKey(m)] = true
+		ids[newMetricID(m)] = true
 	}
 	for _, defs := range policy.RecommenderMetrics {
 		for _, m := range defs.GetDefinitions() {
-			keys[metricKey(m)] = true
+			ids[newMetricID(m)] = true
 		}
 	}
-	return keys
+	return ids
 }
 
 func (s *MemoryStore) cleanupOrphanedSeries(ps *PolicyState) {
-	metricDefs := definedMetricKeys(ps.Policy)
-	for key := range ps.Series {
-		if !metricDefs[key] {
-			delete(ps.Series, key)
+	metricDefs := definedMetricIDs(ps.Policy)
+	for id := range ps.Series {
+		if !metricDefs[id] {
+			delete(ps.Series, id)
 		}
 	}
 }
 
 func (s *MemoryStore) cleanupOrphanedHistograms(ps *PolicyState) {
-	metricDefs := definedMetricKeys(ps.Policy)
-	for key := range ps.GlobalHistograms {
-		if !metricDefs[key] {
-			delete(ps.GlobalHistograms, key)
+	metricDefs := definedMetricIDs(ps.Policy)
+	for id := range ps.GlobalHistograms {
+		if !metricDefs[id] {
+			delete(ps.GlobalHistograms, id)
 		}
 	}
 }
@@ -820,7 +840,7 @@ type metricResult struct {
 // calculateMetric aggregates the series of a single metric definition. It
 // reports false if no value could be computed.
 //
-// key is the key the metric state is tracked under (see metricKey).
+// id identifies the metric whose state is tracked.
 //
 // The fields populated on the result depend on def.Scope:
 //   - "Global" (default): only the policy-wide value is set.
@@ -830,9 +850,9 @@ type metricResult struct {
 //     breakdown that rolls up into them.
 //   - "Container": only the per-container values are set, each averaged over
 //     the pods reporting that container.
-func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.MetricDefinition, seriesMap map[string]*Series, workload map[string]*pb.PodState, readyReplicas int, now, cutoff, gcCutoff int64) (metricResult, bool) {
+func (s *MemoryStore) calculateMetric(ps *PolicyState, id metricID, def *pb.MetricDefinition, seriesMap map[string]*Series, workload map[string]*pb.PodState, readyReplicas int, now, cutoff, gcCutoff int64) (metricResult, bool) {
 	if isGlobalScope(def.Scope) {
-		if gh, ok := ps.GlobalHistograms[key]; ok {
+		if gh, ok := ps.GlobalHistograms[id]; ok {
 			percentile := "p95"
 			if def.DecayingDistribution != nil {
 				percentile = def.DecayingDistribution.Percentile
@@ -899,8 +919,8 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.Metri
 
 		if ser.PodName == "" {
 			if defType == "Histogram" {
-				if ser.ControlMetric.Buckets != nil {
-					sumRateBuckets(globalBuckets, ser.ControlMetric.Buckets)
+				if ser.ControlMetric.RateBuckets != nil {
+					sumRateBuckets(globalBuckets, ser.ControlMetric.RateBuckets)
 					hasBuckets = true
 				}
 			} else {
@@ -916,12 +936,12 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.Metri
 		}
 
 		if defType == "Histogram" {
-			if ser.ControlMetric.Buckets != nil {
+			if ser.ControlMetric.RateBuckets != nil {
 				if !isGlobalScope(def.Scope) {
 					if podBuckets[ser.PodName] == nil {
 						podBuckets[ser.PodName] = make(map[string]float64)
 					}
-					sumRateBuckets(podBuckets[ser.PodName], ser.ControlMetric.Buckets)
+					sumRateBuckets(podBuckets[ser.PodName], ser.ControlMetric.RateBuckets)
 
 					// The per-container breakdown backs both the PodContainer
 					// scope and the per-container average of the Container scope.
@@ -932,10 +952,10 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, key string, def *pb.Metri
 						if containerBuckets[ser.PodName][ser.ContainerName] == nil {
 							containerBuckets[ser.PodName][ser.ContainerName] = make(map[string]float64)
 						}
-						sumRateBuckets(containerBuckets[ser.PodName][ser.ContainerName], ser.ControlMetric.Buckets)
+						sumRateBuckets(containerBuckets[ser.PodName][ser.ContainerName], ser.ControlMetric.RateBuckets)
 					}
 				} else {
-					sumRateBuckets(globalBuckets, ser.ControlMetric.Buckets)
+					sumRateBuckets(globalBuckets, ser.ControlMetric.RateBuckets)
 					hasBuckets = true
 				}
 			}
