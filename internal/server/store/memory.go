@@ -5,7 +5,6 @@ import (
 	"math"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -120,12 +119,11 @@ type ServerStore interface {
 }
 
 type PolicyState struct {
-	Policy   *pb.Policy
-	Workload map[string]*pb.PodState
-	// Series and GlobalHistograms are keyed by metricID, which identifies a
-	// metric by name and owner.
-	Series              map[metricID]map[string]*Series // MetricID -> SeriesID -> Series
-	GlobalHistograms    map[metricID]*DecayingHistogram // MetricID -> Histogram
+	Policy *pb.Policy
+	// Workload maps a pod name to its state.
+	Workload            map[string]*pb.PodState
+	Series              map[metricID]map[seriesID]*Series
+	GlobalHistograms    map[metricID]*DecayingHistogram
 	Recommendation      *pb.Recommendation
 	Explanation         []*pb.RecommenderStatus
 	LastActive          int64
@@ -136,43 +134,12 @@ type PolicyState struct {
 	RecommenderControlMetrics map[string]*pb.ControlMetrics
 }
 
-// metricID identifies the metric whose state is tracked. A metric is
-// identified by the <name, recommenderName> pair: its name is only unique
-// within its owner. Policy-wide metrics have no owner.
-type metricID struct {
-	// name is the name of the metric.
-	name string
-	// recommenderName is the name of the recommender owning the metric, or
-	// empty for policy-wide metrics.
-	recommenderName string
-}
-
-// newMetricID returns the ID of the metric defined by def.
-func newMetricID(def *pb.MetricDefinition) metricID {
-	return metricID{name: def.GetName(), recommenderName: def.GetRecommenderName()}
-}
-
-// String returns "<recommenderName>/<name>" for owned metrics and the bare
-// name for policy-wide metrics.
-func (id metricID) String() string {
-	if id.recommenderName == "" {
-		return id.name
-	}
-	return id.recommenderName + "/" + id.name
-}
-
-// MarshalText implements encoding.TextMarshaler so that maps keyed by metricID
-// can be serialized to JSON (e.g. by the state dump).
-func (id metricID) MarshalText() ([]byte, error) {
-	return []byte(id.String()), nil
-}
-
 type MemoryStore struct {
 	mu    sync.RWMutex
 	clock clock.Clock
 
-	// Storage: PolicyKey -> PolicyState
-	state map[string]*PolicyState
+	// Storage: PolicyID -> PolicyState
+	state map[policyID]*PolicyState
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -182,12 +149,8 @@ func NewMemoryStore() *MemoryStore {
 func NewMemoryStoreWithClock(c clock.Clock) *MemoryStore {
 	return &MemoryStore{
 		clock: c,
-		state: make(map[string]*PolicyState),
+		state: make(map[policyID]*PolicyState),
 	}
-}
-
-func (s *MemoryStore) genPolicyKey(id *pb.PolicyId) string {
-	return id.ClusterName + "/" + id.Namespace + "/" + id.Name
 }
 
 func (s *MemoryStore) SetPolicy(clusterName string, p *pb.Policy) error {
@@ -198,7 +161,7 @@ func (s *MemoryStore) SetPolicy(clusterName string, p *pb.Policy) error {
 func (s *MemoryStore) UpdatePolicy(clusterName string, p *pb.Policy, updateMask *fieldmaskpb.FieldMask) (*pb.Policy, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	key := s.genPolicyKey(&pb.PolicyId{ClusterName: clusterName, Namespace: p.Id.Namespace, Name: p.Id.Name})
+	key := policyID{cluster: clusterName, ns: p.Id.GetNamespace(), name: p.Id.GetName()}
 
 	ps := s.state[key]
 	var current *pb.Policy
@@ -214,7 +177,7 @@ func (s *MemoryStore) UpdatePolicy(clusterName string, p *pb.Policy, updateMask 
 	if ps == nil {
 		ps = &PolicyState{
 			Workload:            make(map[string]*pb.PodState),
-			Series:              make(map[metricID]map[string]*Series),
+			Series:              make(map[metricID]map[seriesID]*Series),
 			GlobalHistograms:    make(map[metricID]*DecayingHistogram),
 			RecommenderStatuses: make(map[string]*pb.RecommenderStatus),
 		}
@@ -236,7 +199,7 @@ func (s *MemoryStore) UpdatePolicy(clusterName string, p *pb.Policy, updateMask 
 func (s *MemoryStore) DeletePolicy(id *pb.PolicyId) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	key := s.genPolicyKey(id)
+	key := newPolicyID(id)
 	delete(s.state, key)
 	return nil
 }
@@ -244,7 +207,7 @@ func (s *MemoryStore) DeletePolicy(id *pb.PolicyId) error {
 func (s *MemoryStore) GetPolicy(id *pb.PolicyId) (*pb.Policy, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	key := s.genPolicyKey(id)
+	key := newPolicyID(id)
 	ps, ok := s.state[key]
 	if !ok || ps.Policy == nil {
 		return nil, false
@@ -260,12 +223,8 @@ func (s *MemoryStore) ListPolicies(clusterName string) []*pb.Policy {
 		if ps.Policy == nil {
 			continue
 		}
-		// Key format: cluster/ns/name
-		parts := strings.Split(key, "/")
-		if len(parts) >= 3 {
-			if clusterName != "" && parts[0] != clusterName {
-				continue
-			}
+		if clusterName != "" && key.cluster != clusterName {
+			continue
 		}
 		policies = append(policies, ps.Policy)
 	}
@@ -276,7 +235,7 @@ func (s *MemoryStore) UpdateWorkload(req *pb.UpdateWorkloadRequest) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	key := s.genPolicyKey(req.Id)
+	key := newPolicyID(req.Id)
 	ps, ok := s.state[key]
 	if !ok || ps.Policy == nil {
 		return fmt.Errorf("policy not found")
@@ -295,7 +254,7 @@ func (s *MemoryStore) AddBatch(req *pb.IngestMetricsRequest) error {
 	defer s.mu.Unlock()
 
 	for _, pBatch := range req.Policies {
-		key := s.genPolicyKey(&pb.PolicyId{ClusterName: req.ClusterName, Namespace: pBatch.Namespace, Name: pBatch.Name})
+		key := policyID{cluster: req.ClusterName, ns: pBatch.Namespace, name: pBatch.Name}
 		ps, ok := s.state[key]
 		if !ok || ps.Policy == nil {
 			return fmt.Errorf("policy not found: %s", key)
@@ -348,15 +307,12 @@ func (s *MemoryStore) processSample(ps *PolicyState, podName, containerName stri
 
 	id := newMetricID(def)
 	if _, ok := ps.Series[id]; !ok {
-		ps.Series[id] = make(map[string]*Series)
+		ps.Series[id] = make(map[seriesID]*Series)
 	}
 
-	labelHash := hashLabels(m.Labels)
-	// The container name is part of the series identity so that samples coming
-	// from different containers of the same pod are tracked independently.
-	seriesID := fmt.Sprintf("%s|%s|%s", podName, containerName, labelHash)
+	sid := newSeriesID(podName, containerName, m.Labels)
 
-	ser, ok := ps.Series[id][seriesID]
+	ser, ok := ps.Series[id][sid]
 	if !ok {
 		ser = &Series{
 			PodName:       podName,
@@ -377,7 +333,7 @@ func (s *MemoryStore) processSample(ps *PolicyState, podName, containerName stri
 			ser.Window = NewSlidingWindow(d, "Avg")
 		}
 
-		ps.Series[id][seriesID] = ser
+		ps.Series[id][sid] = ser
 	}
 
 	var gh *DecayingHistogram
@@ -493,7 +449,7 @@ func (s *MemoryStore) UpdateRecommenderState(req *pb.UpdateRecommenderStateReque
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	key := s.genPolicyKey(req.Id)
+	key := newPolicyID(req.Id)
 	ps, ok := s.state[key]
 	if !ok || ps.Policy == nil {
 		return fmt.Errorf("policy not found")
@@ -566,7 +522,7 @@ func (s *MemoryStore) updateRecommenderStatus(ps *PolicyState, name string, stat
 func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationResponse, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	key := s.genPolicyKey(id)
+	key := newPolicyID(id)
 	ps, ok := s.state[key]
 	if !ok || ps.Policy == nil {
 		return nil, false
@@ -625,7 +581,7 @@ func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationR
 func (s *MemoryStore) GetControlMetrics(id *pb.PolicyId, recommenderName string) (*pb.ControlMetrics, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	key := s.genPolicyKey(id)
+	key := newPolicyID(id)
 	ps, ok := s.state[key]
 	if !ok || ps.ControlMetrics == nil {
 		return nil, false
@@ -850,7 +806,7 @@ type metricResult struct {
 //     breakdown that rolls up into them.
 //   - "Container": only the per-container values are set, each averaged over
 //     the pods reporting that container.
-func (s *MemoryStore) calculateMetric(ps *PolicyState, id metricID, def *pb.MetricDefinition, seriesMap map[string]*Series, workload map[string]*pb.PodState, readyReplicas int, now, cutoff, gcCutoff int64) (metricResult, bool) {
+func (s *MemoryStore) calculateMetric(ps *PolicyState, id metricID, def *pb.MetricDefinition, seriesMap map[seriesID]*Series, workload map[string]*pb.PodState, readyReplicas int, now, cutoff, gcCutoff int64) (metricResult, bool) {
 	if isGlobalScope(def.Scope) {
 		if gh, ok := ps.GlobalHistograms[id]; ok {
 			percentile := "p95"
@@ -905,10 +861,10 @@ func (s *MemoryStore) calculateMetric(ps *PolicyState, id metricID, def *pb.Metr
 		defType = "Gauge"
 	}
 
-	for id, ser := range seriesMap {
+	for sid, ser := range seriesMap {
 		// GC
 		if ser.ControlMetric.Timestamp < gcCutoff {
-			delete(seriesMap, id)
+			delete(seriesMap, sid)
 			continue
 		}
 
@@ -1512,20 +1468,4 @@ func matchFilter(labels, filter map[string]string) bool {
 		}
 	}
 	return true
-}
-
-func hashLabels(labels map[string]string) string {
-	if len(labels) == 0 {
-		return ""
-	}
-	keys := make([]string, 0, len(labels))
-	for k := range labels {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	var b strings.Builder
-	for _, k := range keys {
-		fmt.Fprintf(&b, "%s=%s,", k, labels[k])
-	}
-	return b.String()
 }
