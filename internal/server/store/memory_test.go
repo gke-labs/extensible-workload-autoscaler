@@ -457,30 +457,32 @@ func TestDump(t *testing.T) {
         "is_ready": true
       }
     },
-    "Series": {
-      "cpu": {
-        "p1||0000000000000000": {
-          "PodName": "p1",
-          "ContainerName": "",
-          "ResourceName": "",
-          "Labels": null,
-          "LastRaw": {
-            "Timestamp": 1000,
-            "Value": 1,
-            "Histogram": null
-          },
-          "ControlMetric": {
-            "Timestamp": 1000,
-            "Value": 1,
+    "Metrics": {
+      "Series": {
+        "cpu": {
+          "p1||0000000000000000": {
+            "PodName": "p1",
+            "ContainerName": "",
+            "ResourceName": "",
             "Labels": null,
-            "RateBuckets": null
-          },
-          "Window": null,
-          "DecayingHistogram": null
+            "LastRaw": {
+              "Timestamp": 1000,
+              "Value": 1,
+              "Histogram": null
+            },
+            "ControlMetric": {
+              "Timestamp": 1000,
+              "Value": 1,
+              "Labels": null,
+              "RateBuckets": null
+            },
+            "Window": null,
+            "DecayingHistogram": null
+          }
         }
-      }
+      },
+      "GlobalHistograms": {}
     },
-    "GlobalHistograms": {},
     "Recommendation": {
       "replicas": 2
     },
@@ -785,7 +787,7 @@ func TestOrphanedMetricCleanup(t *testing.T) {
 
 	// 5. Verify m1 is gone from series map
 	dump := s.Dump().(map[policyID]*PolicyState)
-	policySeries := dump[policyID{cluster: "default", ns: "default", name: "pol"}].Series
+	policySeries := dump[policyID{cluster: "default", ns: "default", name: "pol"}].Metrics.Series
 
 	if _, exists := policySeries[metricID{name: "m1"}]; exists {
 		t.Error("Orphaned metric m1 still exists in series map")
@@ -1218,7 +1220,7 @@ func TestRecommenderOwnedMetricsCleanup(t *testing.T) {
 	ingestOwned(s, now, ns, name, "p1", "vpa", "cpu", 10)
 
 	dump := s.Dump().(map[policyID]*PolicyState)
-	if _, ok := dump[policyID{cluster: "default", ns: "default", name: "pol"}].Series[metricID{name: "cpu", recommenderName: "vpa"}]; !ok {
+	if _, ok := dump[policyID{cluster: "default", ns: "default", name: "pol"}].Metrics.Series[metricID{name: "cpu", recommenderName: "vpa"}]; !ok {
 		t.Fatal("Owned metric series was not tracked under its metric key")
 	}
 
@@ -1227,7 +1229,7 @@ func TestRecommenderOwnedMetricsCleanup(t *testing.T) {
 	s.SetPolicy("default", pol)
 	s.CalculateAll()
 
-	series := s.Dump().(map[policyID]*PolicyState)[policyID{cluster: "default", ns: "default", name: "pol"}].Series
+	series := s.Dump().(map[policyID]*PolicyState)[policyID{cluster: "default", ns: "default", name: "pol"}].Metrics.Series
 	if _, ok := series[metricID{name: "cpu", recommenderName: "vpa"}]; ok {
 		t.Error("Orphaned owned metric still exists in series map")
 	}
