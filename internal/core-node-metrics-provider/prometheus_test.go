@@ -234,12 +234,14 @@ lat_count 15
 					{
 						Name:   "latency",
 						Labels: map[string]string{},
-						HistogramBuckets: map[string]uint64{
-							"0.1":  10,
-							"+Inf": 15,
+						Histogram: &pb.Histogram{
+							Buckets: map[string]uint64{
+								"0.1":  10,
+								"+Inf": 15,
+							},
+							Sum:   2.5,
+							Count: 15,
 						},
-						HistogramSum:   2.5,
-						HistogramCount: 15,
 					},
 				},
 			}},

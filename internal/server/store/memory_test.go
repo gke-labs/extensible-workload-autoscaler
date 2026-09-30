@@ -289,9 +289,9 @@ func ingestHist(s *store.MemoryStore, ts int64, ns, pol, pod, metric string, buc
 			Batches: []*pb.MetricBatch{{
 				PodName: pod,
 				Samples: []*pb.MetricSample{{
-					Name:             metric,
-					HistogramBuckets: buckets,
-					Timestamp:        ts,
+					Name:      metric,
+					Histogram: &pb.Histogram{Buckets: buckets},
+					Timestamp: ts,
 				}},
 			}},
 		}},
@@ -468,13 +468,13 @@ func TestDump(t *testing.T) {
           "LastRaw": {
             "Timestamp": 1000,
             "Value": 1,
-            "CumulativeBuckets": null
+            "Histogram": null
           },
           "ControlMetric": {
             "Timestamp": 1000,
             "Value": 1,
             "Labels": null,
-            "Buckets": null
+            "RateBuckets": null
           },
           "Window": null,
           "DecayingHistogram": null

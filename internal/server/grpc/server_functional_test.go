@@ -361,8 +361,8 @@ func TestGetControlMetrics_Aggregation(t *testing.T) {
 		Policies: []*pb.PolicyBatch{{
 			Namespace: "ns", Name: "p1",
 			Batches: []*pb.MetricBatch{
-				{PodName: "p1", Samples: []*pb.MetricSample{{Name: "c_sum", Value: 0}, {Name: "h_p99", HistogramBuckets: map[string]uint64{"1.0": 0, "+Inf": 0}}}},
-				{PodName: "p2", Samples: []*pb.MetricSample{{Name: "c_sum", Value: 0}, {Name: "h_p99", HistogramBuckets: map[string]uint64{"1.0": 0, "+Inf": 0}}}},
+				{PodName: "p1", Samples: []*pb.MetricSample{{Name: "c_sum", Value: 0}, {Name: "h_p99", Histogram: &pb.Histogram{Buckets: map[string]uint64{"1.0": 0, "+Inf": 0}}}}},
+				{PodName: "p2", Samples: []*pb.MetricSample{{Name: "c_sum", Value: 0}, {Name: "h_p99", Histogram: &pb.Histogram{Buckets: map[string]uint64{"1.0": 0, "+Inf": 0}}}}},
 			},
 		}},
 	})
@@ -377,12 +377,12 @@ func TestGetControlMetrics_Aggregation(t *testing.T) {
 				{PodName: "p1", Samples: []*pb.MetricSample{
 					{Name: "g_avg", Value: 10},
 					{Name: "c_sum", Value: 10}, // Diff=10, Rate=1.0
-					{Name: "h_p99", HistogramBuckets: map[string]uint64{"1.0": 99, "+Inf": 100}},
+					{Name: "h_p99", Histogram: &pb.Histogram{Buckets: map[string]uint64{"1.0": 99, "+Inf": 100}}},
 				}},
 				{PodName: "p2", Samples: []*pb.MetricSample{
 					{Name: "g_avg", Value: 30},
 					{Name: "c_sum", Value: 20}, // Diff=20, Rate=2.0
-					{Name: "h_p99", HistogramBuckets: map[string]uint64{"1.0": 99, "+Inf": 100}},
+					{Name: "h_p99", Histogram: &pb.Histogram{Buckets: map[string]uint64{"1.0": 99, "+Inf": 100}}},
 				}},
 			},
 		}},
@@ -1518,7 +1518,7 @@ func TestIngestMetrics_Global(t *testing.T) {
 		ClusterName: "c1", Timestamp: ts,
 		Policies: []*pb.PolicyBatch{{Namespace: "ns", Name: "p1", Batches: []*pb.MetricBatch{{PodName: "", Samples: []*pb.MetricSample{
 			{Name: "c_sum", Value: 0},
-			{Name: "h_p50", HistogramBuckets: map[string]uint64{"1.0": 0, "+Inf": 0}},
+			{Name: "h_p50", Histogram: &pb.Histogram{Buckets: map[string]uint64{"1.0": 0, "+Inf": 0}}},
 		}}}}},
 	})
 
@@ -1529,7 +1529,7 @@ func TestIngestMetrics_Global(t *testing.T) {
 		Policies: []*pb.PolicyBatch{{Namespace: "ns", Name: "p1", Batches: []*pb.MetricBatch{{PodName: "", Samples: []*pb.MetricSample{
 			{Name: "g_sum", Value: 100},
 			{Name: "c_sum", Value: 10}, // Rate = 1.0
-			{Name: "h_p50", HistogramBuckets: map[string]uint64{"1.0": 100, "+Inf": 100}}, // P50 = 0.5
+			{Name: "h_p50", Histogram: &pb.Histogram{Buckets: map[string]uint64{"1.0": 100, "+Inf": 100}}}, // P50 = 0.5
 		}}}}},
 	})
 
@@ -1930,7 +1930,7 @@ func TestIntent_DistributionPercentile(t *testing.T) {
 		ClusterName: "c1", Timestamp: ts,
 		Policies: []*pb.PolicyBatch{{
 			Namespace: "ns", Name: "p1",
-			Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "latency", HistogramBuckets: map[string]uint64{"1.0": 0, "+Inf": 0}}}}},
+			Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "latency", Histogram: &pb.Histogram{Buckets: map[string]uint64{"1.0": 0, "+Inf": 0}}}}}},
 		}},
 	})
 
@@ -1940,7 +1940,7 @@ func TestIntent_DistributionPercentile(t *testing.T) {
 		ClusterName: "c1", Timestamp: ts,
 		Policies: []*pb.PolicyBatch{{
 			Namespace: "ns", Name: "p1",
-			Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "latency", HistogramBuckets: map[string]uint64{"1.0": 99, "+Inf": 100}}}}},
+			Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "latency", Histogram: &pb.Histogram{Buckets: map[string]uint64{"1.0": 99, "+Inf": 100}}}}}},
 		}},
 	})
 
@@ -2192,14 +2192,14 @@ func TestIntent_PodScope_Distribution(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "c1", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: "ns", Name: "p1", Batches: []*pb.MetricBatch{{PodName: "pod1", Samples: []*pb.MetricSample{{Name: "h_p99", HistogramBuckets: map[string]uint64{"1.0": 0, "+Inf": 0}}}}}}},
+		Policies: []*pb.PolicyBatch{{Namespace: "ns", Name: "p1", Batches: []*pb.MetricBatch{{PodName: "pod1", Samples: []*pb.MetricSample{{Name: "h_p99", Histogram: &pb.Histogram{Buckets: map[string]uint64{"1.0": 0, "+Inf": 0}}}}}}}},
 	})
 
 	clk.Advance(10 * time.Second)
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "c1", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: "ns", Name: "p1", Batches: []*pb.MetricBatch{{PodName: "pod1", Samples: []*pb.MetricSample{{Name: "h_p99", HistogramBuckets: map[string]uint64{"1.0": 99, "+Inf": 100}}}}}}},
+		Policies: []*pb.PolicyBatch{{Namespace: "ns", Name: "p1", Batches: []*pb.MetricBatch{{PodName: "pod1", Samples: []*pb.MetricSample{{Name: "h_p99", Histogram: &pb.Histogram{Buckets: map[string]uint64{"1.0": 99, "+Inf": 100}}}}}}}},
 	})
 
 	memStore.CalculateAll()

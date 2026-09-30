@@ -67,9 +67,12 @@ type DataPoint struct {
 
 // Sample represents the raw data from the source
 type Sample struct {
-	Timestamp         int64 // Source Timestamp
-	Value             float64
-	CumulativeBuckets map[string]uint64
+	// Source Timestamp.
+	Timestamp int64
+	// If the sample is a scalar, its value.
+	Value float64
+	// If the sample is a distribution, its cumulative histogram.
+	Histogram *pb.Histogram
 }
 
 // Series holds the state of a single metric stream
@@ -405,22 +408,23 @@ func (s *MemoryStore) updateSeries(ser *Series, def *pb.MetricDefinition, m *pb.
 
 	switch defType {
 	case "Histogram":
-		if m.HistogramBuckets == nil {
+		hist := m.GetHistogram()
+		if hist.GetBuckets() == nil {
 			return
 		}
 
 		if ser.LastRaw.Timestamp == 0 {
-			ser.LastRaw = Sample{Timestamp: ts, CumulativeBuckets: m.HistogramBuckets}
+			ser.LastRaw = Sample{Timestamp: ts, Histogram: hist}
 			ser.ControlMetric = DataPoint{Timestamp: ingestTime, Labels: m.Labels}
 		} else if ts > ser.LastRaw.Timestamp {
 			dt := float64(ts - ser.LastRaw.Timestamp)
-			rateBuckets := calculateBucketRates(m.HistogramBuckets, ser.LastRaw.CumulativeBuckets, dt)
+			rateBuckets := calculateBucketRates(hist.GetBuckets(), ser.LastRaw.Histogram.GetBuckets(), dt)
 			ser.ControlMetric = DataPoint{Timestamp: ingestTime, Value: 0, Labels: m.Labels, Buckets: rateBuckets}
-			ser.LastRaw = Sample{Timestamp: ts, Value: 0, CumulativeBuckets: m.HistogramBuckets}
+			ser.LastRaw = Sample{Timestamp: ts, Value: 0, Histogram: hist}
 		} else if ts == ser.LastRaw.Timestamp {
 			ser.ControlMetric.Timestamp = ingestTime
 			ser.LastRaw.Value = m.Value
-			ser.LastRaw.CumulativeBuckets = m.HistogramBuckets
+			ser.LastRaw.Histogram = hist
 		}
 
 	case "Counter":
@@ -441,7 +445,7 @@ func (s *MemoryStore) updateSeries(ser *Series, def *pb.MetricDefinition, m *pb.
 		} else if ts == ser.LastRaw.Timestamp {
 			ser.ControlMetric.Timestamp = ingestTime
 			ser.LastRaw.Value = m.Value
-			ser.LastRaw.CumulativeBuckets = m.HistogramBuckets
+			ser.LastRaw.Histogram = m.GetHistogram()
 		}
 
 	default: // Gauge (Default)

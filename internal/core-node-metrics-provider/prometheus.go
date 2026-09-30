@@ -101,11 +101,13 @@ func (a *CoreNodeMetricsProvider) scrapePod(ip string, port string, path string,
 						count := m.Histogram.GetSampleCount()
 
 						samples = append(samples, &pb.MetricSample{
-							Name:             name,
-							Labels:           labels,
-							HistogramBuckets: buckets,
-							HistogramSum:     sum,
-							HistogramCount:   count,
+							Name:   name,
+							Labels: labels,
+							Histogram: &pb.Histogram{
+								Buckets: buckets,
+								Sum:     sum,
+								Count:   count,
+							},
 						})
 					}
 

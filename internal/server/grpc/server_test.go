@@ -721,9 +721,9 @@ func TestHistogramWithFilterGRPC(t *testing.T) {
 			Batches: []*pb.MetricBatch{{
 				PodName: "p1",
 				Samples: []*pb.MetricSample{
-					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "GET"}, HistogramBuckets: buckets0, Timestamp: ts},
-					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "POST"}, HistogramBuckets: buckets0, Timestamp: ts},
-					{Name: "api_latency", Labels: map[string]string{"path": "/health"}, HistogramBuckets: buckets0, Timestamp: ts},
+					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "GET"}, Histogram: &pb.Histogram{Buckets: buckets0}, Timestamp: ts},
+					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "POST"}, Histogram: &pb.Histogram{Buckets: buckets0}, Timestamp: ts},
+					{Name: "api_latency", Labels: map[string]string{"path": "/health"}, Histogram: &pb.Histogram{Buckets: buckets0}, Timestamp: ts},
 				},
 			}},
 		}},
@@ -741,11 +741,11 @@ func TestHistogramWithFilterGRPC(t *testing.T) {
 				PodName: "p1",
 				Samples: []*pb.MetricSample{
 					// A: 50 fast
-					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "GET"}, HistogramBuckets: map[string]uint64{"0.1": 50, "0.5": 50, "+Inf": 50}, Timestamp: ts},
+					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "GET"}, Histogram: &pb.Histogram{Buckets: map[string]uint64{"0.1": 50, "0.5": 50, "+Inf": 50}}, Timestamp: ts},
 					// B: 50 slow
-					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "POST"}, HistogramBuckets: map[string]uint64{"0.1": 0, "0.5": 50, "+Inf": 50}, Timestamp: ts},
+					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "POST"}, Histogram: &pb.Histogram{Buckets: map[string]uint64{"0.1": 0, "0.5": 50, "+Inf": 50}}, Timestamp: ts},
 					// C: 1000 very slow (Should be filtered out)
-					{Name: "api_latency", Labels: map[string]string{"path": "/health"}, HistogramBuckets: map[string]uint64{"0.1": 0, "0.5": 0, "+Inf": 1000}, Timestamp: ts},
+					{Name: "api_latency", Labels: map[string]string{"path": "/health"}, Histogram: &pb.Histogram{Buckets: map[string]uint64{"0.1": 0, "0.5": 0, "+Inf": 1000}}, Timestamp: ts},
 				},
 			}},
 		}},
@@ -807,7 +807,7 @@ func TestHistogramLatencyScalingGRPC(t *testing.T) {
 				PodName: "p1",
 				Samples: []*pb.MetricSample{{
 					Name: "latency", Timestamp: ts,
-					HistogramBuckets: map[string]uint64{"0.05": 0, "0.2": 0, "+Inf": 0},
+					Histogram: &pb.Histogram{Buckets: map[string]uint64{"0.05": 0, "0.2": 0, "+Inf": 0}},
 				}},
 			}},
 		}},
@@ -825,7 +825,7 @@ func TestHistogramLatencyScalingGRPC(t *testing.T) {
 				PodName: "p1",
 				Samples: []*pb.MetricSample{{
 					Name: "latency", Timestamp: ts,
-					HistogramBuckets: map[string]uint64{"0.05": 80, "0.2": 100, "+Inf": 100},
+					Histogram: &pb.Histogram{Buckets: map[string]uint64{"0.05": 80, "0.2": 100, "+Inf": 100}},
 				}},
 			}},
 		}},
