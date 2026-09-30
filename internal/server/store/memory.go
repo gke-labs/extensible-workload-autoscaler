@@ -95,7 +95,7 @@ type Series struct {
 	DecayingHistogram *DecayingHistogram
 }
 
-type MetricStore interface {
+type ServerStore interface {
 	AddBatch(req *pb.IngestMetricsRequest) error
 	UpdateRecommenderState(req *pb.UpdateRecommenderStateRequest) error
 	// SetPolicy stores p as the full definition of the policy, replacing any

@@ -9,11 +9,11 @@ import (
 )
 
 // RegisterHandlers registers the UI handlers on the provided mux.
-func RegisterHandlers(mux *http.ServeMux, s store.MetricStore) {
+func RegisterHandlers(mux *http.ServeMux, s store.ServerStore) {
 	mux.HandleFunc("/", handleIndex(s))
 }
 
-func handleIndex(s store.MetricStore) http.HandlerFunc {
+func handleIndex(s store.ServerStore) http.HandlerFunc {
 	tmpl, err := template.New("index").Parse(pageTemplate)
 
 	if err != nil {
