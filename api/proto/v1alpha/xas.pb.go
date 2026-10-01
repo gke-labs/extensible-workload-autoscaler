@@ -10,7 +10,6 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
-	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -92,14 +91,7 @@ func (x *PolicyId) GetName() string {
 type UpdatePolicyRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The policy definition.
-	Policy *Policy `protobuf:"bytes,1,opt,name=policy,proto3" json:"policy,omitempty"`
-	// The list of fields to update. Supports '*' to update only the fields provided in the policy,
-	// a field name, nested or not (e.g. `max_replicas`, `workload.name`), to replace that field
-	// with the value provided,
-	// or `recommender_metrics.my_recommender` to update only the metrics for that recommender.
-	// A field, or map entry, selected by the mask but left unset in the policy is cleared.
-	// Optional: if unset, the whole resource is replaced.
-	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
+	Policy        *Policy `protobuf:"bytes,1,opt,name=policy,proto3" json:"policy,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -137,13 +129,6 @@ func (*UpdatePolicyRequest) Descriptor() ([]byte, []int) {
 func (x *UpdatePolicyRequest) GetPolicy() *Policy {
 	if x != nil {
 		return x.Policy
-	}
-	return nil
-}
-
-func (x *UpdatePolicyRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
-	if x != nil {
-		return x.UpdateMask
 	}
 	return nil
 }
@@ -311,8 +296,11 @@ type Policy struct {
 	// Metric names only need to be unique within their owner. The
 	// `recommender_name` field in the metric definition must match.
 	RecommenderMetrics map[string]*MetricDefinitionList `protobuf:"bytes,10,rep,name=recommender_metrics,json=recommenderMetrics,proto3" json:"recommender_metrics,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// The tag that holds the hash of the subset of the policy fields that are modified externally.
+	// The etag shows the freshness of the policy and ensures no updates derived from old policy states are accepted.
+	Etag          string `protobuf:"bytes,11,opt,name=etag,proto3" json:"etag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Policy) Reset() {
@@ -406,6 +394,13 @@ func (x *Policy) GetRecommenderMetrics() map[string]*MetricDefinitionList {
 		return x.RecommenderMetrics
 	}
 	return nil
+}
+
+func (x *Policy) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
 }
 
 // MetricDefinitionList is a list of metric definitions.
@@ -2492,21 +2487,19 @@ var File_xas_proto protoreflect.FileDescriptor
 
 const file_xas_proto_rawDesc = "" +
 	"\n" +
-	"\txas.proto\x12\vxas.v1alpha\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\"_\n" +
+	"\txas.proto\x12\vxas.v1alpha\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\"_\n" +
 	"\bPolicyId\x12!\n" +
 	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\x12\x1c\n" +
 	"\tnamespace\x18\x02 \x01(\tR\tnamespace\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\"\x7f\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\"B\n" +
 	"\x13UpdatePolicyRequest\x12+\n" +
-	"\x06policy\x18\x01 \x01(\v2\x13.xas.v1alpha.PolicyR\x06policy\x12;\n" +
-	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
-	"updateMask\"<\n" +
+	"\x06policy\x18\x01 \x01(\v2\x13.xas.v1alpha.PolicyR\x06policy\"<\n" +
 	"\x13DeletePolicyRequest\x12%\n" +
 	"\x02id\x18\x01 \x01(\v2\x15.xas.v1alpha.PolicyIdR\x02id\"8\n" +
 	"\x13ListPoliciesRequest\x12!\n" +
 	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\"G\n" +
 	"\x14ListPoliciesResponse\x12/\n" +
-	"\bpolicies\x18\x01 \x03(\v2\x13.xas.v1alpha.PolicyR\bpolicies\"\xca\x04\n" +
+	"\bpolicies\x18\x01 \x03(\v2\x13.xas.v1alpha.PolicyR\bpolicies\"\xde\x04\n" +
 	"\x06Policy\x12%\n" +
 	"\x02id\x18\x01 \x01(\v2\x15.xas.v1alpha.PolicyIdR\x02id\x124\n" +
 	"\bworkload\x18\x03 \x01(\v2\x18.xas.v1alpha.WorkloadRefR\bworkload\x12!\n" +
@@ -2519,7 +2512,8 @@ const file_xas_proto_rawDesc = "" +
 	"\ascaling\x18\b \x03(\v2\".xas.v1alpha.RecommenderDefinitionR\ascaling\x12\x1a\n" +
 	"\bselector\x18\t \x01(\tR\bselector\x12\\\n" +
 	"\x13recommender_metrics\x18\n" +
-	" \x03(\v2+.xas.v1alpha.Policy.RecommenderMetricsEntryR\x12recommenderMetrics\x1ah\n" +
+	" \x03(\v2+.xas.v1alpha.Policy.RecommenderMetricsEntryR\x12recommenderMetrics\x12\x12\n" +
+	"\x04etag\x18\v \x01(\tR\x04etag\x1ah\n" +
 	"\x17RecommenderMetricsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x127\n" +
 	"\x05value\x18\x02 \x01(\v2!.xas.v1alpha.MetricDefinitionListR\x05value:\x028\x01\"W\n" +
@@ -2787,88 +2781,86 @@ var file_xas_proto_goTypes = []any{
 	nil,                                   // 49: xas.v1alpha.RecommenderState.ConfigEntry
 	nil,                                   // 50: xas.v1alpha.MetricSample.LabelsEntry
 	nil,                                   // 51: xas.v1alpha.Histogram.BucketsEntry
-	(*fieldmaskpb.FieldMask)(nil),         // 52: google.protobuf.FieldMask
-	(*timestamppb.Timestamp)(nil),         // 53: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),                 // 54: google.protobuf.Empty
+	(*timestamppb.Timestamp)(nil),         // 52: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),                 // 53: google.protobuf.Empty
 }
 var file_xas_proto_depIdxs = []int32{
 	5,  // 0: xas.v1alpha.UpdatePolicyRequest.policy:type_name -> xas.v1alpha.Policy
-	52, // 1: xas.v1alpha.UpdatePolicyRequest.update_mask:type_name -> google.protobuf.FieldMask
-	0,  // 2: xas.v1alpha.DeletePolicyRequest.id:type_name -> xas.v1alpha.PolicyId
-	5,  // 3: xas.v1alpha.ListPoliciesResponse.policies:type_name -> xas.v1alpha.Policy
-	0,  // 4: xas.v1alpha.Policy.id:type_name -> xas.v1alpha.PolicyId
-	7,  // 5: xas.v1alpha.Policy.workload:type_name -> xas.v1alpha.WorkloadRef
-	8,  // 6: xas.v1alpha.Policy.metrics:type_name -> xas.v1alpha.MetricDefinition
-	13, // 7: xas.v1alpha.Policy.activation:type_name -> xas.v1alpha.RecommenderDefinition
-	13, // 8: xas.v1alpha.Policy.scaling:type_name -> xas.v1alpha.RecommenderDefinition
-	37, // 9: xas.v1alpha.Policy.recommender_metrics:type_name -> xas.v1alpha.Policy.RecommenderMetricsEntry
-	8,  // 10: xas.v1alpha.MetricDefinitionList.definitions:type_name -> xas.v1alpha.MetricDefinition
-	38, // 11: xas.v1alpha.MetricDefinition.params:type_name -> xas.v1alpha.MetricDefinition.ParamsEntry
-	39, // 12: xas.v1alpha.MetricDefinition.filter:type_name -> xas.v1alpha.MetricDefinition.FilterEntry
-	9,  // 13: xas.v1alpha.MetricDefinition.gauge:type_name -> xas.v1alpha.Gauge
-	10, // 14: xas.v1alpha.MetricDefinition.rate:type_name -> xas.v1alpha.Rate
-	11, // 15: xas.v1alpha.MetricDefinition.distribution:type_name -> xas.v1alpha.Distribution
-	12, // 16: xas.v1alpha.MetricDefinition.decaying_distribution:type_name -> xas.v1alpha.DecayingDistribution
-	40, // 17: xas.v1alpha.RecommenderDefinition.params:type_name -> xas.v1alpha.RecommenderDefinition.ParamsEntry
-	0,  // 18: xas.v1alpha.UpdateWorkloadRequest.id:type_name -> xas.v1alpha.PolicyId
-	15, // 19: xas.v1alpha.UpdateWorkloadRequest.workload:type_name -> xas.v1alpha.Workload
-	16, // 20: xas.v1alpha.Workload.pods:type_name -> xas.v1alpha.PodState
-	17, // 21: xas.v1alpha.PodState.containers:type_name -> xas.v1alpha.ContainerState
-	41, // 22: xas.v1alpha.ContainerState.requests:type_name -> xas.v1alpha.ContainerState.RequestsEntry
-	0,  // 23: xas.v1alpha.GetControlMetricsRequest.id:type_name -> xas.v1alpha.PolicyId
-	42, // 24: xas.v1alpha.MetricValues.values:type_name -> xas.v1alpha.MetricValues.ValuesEntry
-	43, // 25: xas.v1alpha.ContainerMetrics.container_metrics:type_name -> xas.v1alpha.ContainerMetrics.ContainerMetricsEntry
-	44, // 26: xas.v1alpha.ControlMetrics.values:type_name -> xas.v1alpha.ControlMetrics.ValuesEntry
-	45, // 27: xas.v1alpha.ControlMetrics.pod_metrics:type_name -> xas.v1alpha.ControlMetrics.PodMetricsEntry
-	46, // 28: xas.v1alpha.ControlMetrics.pod_container_metrics:type_name -> xas.v1alpha.ControlMetrics.PodContainerMetricsEntry
-	20, // 29: xas.v1alpha.ControlMetrics.container_metrics:type_name -> xas.v1alpha.ContainerMetrics
-	0,  // 30: xas.v1alpha.UpdateRecommenderStateRequest.id:type_name -> xas.v1alpha.PolicyId
-	25, // 31: xas.v1alpha.UpdateRecommenderStateRequest.recommendation:type_name -> xas.v1alpha.Recommendation
-	47, // 32: xas.v1alpha.ContainerResource.requests:type_name -> xas.v1alpha.ContainerResource.RequestsEntry
-	48, // 33: xas.v1alpha.ContainerResource.limits:type_name -> xas.v1alpha.ContainerResource.LimitsEntry
-	23, // 34: xas.v1alpha.PodContainerResource.container_resources:type_name -> xas.v1alpha.ContainerResource
-	23, // 35: xas.v1alpha.Recommendation.workload_resources:type_name -> xas.v1alpha.ContainerResource
-	24, // 36: xas.v1alpha.Recommendation.pod_container_resources:type_name -> xas.v1alpha.PodContainerResource
-	49, // 37: xas.v1alpha.RecommenderState.config:type_name -> xas.v1alpha.RecommenderState.ConfigEntry
-	27, // 38: xas.v1alpha.RecommenderState.status:type_name -> xas.v1alpha.RecommenderStatus
-	53, // 39: xas.v1alpha.RecommenderStatus.last_updated:type_name -> google.protobuf.Timestamp
-	23, // 40: xas.v1alpha.RecommenderStatus.workload_resources:type_name -> xas.v1alpha.ContainerResource
-	24, // 41: xas.v1alpha.RecommenderStatus.pod_resources:type_name -> xas.v1alpha.PodContainerResource
-	0,  // 42: xas.v1alpha.GetRecommendationRequest.id:type_name -> xas.v1alpha.PolicyId
-	25, // 43: xas.v1alpha.GetRecommendationResponse.recommendation:type_name -> xas.v1alpha.Recommendation
-	27, // 44: xas.v1alpha.GetRecommendationResponse.explanation:type_name -> xas.v1alpha.RecommenderStatus
-	30, // 45: xas.v1alpha.GetRecommendationResponse.metric_statuses:type_name -> xas.v1alpha.MetricStatus
-	32, // 46: xas.v1alpha.IngestMetricsRequest.policies:type_name -> xas.v1alpha.PolicyBatch
-	33, // 47: xas.v1alpha.PolicyBatch.batches:type_name -> xas.v1alpha.MetricBatch
-	34, // 48: xas.v1alpha.MetricBatch.samples:type_name -> xas.v1alpha.MetricSample
-	50, // 49: xas.v1alpha.MetricSample.labels:type_name -> xas.v1alpha.MetricSample.LabelsEntry
-	35, // 50: xas.v1alpha.MetricSample.histogram:type_name -> xas.v1alpha.Histogram
-	51, // 51: xas.v1alpha.Histogram.buckets:type_name -> xas.v1alpha.Histogram.BucketsEntry
-	6,  // 52: xas.v1alpha.Policy.RecommenderMetricsEntry.value:type_name -> xas.v1alpha.MetricDefinitionList
-	19, // 53: xas.v1alpha.ContainerMetrics.ContainerMetricsEntry.value:type_name -> xas.v1alpha.MetricValues
-	19, // 54: xas.v1alpha.ControlMetrics.PodMetricsEntry.value:type_name -> xas.v1alpha.MetricValues
-	20, // 55: xas.v1alpha.ControlMetrics.PodContainerMetricsEntry.value:type_name -> xas.v1alpha.ContainerMetrics
-	1,  // 56: xas.v1alpha.XASServer.UpdatePolicy:input_type -> xas.v1alpha.UpdatePolicyRequest
-	2,  // 57: xas.v1alpha.XASServer.DeletePolicy:input_type -> xas.v1alpha.DeletePolicyRequest
-	3,  // 58: xas.v1alpha.XASServer.ListPolicies:input_type -> xas.v1alpha.ListPoliciesRequest
-	14, // 59: xas.v1alpha.XASServer.UpdateWorkload:input_type -> xas.v1alpha.UpdateWorkloadRequest
-	18, // 60: xas.v1alpha.XASServer.GetControlMetrics:input_type -> xas.v1alpha.GetControlMetricsRequest
-	22, // 61: xas.v1alpha.XASServer.UpdateRecommenderState:input_type -> xas.v1alpha.UpdateRecommenderStateRequest
-	28, // 62: xas.v1alpha.XASServer.GetRecommendation:input_type -> xas.v1alpha.GetRecommendationRequest
-	31, // 63: xas.v1alpha.XASServer.IngestMetrics:input_type -> xas.v1alpha.IngestMetricsRequest
-	5,  // 64: xas.v1alpha.XASServer.UpdatePolicy:output_type -> xas.v1alpha.Policy
-	54, // 65: xas.v1alpha.XASServer.DeletePolicy:output_type -> google.protobuf.Empty
-	4,  // 66: xas.v1alpha.XASServer.ListPolicies:output_type -> xas.v1alpha.ListPoliciesResponse
-	15, // 67: xas.v1alpha.XASServer.UpdateWorkload:output_type -> xas.v1alpha.Workload
-	21, // 68: xas.v1alpha.XASServer.GetControlMetrics:output_type -> xas.v1alpha.ControlMetrics
-	26, // 69: xas.v1alpha.XASServer.UpdateRecommenderState:output_type -> xas.v1alpha.RecommenderState
-	29, // 70: xas.v1alpha.XASServer.GetRecommendation:output_type -> xas.v1alpha.GetRecommendationResponse
-	36, // 71: xas.v1alpha.XASServer.IngestMetrics:output_type -> xas.v1alpha.IngestMetricsResponse
-	64, // [64:72] is the sub-list for method output_type
-	56, // [56:64] is the sub-list for method input_type
-	56, // [56:56] is the sub-list for extension type_name
-	56, // [56:56] is the sub-list for extension extendee
-	0,  // [0:56] is the sub-list for field type_name
+	0,  // 1: xas.v1alpha.DeletePolicyRequest.id:type_name -> xas.v1alpha.PolicyId
+	5,  // 2: xas.v1alpha.ListPoliciesResponse.policies:type_name -> xas.v1alpha.Policy
+	0,  // 3: xas.v1alpha.Policy.id:type_name -> xas.v1alpha.PolicyId
+	7,  // 4: xas.v1alpha.Policy.workload:type_name -> xas.v1alpha.WorkloadRef
+	8,  // 5: xas.v1alpha.Policy.metrics:type_name -> xas.v1alpha.MetricDefinition
+	13, // 6: xas.v1alpha.Policy.activation:type_name -> xas.v1alpha.RecommenderDefinition
+	13, // 7: xas.v1alpha.Policy.scaling:type_name -> xas.v1alpha.RecommenderDefinition
+	37, // 8: xas.v1alpha.Policy.recommender_metrics:type_name -> xas.v1alpha.Policy.RecommenderMetricsEntry
+	8,  // 9: xas.v1alpha.MetricDefinitionList.definitions:type_name -> xas.v1alpha.MetricDefinition
+	38, // 10: xas.v1alpha.MetricDefinition.params:type_name -> xas.v1alpha.MetricDefinition.ParamsEntry
+	39, // 11: xas.v1alpha.MetricDefinition.filter:type_name -> xas.v1alpha.MetricDefinition.FilterEntry
+	9,  // 12: xas.v1alpha.MetricDefinition.gauge:type_name -> xas.v1alpha.Gauge
+	10, // 13: xas.v1alpha.MetricDefinition.rate:type_name -> xas.v1alpha.Rate
+	11, // 14: xas.v1alpha.MetricDefinition.distribution:type_name -> xas.v1alpha.Distribution
+	12, // 15: xas.v1alpha.MetricDefinition.decaying_distribution:type_name -> xas.v1alpha.DecayingDistribution
+	40, // 16: xas.v1alpha.RecommenderDefinition.params:type_name -> xas.v1alpha.RecommenderDefinition.ParamsEntry
+	0,  // 17: xas.v1alpha.UpdateWorkloadRequest.id:type_name -> xas.v1alpha.PolicyId
+	15, // 18: xas.v1alpha.UpdateWorkloadRequest.workload:type_name -> xas.v1alpha.Workload
+	16, // 19: xas.v1alpha.Workload.pods:type_name -> xas.v1alpha.PodState
+	17, // 20: xas.v1alpha.PodState.containers:type_name -> xas.v1alpha.ContainerState
+	41, // 21: xas.v1alpha.ContainerState.requests:type_name -> xas.v1alpha.ContainerState.RequestsEntry
+	0,  // 22: xas.v1alpha.GetControlMetricsRequest.id:type_name -> xas.v1alpha.PolicyId
+	42, // 23: xas.v1alpha.MetricValues.values:type_name -> xas.v1alpha.MetricValues.ValuesEntry
+	43, // 24: xas.v1alpha.ContainerMetrics.container_metrics:type_name -> xas.v1alpha.ContainerMetrics.ContainerMetricsEntry
+	44, // 25: xas.v1alpha.ControlMetrics.values:type_name -> xas.v1alpha.ControlMetrics.ValuesEntry
+	45, // 26: xas.v1alpha.ControlMetrics.pod_metrics:type_name -> xas.v1alpha.ControlMetrics.PodMetricsEntry
+	46, // 27: xas.v1alpha.ControlMetrics.pod_container_metrics:type_name -> xas.v1alpha.ControlMetrics.PodContainerMetricsEntry
+	20, // 28: xas.v1alpha.ControlMetrics.container_metrics:type_name -> xas.v1alpha.ContainerMetrics
+	0,  // 29: xas.v1alpha.UpdateRecommenderStateRequest.id:type_name -> xas.v1alpha.PolicyId
+	25, // 30: xas.v1alpha.UpdateRecommenderStateRequest.recommendation:type_name -> xas.v1alpha.Recommendation
+	47, // 31: xas.v1alpha.ContainerResource.requests:type_name -> xas.v1alpha.ContainerResource.RequestsEntry
+	48, // 32: xas.v1alpha.ContainerResource.limits:type_name -> xas.v1alpha.ContainerResource.LimitsEntry
+	23, // 33: xas.v1alpha.PodContainerResource.container_resources:type_name -> xas.v1alpha.ContainerResource
+	23, // 34: xas.v1alpha.Recommendation.workload_resources:type_name -> xas.v1alpha.ContainerResource
+	24, // 35: xas.v1alpha.Recommendation.pod_container_resources:type_name -> xas.v1alpha.PodContainerResource
+	49, // 36: xas.v1alpha.RecommenderState.config:type_name -> xas.v1alpha.RecommenderState.ConfigEntry
+	27, // 37: xas.v1alpha.RecommenderState.status:type_name -> xas.v1alpha.RecommenderStatus
+	52, // 38: xas.v1alpha.RecommenderStatus.last_updated:type_name -> google.protobuf.Timestamp
+	23, // 39: xas.v1alpha.RecommenderStatus.workload_resources:type_name -> xas.v1alpha.ContainerResource
+	24, // 40: xas.v1alpha.RecommenderStatus.pod_resources:type_name -> xas.v1alpha.PodContainerResource
+	0,  // 41: xas.v1alpha.GetRecommendationRequest.id:type_name -> xas.v1alpha.PolicyId
+	25, // 42: xas.v1alpha.GetRecommendationResponse.recommendation:type_name -> xas.v1alpha.Recommendation
+	27, // 43: xas.v1alpha.GetRecommendationResponse.explanation:type_name -> xas.v1alpha.RecommenderStatus
+	30, // 44: xas.v1alpha.GetRecommendationResponse.metric_statuses:type_name -> xas.v1alpha.MetricStatus
+	32, // 45: xas.v1alpha.IngestMetricsRequest.policies:type_name -> xas.v1alpha.PolicyBatch
+	33, // 46: xas.v1alpha.PolicyBatch.batches:type_name -> xas.v1alpha.MetricBatch
+	34, // 47: xas.v1alpha.MetricBatch.samples:type_name -> xas.v1alpha.MetricSample
+	50, // 48: xas.v1alpha.MetricSample.labels:type_name -> xas.v1alpha.MetricSample.LabelsEntry
+	35, // 49: xas.v1alpha.MetricSample.histogram:type_name -> xas.v1alpha.Histogram
+	51, // 50: xas.v1alpha.Histogram.buckets:type_name -> xas.v1alpha.Histogram.BucketsEntry
+	6,  // 51: xas.v1alpha.Policy.RecommenderMetricsEntry.value:type_name -> xas.v1alpha.MetricDefinitionList
+	19, // 52: xas.v1alpha.ContainerMetrics.ContainerMetricsEntry.value:type_name -> xas.v1alpha.MetricValues
+	19, // 53: xas.v1alpha.ControlMetrics.PodMetricsEntry.value:type_name -> xas.v1alpha.MetricValues
+	20, // 54: xas.v1alpha.ControlMetrics.PodContainerMetricsEntry.value:type_name -> xas.v1alpha.ContainerMetrics
+	1,  // 55: xas.v1alpha.XASServer.UpdatePolicy:input_type -> xas.v1alpha.UpdatePolicyRequest
+	2,  // 56: xas.v1alpha.XASServer.DeletePolicy:input_type -> xas.v1alpha.DeletePolicyRequest
+	3,  // 57: xas.v1alpha.XASServer.ListPolicies:input_type -> xas.v1alpha.ListPoliciesRequest
+	14, // 58: xas.v1alpha.XASServer.UpdateWorkload:input_type -> xas.v1alpha.UpdateWorkloadRequest
+	18, // 59: xas.v1alpha.XASServer.GetControlMetrics:input_type -> xas.v1alpha.GetControlMetricsRequest
+	22, // 60: xas.v1alpha.XASServer.UpdateRecommenderState:input_type -> xas.v1alpha.UpdateRecommenderStateRequest
+	28, // 61: xas.v1alpha.XASServer.GetRecommendation:input_type -> xas.v1alpha.GetRecommendationRequest
+	31, // 62: xas.v1alpha.XASServer.IngestMetrics:input_type -> xas.v1alpha.IngestMetricsRequest
+	5,  // 63: xas.v1alpha.XASServer.UpdatePolicy:output_type -> xas.v1alpha.Policy
+	53, // 64: xas.v1alpha.XASServer.DeletePolicy:output_type -> google.protobuf.Empty
+	4,  // 65: xas.v1alpha.XASServer.ListPolicies:output_type -> xas.v1alpha.ListPoliciesResponse
+	15, // 66: xas.v1alpha.XASServer.UpdateWorkload:output_type -> xas.v1alpha.Workload
+	21, // 67: xas.v1alpha.XASServer.GetControlMetrics:output_type -> xas.v1alpha.ControlMetrics
+	26, // 68: xas.v1alpha.XASServer.UpdateRecommenderState:output_type -> xas.v1alpha.RecommenderState
+	29, // 69: xas.v1alpha.XASServer.GetRecommendation:output_type -> xas.v1alpha.GetRecommendationResponse
+	36, // 70: xas.v1alpha.XASServer.IngestMetrics:output_type -> xas.v1alpha.IngestMetricsResponse
+	63, // [63:71] is the sub-list for method output_type
+	55, // [55:63] is the sub-list for method input_type
+	55, // [55:55] is the sub-list for extension type_name
+	55, // [55:55] is the sub-list for extension extendee
+	0,  // [0:55] is the sub-list for field type_name
 }
 
 func init() { file_xas_proto_init() }

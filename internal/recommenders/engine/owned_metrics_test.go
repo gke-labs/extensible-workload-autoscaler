@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
@@ -26,6 +25,9 @@ type fakeXASServerClient struct {
 	pb.XASServerClient
 	requests []*pb.UpdatePolicyRequest
 	err      error
+	// etag, when set, is the ETag the fake Server puts on the returned policy,
+	// like the real Server does after a successful write.
+	etag string
 }
 
 func (c *fakeXASServerClient) UpdatePolicy(_ context.Context, req *pb.UpdatePolicyRequest, _ ...grpc.CallOption) (*pb.Policy, error) {
@@ -33,7 +35,11 @@ func (c *fakeXASServerClient) UpdatePolicy(_ context.Context, req *pb.UpdatePoli
 	if c.err != nil {
 		return nil, c.err
 	}
-	return req.Policy, nil
+	resp := proto.Clone(req.Policy).(*pb.Policy)
+	if c.etag != "" {
+		resp.Etag = c.etag
+	}
+	return resp, nil
 }
 
 // owningRecommender owns the metrics declared for each recommender instance
@@ -101,9 +107,11 @@ func TestSyncRecommenderMetrics(t *testing.T) {
 	tests := []struct {
 		name string
 		// owned is what the owning recommender claims, keyed by recommender name.
-		owned        map[string][]*pb.MetricDefinition
-		policy       *pb.Policy
-		clientErr    error
+		owned     map[string][]*pb.MetricDefinition
+		policy    *pb.Policy
+		clientErr error
+		// serverEtag is the ETag the fake Server puts on the policy it returns.
+		serverEtag   string
 		wantRequests []*pb.UpdatePolicyRequest
 		wantPolicy   *pb.Policy
 	}{
@@ -112,10 +120,9 @@ func TestSyncRecommenderMetrics(t *testing.T) {
 			owned:  map[string][]*pb.MetricDefinition{"vpa": {cpuMetric("vpa")}},
 			policy: &pb.Policy{Id: id, Scaling: scaling},
 			wantRequests: []*pb.UpdatePolicyRequest{{
-				Policy: &pb.Policy{Id: id, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+				Policy: &pb.Policy{Id: id, Scaling: scaling, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 					"vpa": {Definitions: []*pb.MetricDefinition{cpuMetric("vpa")}},
 				}},
-				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"recommender_metrics.vpa"}},
 			}},
 			wantPolicy: &pb.Policy{Id: id, Scaling: scaling, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 				"vpa": {Definitions: []*pb.MetricDefinition{cpuMetric("vpa")}},
@@ -128,10 +135,9 @@ func TestSyncRecommenderMetrics(t *testing.T) {
 				"vpa": {Definitions: []*pb.MetricDefinition{cpuMetric("vpa")}},
 			}},
 			wantRequests: []*pb.UpdatePolicyRequest{{
-				Policy: &pb.Policy{Id: id, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+				Policy: &pb.Policy{Id: id, Scaling: scaling, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 					"vpa": {Definitions: []*pb.MetricDefinition{cpuMetric("vpa"), memoryMetric("vpa")}},
 				}},
-				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"recommender_metrics.vpa"}},
 			}},
 			wantPolicy: &pb.Policy{Id: id, Scaling: scaling, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 				"vpa": {Definitions: []*pb.MetricDefinition{cpuMetric("vpa"), memoryMetric("vpa")}},
@@ -157,14 +163,14 @@ func TestSyncRecommenderMetrics(t *testing.T) {
 			name:  "Entries owned by other writers are left untouched",
 			owned: map[string][]*pb.MetricDefinition{"vpa": {cpuMetric("vpa")}},
 			policy: &pb.Policy{Id: id, Scaling: scaling, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
-				// Registered by another binary: outside the mask, and kept as is.
+				// Registered by another binary: sent back unchanged.
 				"custom": {Definitions: []*pb.MetricDefinition{cpuMetric("custom")}},
 			}},
 			wantRequests: []*pb.UpdatePolicyRequest{{
-				Policy: &pb.Policy{Id: id, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
-					"vpa": {Definitions: []*pb.MetricDefinition{cpuMetric("vpa")}},
+				Policy: &pb.Policy{Id: id, Scaling: scaling, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+					"vpa":    {Definitions: []*pb.MetricDefinition{cpuMetric("vpa")}},
+					"custom": {Definitions: []*pb.MetricDefinition{cpuMetric("custom")}},
 				}},
-				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"recommender_metrics.vpa"}},
 			}},
 			wantPolicy: &pb.Policy{Id: id, Scaling: scaling, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 				"vpa":    {Definitions: []*pb.MetricDefinition{cpuMetric("vpa")}},
@@ -178,13 +184,26 @@ func TestSyncRecommenderMetrics(t *testing.T) {
 				"vpa": {Definitions: []*pb.MetricDefinition{cpuMetric("vpa")}},
 			}},
 			wantRequests: []*pb.UpdatePolicyRequest{{
-				Policy: &pb.Policy{Id: id, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+				Policy: &pb.Policy{Id: id, Scaling: scaling, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 					"vpa": {},
 				}},
-				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"recommender_metrics.vpa"}},
 			}},
 			wantPolicy: &pb.Policy{Id: id, Scaling: scaling, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 				"vpa": {},
+			}},
+		},
+		{
+			name:       "Sends the listed ETag and returns the policy with the new one",
+			owned:      map[string][]*pb.MetricDefinition{"vpa": {cpuMetric("vpa")}},
+			policy:     &pb.Policy{Id: id, Scaling: scaling, Etag: "listed"},
+			serverEtag: "after-write",
+			wantRequests: []*pb.UpdatePolicyRequest{{
+				Policy: &pb.Policy{Id: id, Scaling: scaling, Etag: "listed", RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+					"vpa": {Definitions: []*pb.MetricDefinition{cpuMetric("vpa")}},
+				}},
+			}},
+			wantPolicy: &pb.Policy{Id: id, Scaling: scaling, Etag: "after-write", RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+				"vpa": {Definitions: []*pb.MetricDefinition{cpuMetric("vpa")}},
 			}},
 		},
 		{
@@ -193,10 +212,9 @@ func TestSyncRecommenderMetrics(t *testing.T) {
 			policy:    &pb.Policy{Id: id, Scaling: scaling},
 			clientErr: errors.New("server unavailable"),
 			wantRequests: []*pb.UpdatePolicyRequest{{
-				Policy: &pb.Policy{Id: id, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+				Policy: &pb.Policy{Id: id, Scaling: scaling, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 					"vpa": {Definitions: []*pb.MetricDefinition{cpuMetric("vpa")}},
 				}},
-				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"recommender_metrics.vpa"}},
 			}},
 			wantPolicy: &pb.Policy{Id: id, Scaling: scaling},
 		},
@@ -204,7 +222,7 @@ func TestSyncRecommenderMetrics(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			client := &fakeXASServerClient{err: tc.clientErr}
+			client := &fakeXASServerClient{err: tc.clientErr, etag: tc.serverEtag}
 			e := newTestEngine(t, client, classes, map[string]Recommender{
 				"Owning": &owningRecommender{metrics: tc.owned},
 				"Plain":  plainRecommender{},
@@ -222,10 +240,10 @@ func TestSyncRecommenderMetrics(t *testing.T) {
 	}
 }
 
-// TestSyncRecommenderMetricsSendsOnlyChangedEntries checks that a recommender
-// whose metrics are up to date is left out of the update, so the engine does not
-// rewrite the entries of the other recommenders it manages.
-func TestSyncRecommenderMetricsSendsOnlyChangedEntries(t *testing.T) {
+// TestSyncRecommenderMetricsKeepsUpToDateEntries checks that when only one
+// recommender's metrics changed, the entries of the other recommenders the
+// engine manages are sent back as they were, not dropped or rewritten.
+func TestSyncRecommenderMetricsKeepsUpToDateEntries(t *testing.T) {
 	id := &pb.PolicyId{ClusterName: "default", Namespace: "prod", Name: "web"}
 	client := &fakeXASServerClient{}
 	e := newTestEngine(t, client,
@@ -251,10 +269,10 @@ func TestSyncRecommenderMetricsSendsOnlyChangedEntries(t *testing.T) {
 	got := e.syncRecommenderMetrics(pol)
 
 	wantRequests := []*pb.UpdatePolicyRequest{{
-		Policy: &pb.Policy{Id: id, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
-			"vpa": {Definitions: []*pb.MetricDefinition{cpuMetric("vpa"), memoryMetric("vpa")}},
+		Policy: &pb.Policy{Id: id, Scaling: pol.Scaling, RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+			"vpa":  {Definitions: []*pb.MetricDefinition{cpuMetric("vpa"), memoryMetric("vpa")}},
+			"vpa2": {Definitions: []*pb.MetricDefinition{cpuMetric("vpa2")}},
 		}},
-		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"recommender_metrics.vpa"}},
 	}}
 	if diff := cmp.Diff(wantRequests, client.requests, protocmp.Transform()); diff != "" {
 		t.Errorf("UpdatePolicy requests mismatch (-want +got):\n%s", diff)

@@ -2,7 +2,9 @@ package store
 
 import (
 	"encoding/json"
+	"errors"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -223,7 +225,7 @@ func TestMetricCalculations(t *testing.T) {
 				Metrics:  tc.metrics,
 				Workload: &pb.WorkloadRef{Name: "app"},
 			}
-			s.SetPolicy("default", policy)
+			s.UpdatePolicy("default", policy)
 
 			if tc.workload != nil {
 				s.UpdateWorkload(&pb.UpdateWorkloadRequest{
@@ -315,7 +317,7 @@ func TestRecommendationArbitration(t *testing.T) {
 			{Name: "a1", Recommender: "Threshold", Type: "Threshold"},
 		},
 	}
-	s.SetPolicy("default", policy)
+	s.UpdatePolicy("default", policy)
 
 	// Case 1: All Active. R1=3, R2=5. Result=5.
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
@@ -373,7 +375,10 @@ func TestDump(t *testing.T) {
 		MinReplicas: 1,
 		MaxReplicas: 10,
 	}
-	s.SetPolicy("default", policy)
+	stored := mustUpdatePolicy(t, s, "default", policy)
+	if stored.GetEtag() == "" {
+		t.Fatal("UpdatePolicy() returned a policy without an ETag")
+	}
 
 	// 2. Workload
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
@@ -449,7 +454,8 @@ func TestDump(t *testing.T) {
           },
           "type": "Linear"
         }
-      ]
+      ],
+      "etag": "ETAG"
     },
     "Workload": {
       "p1": {
@@ -521,6 +527,7 @@ func TestDump(t *testing.T) {
     "RecommenderControlMetrics": null
   }
 }`
+	expected = strings.Replace(expected, `"etag": "ETAG"`, `"etag": "`+stored.GetEtag()+`"`, 1)
 
 	if string(data) != expected {
 		t.Errorf("Dump JSON mismatch.\nWant:\n%s\nGot:\n%s", expected, string(data))
@@ -552,7 +559,7 @@ func TestWindowedMetrics(t *testing.T) {
 		},
 		Workload: &pb.WorkloadRef{Name: "app"},
 	}
-	s.SetPolicy("default", policy)
+	s.UpdatePolicy("default", policy)
 
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
 		Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol},
@@ -628,7 +635,7 @@ func TestAggregatedDecayingHistogram(t *testing.T) {
 		},
 		Workload: &pb.WorkloadRef{Name: "app"},
 	}
-	s.SetPolicy("default", policy)
+	s.UpdatePolicy("default", policy)
 
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
 		Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol},
@@ -666,7 +673,7 @@ func TestDeletePolicy(t *testing.T) {
 	id := &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: name}
 
 	// 1. Setup state
-	s.SetPolicy("default", &pb.Policy{
+	s.UpdatePolicy("default", &pb.Policy{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: name},
 	})
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{Id: id, Workload: &pb.Workload{Pods: []*pb.PodState{{Name: "p1"}}}})
@@ -698,13 +705,13 @@ func TestMultiTenantIsolation(t *testing.T) {
 		Id:      &pb.PolicyId{ClusterName: "cluster-A", Namespace: ns, Name: name},
 		Metrics: []*pb.MetricDefinition{{Name: "m", Gauge: &pb.Gauge{Aggregation: "Avg"}}},
 	}
-	s.SetPolicy("cluster-A", polA)
+	s.UpdatePolicy("cluster-A", polA)
 
 	polB := &pb.Policy{
 		Id:      &pb.PolicyId{ClusterName: "cluster-B", Namespace: ns, Name: name},
 		Metrics: []*pb.MetricDefinition{{Name: "m", Gauge: &pb.Gauge{Aggregation: "Avg"}}},
 	}
-	s.SetPolicy("cluster-B", polB)
+	s.UpdatePolicy("cluster-B", polB)
 
 	// 2. Setup Workloads
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
@@ -772,7 +779,7 @@ func TestOrphanedMetricCleanup(t *testing.T) {
 			{Name: "m2", Gauge: &pb.Gauge{Aggregation: "Avg"}},
 		},
 	}
-	s.SetPolicy("default", pol)
+	stored := mustUpdatePolicy(t, s, "default", pol)
 
 	// 2. Ingest data for both
 	ingest(s, 1000, ns, name, "p1", "m1", 10)
@@ -780,7 +787,8 @@ func TestOrphanedMetricCleanup(t *testing.T) {
 
 	// 3. Update policy: remove m1
 	pol.Metrics = []*pb.MetricDefinition{{Name: "m2", Gauge: &pb.Gauge{Aggregation: "Avg"}}}
-	s.SetPolicy("default", pol)
+	pol.Etag = stored.GetEtag()
+	mustUpdatePolicy(t, s, "default", pol)
 
 	// 4. Calculate
 	s.CalculateAll()
@@ -811,7 +819,7 @@ func TestRemoveRecommender(t *testing.T) {
 			{Name: "r1", Recommender: "Linear", Type: "Linear", Params: map[string]string{"target": "10"}},
 		},
 	}
-	s.SetPolicy("default", pol)
+	stored := mustUpdatePolicy(t, s, "default", pol)
 
 	// 2. Simulate R1 recommendation = 10
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
@@ -827,7 +835,8 @@ func TestRemoveRecommender(t *testing.T) {
 
 	// 3. Update Policy: Remove R1
 	pol.Scaling = []*pb.RecommenderDefinition{} // Empty list
-	s.SetPolicy("default", pol)
+	pol.Etag = stored.GetEtag()
+	mustUpdatePolicy(t, s, "default", pol)
 
 	s.CalculateAll()
 	rec, ok := s.GetRecommendation(id)
@@ -876,7 +885,7 @@ func TestPodScopedDecayingHistogram(t *testing.T) {
 		},
 		Workload: &pb.WorkloadRef{Name: "app"},
 	}
-	s.SetPolicy("default", policy)
+	s.UpdatePolicy("default", policy)
 
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
 		Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol},
@@ -924,7 +933,7 @@ func TestContainerResourceRequestWeighting(t *testing.T) {
 		},
 		Workload: &pb.WorkloadRef{Name: "app"},
 	}
-	s.SetPolicy("default", policy)
+	s.UpdatePolicy("default", policy)
 
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
 		Id: id,
@@ -1024,7 +1033,7 @@ func TestVerticalResourceArbitration(t *testing.T) {
 		},
 		Workload: &pb.WorkloadRef{Name: "app"},
 	}
-	s.SetPolicy("default", policy)
+	s.UpdatePolicy("default", policy)
 
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
 		Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol},
@@ -1153,7 +1162,7 @@ func TestRecommenderOwnedMetrics(t *testing.T) {
 			}},
 		},
 	}
-	s.SetPolicy("default", pol)
+	s.UpdatePolicy("default", pol)
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
 		Id:       id,
 		Workload: &pb.Workload{Pods: []*pb.PodState{{Name: "p1", IsReady: true}, {Name: "p2", IsReady: true}}},
@@ -1213,7 +1222,7 @@ func TestRecommenderOwnedMetricsCleanup(t *testing.T) {
 			}},
 		},
 	}
-	s.SetPolicy("default", pol)
+	stored := mustUpdatePolicy(t, s, "default", pol)
 
 	now := time.Now().Unix()
 	ingest(s, now, ns, name, "p1", "cpu", 1)
@@ -1226,7 +1235,8 @@ func TestRecommenderOwnedMetricsCleanup(t *testing.T) {
 
 	// The recommender no longer owns any metric.
 	pol.RecommenderMetrics = nil
-	s.SetPolicy("default", pol)
+	pol.Etag = stored.GetEtag()
+	mustUpdatePolicy(t, s, "default", pol)
 	s.CalculateAll()
 
 	series := s.Dump().(map[policyID]*PolicyState)[policyID{cluster: "default", ns: "default", name: "pol"}].Metrics.Series
@@ -1235,5 +1245,163 @@ func TestRecommenderOwnedMetricsCleanup(t *testing.T) {
 	}
 	if _, ok := series[metricID{name: "cpu"}]; !ok {
 		t.Error("Policy-wide metric was incorrectly deleted")
+	}
+}
+
+// mustUpdatePolicy writes p to the store and fails the test on error. It
+// returns the stored policy, which carries the new ETag.
+func mustUpdatePolicy(t *testing.T, s *MemoryStore, clusterName string, p *pb.Policy) *pb.Policy {
+	t.Helper()
+	stored, err := s.UpdatePolicy(clusterName, p)
+	if err != nil {
+		t.Fatalf("UpdatePolicy(%s) error = %v", p.GetId().GetName(), err)
+	}
+	return stored
+}
+
+func TestUpdatePolicyEtag(t *testing.T) {
+	id := &pb.PolicyId{ClusterName: "default", Namespace: "ns", Name: "pol"}
+	newPolicy := func(maxReplicas int32, etag string) *pb.Policy {
+		return &pb.Policy{Id: id, MinReplicas: 1, MaxReplicas: maxReplicas, Etag: etag}
+	}
+
+	tests := []struct {
+		name     string
+		existing bool // create the policy first
+		// etag returns the ETag to send, given the stored one ("" if none).
+		etag    func(stored string) string
+		wantErr error
+	}{
+		{
+			name: "new policy, empty etag: created",
+			etag: func(string) string { return "" },
+		},
+		{
+			name:    "new policy, etag given: rejected",
+			etag:    func(string) string { return "some-etag" },
+			wantErr: ErrUnknownEtag,
+		},
+		{
+			name:     "existing policy, empty etag: overwritten",
+			existing: true,
+			etag:     func(string) string { return "" },
+		},
+		{
+			name:     "existing policy, matching etag: updated",
+			existing: true,
+			etag:     func(stored string) string { return stored },
+		},
+		{
+			name:     "existing policy, stale etag: rejected",
+			existing: true,
+			etag:     func(stored string) string { return stored + "-stale" },
+			wantErr:  ErrStaleEtag,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewMemoryStore()
+			var before *pb.Policy
+			if tt.existing {
+				before = mustUpdatePolicy(t, s, "default", newPolicy(10, ""))
+			}
+
+			got, err := s.UpdatePolicy("default", newPolicy(20, tt.etag(before.GetEtag())))
+
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("UpdatePolicy() error = %v, want %v", err, tt.wantErr)
+				}
+				if got != nil {
+					t.Errorf("UpdatePolicy() returned %v on error, want nil", got)
+				}
+				// A rejected write must leave the store as it was.
+				after, ok := s.GetPolicy(id)
+				if ok != tt.existing || !proto.Equal(after, before) {
+					t.Errorf("store changed on rejection: got %v (ok=%v), want %v", after, ok, before)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("UpdatePolicy() error = %v", err)
+			}
+			if got.GetMaxReplicas() != 20 {
+				t.Errorf("stored MaxReplicas = %d, want 20", got.GetMaxReplicas())
+			}
+			if got.GetEtag() == "" {
+				t.Error("UpdatePolicy() returned an empty ETag")
+			}
+			if got.GetEtag() == before.GetEtag() {
+				t.Errorf("ETag did not change after a content change: %q", got.GetEtag())
+			}
+		})
+	}
+}
+
+func TestUpdatePolicyDoesNotAliasCaller(t *testing.T) {
+	s := NewMemoryStore()
+	id := &pb.PolicyId{ClusterName: "default", Namespace: "ns", Name: "pol"}
+	p := &pb.Policy{Id: id, MaxReplicas: 10}
+
+	mustUpdatePolicy(t, s, "default", p)
+
+	if p.GetEtag() != "" {
+		t.Errorf("UpdatePolicy() set the ETag on the caller's policy: %q", p.GetEtag())
+	}
+	// Changing the caller's object afterwards must not change the store.
+	p.MaxReplicas = 99
+	stored, _ := s.GetPolicy(id)
+	if stored.GetMaxReplicas() != 10 {
+		t.Errorf("stored MaxReplicas = %d after caller mutation, want 10", stored.GetMaxReplicas())
+	}
+}
+
+func TestListPoliciesReturnsEtag(t *testing.T) {
+	s := NewMemoryStore()
+	stored := mustUpdatePolicy(t, s, "default", &pb.Policy{
+		Id: &pb.PolicyId{ClusterName: "default", Namespace: "ns", Name: "pol"},
+	})
+
+	list := s.ListPolicies("default")
+	if len(list) != 1 {
+		t.Fatalf("ListPolicies() returned %d policies, want 1", len(list))
+	}
+	if got := list[0].GetEtag(); got == "" || got != stored.GetEtag() {
+		t.Errorf("ListPolicies() ETag = %q, want %q", got, stored.GetEtag())
+	}
+}
+
+func TestUpdatePolicyConcurrentSameEtag(t *testing.T) {
+	s := NewMemoryStore()
+	id := &pb.PolicyId{ClusterName: "default", Namespace: "ns", Name: "pol"}
+	initial := mustUpdatePolicy(t, s, "default", &pb.Policy{Id: id, MaxReplicas: 1})
+
+	// All writers read the same version, then race to write different content.
+	const writers = 20
+	errs := make(chan error, writers)
+	for i := 0; i < writers; i++ {
+		go func(i int) {
+			_, err := s.UpdatePolicy("default", &pb.Policy{
+				Id:          id,
+				MaxReplicas: int32(100 + i),
+				Etag:        initial.GetEtag(),
+			})
+			errs <- err
+		}(i)
+	}
+
+	wins := 0
+	for i := 0; i < writers; i++ {
+		err := <-errs
+		switch {
+		case err == nil:
+			wins++
+		case !errors.Is(err, ErrStaleEtag):
+			t.Errorf("unexpected error: %v", err)
+		}
+	}
+	if wins != 1 {
+		t.Errorf("%d writers succeeded with the same ETag, want exactly 1", wins)
 	}
 }

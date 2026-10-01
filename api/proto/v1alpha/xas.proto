@@ -4,7 +4,6 @@ package xas.v1alpha;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
-import "google/protobuf/field_mask.proto";
 
 option go_package = "github.com/gke-labs/extensible-workload-autoscaler/api/v1alpha";
 
@@ -71,14 +70,6 @@ message PolicyId {
 message UpdatePolicyRequest { 
   // The policy definition.
   Policy policy = 1;
-
-  // The list of fields to update. Supports '*' to update only the fields provided in the policy,
-  // a field name, nested or not (e.g. `max_replicas`, `workload.name`), to replace that field
-  // with the value provided,
-  // or `recommender_metrics.my_recommender` to update only the metrics for that recommender.
-  // A field, or map entry, selected by the mask but left unset in the policy is cleared.
-  // Optional: if unset, the whole resource is replaced.
-  google.protobuf.FieldMask update_mask = 2;
 }
 
 // DeletePolicyRequest identifies a policy to delete.
@@ -129,6 +120,10 @@ message Policy {
   // Metric names only need to be unique within their owner. The
   // `recommender_name` field in the metric definition must match.
   map<string, MetricDefinitionList> recommender_metrics = 10;
+
+  // The tag that holds the hash of the subset of the policy fields that are modified externally.
+  // The etag shows the freshness of the policy and ensures no updates derived from old policy states are accepted.
+  string etag = 11;
 }
 
 // MetricDefinitionList is a list of metric definitions.

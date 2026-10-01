@@ -120,16 +120,16 @@ func TestUpdatePolicy_CrossCluster(t *testing.T) {
 	p1 := &pb.Policy{Id: id1, MinReplicas: 1}
 	p2 := &pb.Policy{Id: id2, MinReplicas: 5}
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{Policy: p1})
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{Policy: p2})
+	mustUpdatePolicy(t, client, p1)
+	mustUpdatePolicy(t, client, p2)
 
 	resp1, _ := client.ListPolicies(ctx, &pb.ListPoliciesRequest{ClusterName: "cluster-1"})
-	if diff := cmp.Diff(&pb.ListPoliciesResponse{Policies: []*pb.Policy{p1}}, resp1, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(&pb.ListPoliciesResponse{Policies: []*pb.Policy{p1}}, resp1, protocmp.Transform(), ignoreEtag); diff != "" {
 		t.Errorf("Cluster 1 mismatch (-want +got):\n%s", diff)
 	}
 
 	resp2, _ := client.ListPolicies(ctx, &pb.ListPoliciesRequest{ClusterName: "cluster-2"})
-	if diff := cmp.Diff(&pb.ListPoliciesResponse{Policies: []*pb.Policy{p2}}, resp2, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(&pb.ListPoliciesResponse{Policies: []*pb.Policy{p2}}, resp2, protocmp.Transform(), ignoreEtag); diff != "" {
 		t.Errorf("Cluster 2 mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -148,7 +148,7 @@ func TestUpdatePolicy_FullUpdate(t *testing.T) {
 		Metrics:     []*pb.MetricDefinition{{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}}},
 	}
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{Policy: p1})
+	stored := mustUpdatePolicy(t, client, p1)
 
 	p2 := &pb.Policy{
 		Id:          id,
@@ -156,11 +156,12 @@ func TestUpdatePolicy_FullUpdate(t *testing.T) {
 		MaxReplicas: 20,
 		Workload:    &pb.WorkloadRef{Name: "app2"},
 		Metrics:     []*pb.MetricDefinition{{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}}},
+		Etag:        stored.GetEtag(),
 	}
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{Policy: p2})
+	mustUpdatePolicy(t, client, p2)
 
 	resp, _ := client.ListPolicies(ctx, &pb.ListPoliciesRequest{ClusterName: "c1"})
-	if diff := cmp.Diff(&pb.ListPoliciesResponse{Policies: []*pb.Policy{p2}}, resp, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(&pb.ListPoliciesResponse{Policies: []*pb.Policy{p2}}, resp, protocmp.Transform(), ignoreEtag); diff != "" {
 		t.Errorf("Policy update mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -231,11 +232,11 @@ func TestListPolicies_Filtering(t *testing.T) {
 	p1 := &pb.Policy{Id: &pb.PolicyId{ClusterName: "c1", Namespace: "ns", Name: "p1"}}
 	p2 := &pb.Policy{Id: &pb.PolicyId{ClusterName: "c2", Namespace: "ns", Name: "p2"}}
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{Policy: p1})
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{Policy: p2})
+	mustUpdatePolicy(t, client, p1)
+	mustUpdatePolicy(t, client, p2)
 
 	resp, _ := client.ListPolicies(ctx, &pb.ListPoliciesRequest{ClusterName: "c1"})
-	if diff := cmp.Diff(&pb.ListPoliciesResponse{Policies: []*pb.Policy{p1}}, resp, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(&pb.ListPoliciesResponse{Policies: []*pb.Policy{p1}}, resp, protocmp.Transform(), ignoreEtag); diff != "" {
 		t.Errorf("ListPolicies filtering mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -776,11 +777,9 @@ func TestGetControlMetrics_PolicyUpdate(t *testing.T) {
 	ctx := context.Background()
 
 	id := &pb.PolicyId{ClusterName: "c1", Namespace: "ns", Name: "p1"}
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
-		Policy: &pb.Policy{
-			Id:      id,
-			Metrics: []*pb.MetricDefinition{{Name: "m1", Gauge: &pb.Gauge{Aggregation: "Avg"}}},
-		},
+	stored := mustUpdatePolicy(t, client, &pb.Policy{
+		Id:      id,
+		Metrics: []*pb.MetricDefinition{{Name: "m1", Gauge: &pb.Gauge{Aggregation: "Avg"}}},
 	})
 	client.UpdateWorkload(ctx, &pb.UpdateWorkloadRequest{Id: id, Workload: &pb.Workload{Pods: []*pb.PodState{{Name: "p1", IsReady: true}}}})
 
@@ -802,11 +801,10 @@ func TestGetControlMetrics_PolicyUpdate(t *testing.T) {
 	}
 
 	// Update Policy: Remove m1, add m2
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
-		Policy: &pb.Policy{
-			Id:      id,
-			Metrics: []*pb.MetricDefinition{{Name: "m2", Gauge: &pb.Gauge{Aggregation: "Avg"}}},
-		},
+	mustUpdatePolicy(t, client, &pb.Policy{
+		Id:      id,
+		Metrics: []*pb.MetricDefinition{{Name: "m2", Gauge: &pb.Gauge{Aggregation: "Avg"}}},
+		Etag:    stored.GetEtag(),
 	})
 
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
@@ -1557,16 +1555,14 @@ func TestGetControlMetrics_AggregatedDecayingHistogram(t *testing.T) {
 	ctx := context.Background()
 
 	id := &pb.PolicyId{ClusterName: "c1", Namespace: "ns", Name: "p1"}
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
-		Policy: &pb.Policy{
-			Id: id,
-			Metrics: []*pb.MetricDefinition{
-				{
-					Name: "m_hist", DecayingDistribution: &pb.DecayingDistribution{
-						HalfLife:   "1h",
-						BucketSize: "1.0",
-						Percentile: "p50",
-					},
+	stored := mustUpdatePolicy(t, client, &pb.Policy{
+		Id: id,
+		Metrics: []*pb.MetricDefinition{
+			{
+				Name: "m_hist", DecayingDistribution: &pb.DecayingDistribution{
+					HalfLife:   "1h",
+					BucketSize: "1.0",
+					Percentile: "p50",
 				},
 			},
 		},
@@ -1606,19 +1602,18 @@ func TestGetControlMetrics_AggregatedDecayingHistogram(t *testing.T) {
 	}
 
 	// Now check p95 (should reach bucket 20)
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
-		Policy: &pb.Policy{
-			Id: id,
-			Metrics: []*pb.MetricDefinition{
-				{
-					Name: "m_hist", DecayingDistribution: &pb.DecayingDistribution{
-						HalfLife:   "1h",
-						BucketSize: "1.0",
-						Percentile: "p95",
-					},
+	stored = mustUpdatePolicy(t, client, &pb.Policy{
+		Id: id,
+		Metrics: []*pb.MetricDefinition{
+			{
+				Name: "m_hist", DecayingDistribution: &pb.DecayingDistribution{
+					HalfLife:   "1h",
+					BucketSize: "1.0",
+					Percentile: "p95",
 				},
 			},
 		},
+		Etag: stored.GetEtag(),
 	})
 
 	memStore.CalculateAll()
@@ -1637,19 +1632,18 @@ func TestGetControlMetrics_AggregatedDecayingHistogram(t *testing.T) {
 	ts = clk.Now().Unix()
 
 	// Update policy back to p50 for decay check
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
-		Policy: &pb.Policy{
-			Id: id,
-			Metrics: []*pb.MetricDefinition{
-				{
-					Name: "m_hist", DecayingDistribution: &pb.DecayingDistribution{
-						HalfLife:   "1h",
-						BucketSize: "1.0",
-						Percentile: "p50",
-					},
+	mustUpdatePolicy(t, client, &pb.Policy{
+		Id: id,
+		Metrics: []*pb.MetricDefinition{
+			{
+				Name: "m_hist", DecayingDistribution: &pb.DecayingDistribution{
+					HalfLife:   "1h",
+					BucketSize: "1.0",
+					Percentile: "p50",
 				},
 			},
 		},
+		Etag: stored.GetEtag(),
 	})
 
 	// Ingest a new large sample (weight 1.0, vs old samples now weight 0.5 each -> total 1.0)

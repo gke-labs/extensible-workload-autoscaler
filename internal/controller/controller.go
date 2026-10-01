@@ -22,7 +22,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/types/known/fieldmaskpb"
+	"google.golang.org/protobuf/proto"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
@@ -32,20 +32,6 @@ import (
 )
 
 const xasFinalizer = "xas.io/finalizer"
-
-// crdOwnedPolicyFields lists the Policy fields defined by the ScalingPolicy CRD,
-// i.e. the fields this controller is the source of truth for. It is used as the
-// update mask of the policy sync; the fields left out (notably
-// `recommender_metrics`, owned by the recommenders) are preserved by the Server.
-var crdOwnedPolicyFields = []string{
-	"workload",
-	"min_replicas",
-	"max_replicas",
-	"metrics",
-	"activation",
-	"scaling",
-	"selector",
-}
 
 type Controller struct {
 	kubeclientset        kubernetes.Interface
@@ -540,6 +526,17 @@ func (c *Controller) pushPolicy(p *xasv1.ScalingPolicy, deployment *appsv1.Deplo
 		})
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	listPoliciesReq := &pb.ListPoliciesRequest{
+		ClusterName: c.clusterName,
+	}
+	policiesList, err := c.grpcClient.ListPolicies(ctx, listPoliciesReq)
+	if err != nil {
+		return fmt.Errorf("unable to list policies: %w", err)
+	}
+
 	pol := &pb.Policy{
 		Id: &pb.PolicyId{
 			ClusterName: c.clusterName,
@@ -564,19 +561,19 @@ func (c *Controller) pushPolicy(p *xasv1.ScalingPolicy, deployment *appsv1.Deplo
 		pol.MinReplicas = *p.Spec.MinReplicas
 	}
 
-	req := &pb.UpdatePolicyRequest{
-		Policy: pol,
-		// Only the fields the ScalingPolicy CRD owns are synced. Listing them
-		// explicitly (rather than relying on '*') keeps clearing a field, e.g.
-		// dropping the last metric, meaningful, while leaving the metrics
-		// registered by the recommenders themselves untouched.
-		UpdateMask: &fieldmaskpb.FieldMask{Paths: crdOwnedPolicyFields},
+	for _, sp := range policiesList.Policies {
+		if proto.Equal(sp.GetId(), pol.Id) {
+			pol.Etag = sp.Etag
+			pol.RecommenderMetrics = sp.RecommenderMetrics
+			break
+		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	updatePolicyRequest := &pb.UpdatePolicyRequest{
+		Policy: pol,
+	}
 
-	_, err := c.grpcClient.UpdatePolicy(ctx, req)
+	_, err = c.grpcClient.UpdatePolicy(ctx, updatePolicyRequest)
 	return err
 }
 

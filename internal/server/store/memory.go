@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -9,22 +10,25 @@ import (
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/policy"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/metrics"
-	"google.golang.org/protobuf/types/known/fieldmaskpb"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/apimachinery/pkg/api/resource"
+)
+
+var (
+	ErrStaleEtag   = errors.New("etag does not match the stored policy")
+	ErrUnknownEtag = errors.New("etag given for unknown policy")
 )
 
 type ServerStore interface {
 	AddBatch(req *pb.IngestMetricsRequest) error
 	UpdateRecommenderState(req *pb.UpdateRecommenderStateRequest) error
-	// SetPolicy stores p as the full definition of the policy, replacing any
-	// previous one.
-	SetPolicy(clusterName string, p *pb.Policy) error
-	// UpdatePolicy applies p to the stored policy, restricted to the fields
-	// selected by updateMask, and returns the stored result. An empty mask
-	// replaces the whole policy. See policy.ApplyUpdateMask for the supported
-	// mask paths.
-	UpdatePolicy(clusterName string, p *pb.Policy, updateMask *fieldmaskpb.FieldMask) (*pb.Policy, error)
+	// UpdatePolicy replaces the stored policy with p and returns the stored
+	// result with a new ETag. If the policy exists, a non-empty p.Etag must
+	// match the stored one (ErrStaleEtag); an empty p.Etag overwrites it
+	// unconditionally. If the policy does not exist, p.Etag must be empty
+	// (ErrUnknownEtag). On error the stored policy is left unchanged.
+	UpdatePolicy(clusterName string, p *pb.Policy) (*pb.Policy, error)
 	DeletePolicy(id *pb.PolicyId) error
 	GetPolicy(id *pb.PolicyId) (*pb.Policy, bool)
 	ListPolicies(clusterName string) []*pb.Policy
@@ -72,26 +76,33 @@ func NewMemoryStoreWithClock(c clock.Clock) *MemoryStore {
 	}
 }
 
-func (s *MemoryStore) SetPolicy(clusterName string, p *pb.Policy) error {
-	_, err := s.UpdatePolicy(clusterName, p, nil)
-	return err
-}
-
-func (s *MemoryStore) UpdatePolicy(clusterName string, p *pb.Policy, updateMask *fieldmaskpb.FieldMask) (*pb.Policy, error) {
+func (s *MemoryStore) UpdatePolicy(clusterName string, p *pb.Policy) (*pb.Policy, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := policyID{cluster: clusterName, ns: p.Id.GetNamespace(), name: p.Id.GetName()}
 
 	ps := s.state[key]
 	var current *pb.Policy
+
 	if ps != nil {
 		current = ps.Policy
 	}
-	// Merge before touching the state: an invalid mask must leave the store as is.
-	updated, err := policy.ApplyUpdateMask(current, p, updateMask)
-	if err != nil {
-		return nil, err
+	if current != nil {
+		// A sent ETag must match the stored one; an empty ETag overwrites.
+		if p.Etag != "" && p.Etag != current.Etag {
+			return nil, fmt.Errorf("%w: got %q, want %q", ErrStaleEtag, p.Etag, current.Etag)
+		}
+	} else if p.Etag != "" {
+		// An ETag was sent for a policy that does not exist.
+		return nil, ErrUnknownEtag
 	}
+
+	updated := proto.Clone(p).(*pb.Policy)
+	etag, err := policy.CreateEtag(updated)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create etag: %w", err)
+	}
+	updated.Etag = etag
 
 	if ps == nil {
 		ps = &PolicyState{

@@ -2,7 +2,6 @@ package grpc
 
 import (
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/policy"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -17,9 +16,7 @@ func validateUpdatePolicyRequest(req *pb.UpdatePolicyRequest) error {
 	if err := validatePolicyId(req.Policy.Id); err != nil {
 		return err
 	}
-	if err := policy.ValidateUpdateMask(req.GetUpdateMask()); err != nil {
-		return status.Errorf(codes.InvalidArgument, "invalid update_mask: %v", err)
-	}
+
 	for _, m := range req.Policy.Metrics {
 		if m.GetRecommenderName() != "" {
 			return status.Errorf(codes.InvalidArgument, "metric %s: recommender_name must be empty for policy-wide metrics", m.GetName())

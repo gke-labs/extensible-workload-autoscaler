@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 
@@ -29,7 +30,14 @@ func (s *Server) UpdatePolicy(ctx context.Context, req *pb.UpdatePolicyRequest) 
 	if err := validateUpdatePolicyRequest(req); err != nil {
 		return nil, err
 	}
-	updated, err := s.store.UpdatePolicy(req.Policy.Id.ClusterName, req.Policy, req.GetUpdateMask())
+	updated, err := s.store.UpdatePolicy(req.Policy.Id.ClusterName, req.Policy)
+	if errors.Is(err, store.ErrStaleEtag) {
+		return nil, status.Error(codes.Aborted, err.Error())
+	}
+	if errors.Is(err, store.ErrUnknownEtag) {
+		return nil, status.Error(codes.NotFound, err.Error())
+	}
+
 	if err != nil {
 		return nil, err
 	}

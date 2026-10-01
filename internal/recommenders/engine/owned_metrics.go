@@ -7,10 +7,8 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/policy"
 )
 
 // MetricsOwner is implemented by recommenders that need metrics beyond the ones
@@ -50,9 +48,8 @@ func (e *Engine) syncRecommenderMetrics(pol *pb.Policy) *pb.Policy {
 		owned[recDef.Name] = &pb.MetricDefinitionList{Definitions: ownedMetrics}
 	}
 
-	// Only send the entries that changed. An entry the mask selects but the
-	// request omits is removed from the policy.
-	var changedPaths []string
+	//changed holds the owned metric lists that differ from the policy on the server (new, updated or dropped). If none differ, the policy is returned as is; otherwise the whole policy is sent with those entries merged in.
+
 	changed := make(map[string]*pb.MetricDefinitionList)
 	for name, list := range owned {
 		current, registered := pol.RecommenderMetrics[name]
@@ -65,7 +62,6 @@ func (e *Engine) syncRecommenderMetrics(pol *pb.Policy) *pb.Policy {
 			continue
 		default:
 			changed[name] = list
-			changedPaths = append(changedPaths, policy.RecommenderMetricsPath(name))
 		}
 	}
 	if len(changed) == 0 {
@@ -75,20 +71,22 @@ func (e *Engine) syncRecommenderMetrics(pol *pb.Policy) *pb.Policy {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	req := &pb.UpdatePolicyRequest{
-		Policy:     &pb.Policy{Id: pol.Id, RecommenderMetrics: changed},
-		UpdateMask: &fieldmaskpb.FieldMask{Paths: changedPaths},
+	desired := proto.Clone(pol).(*pb.Policy)
+
+	if desired.RecommenderMetrics == nil {
+		desired.RecommenderMetrics = make(map[string]*pb.MetricDefinitionList, len(changed))
 	}
-	if _, err := e.client.UpdatePolicy(ctx, req); err != nil {
+	maps.Copy(desired.RecommenderMetrics, changed)
+
+	req := &pb.UpdatePolicyRequest{
+		Policy: desired,
+	}
+	updated, err := e.client.UpdatePolicy(ctx, req)
+	if err != nil {
 		slog.Error("Failed to register recommender owned metrics", "policy", pol.Id.Name, "error", err)
 		return pol
 	}
 	slog.Debug("Registered recommender owned metrics", "policy", pol.Id.Name, "recommenders", len(changed))
 
-	updated := proto.Clone(pol).(*pb.Policy)
-	if updated.RecommenderMetrics == nil {
-		updated.RecommenderMetrics = make(map[string]*pb.MetricDefinitionList, len(changed))
-	}
-	maps.Copy(updated.RecommenderMetrics, changed) // Override new owned metrics
 	return updated
 }
