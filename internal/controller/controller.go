@@ -290,10 +290,15 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		}
 	}
 
-	// Helper to patch pod resize. An empty containerName targets the pod-level
-	// resources (pod.spec.resources).
-	patchPodResize := func(pod *corev1.Pod, containerName string, requests, limits map[string]string) {
-		patchBytes, skipReason, err := buildResizePatch(pod, containerName, requests, limits)
+	// Helper to patch pod resize. An empty res.ContainerName targets the
+	// pod-level resources (pod.spec.resources).
+	patchPodResize := func(pod *corev1.Pod, res *pb.ContainerResource) {
+		containerName := res.ContainerName
+		if ok, reason := shouldResize(pod, containerName, res.Requests, res.LowerBound, res.UpperBound); !ok {
+			slog.Debug("Leaving pod resources as is", "pod", pod.Name, "container", containerName, "reason", reason)
+			return
+		}
+		patchBytes, skipReason, err := buildResizePatch(pod, containerName, res.Requests, res.Limits)
 		if err != nil {
 			slog.Error("Failed to build pod resize patch", "pod", pod.Name, "container", containerName, "error", err)
 			return
@@ -324,7 +329,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 					if res == nil {
 						continue
 					}
-					patchPodResize(pod, res.ContainerName, res.Requests, res.Limits)
+					patchPodResize(pod, res)
 				}
 			}
 		}
@@ -337,8 +342,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		}
 		pod, err := c.kubeclientset.CoreV1().Pods(policy.Namespace).Get(context.TODO(), pr.PodName, metav1.GetOptions{})
 		if err == nil {
-			res := pr.ContainerResources
-			patchPodResize(pod, res.ContainerName, res.Requests, res.Limits)
+			patchPodResize(pod, pr.ContainerResources)
 		}
 	}
 
@@ -386,6 +390,8 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 				ContainerName: wr.ContainerName,
 				Requests:      wr.Requests,
 				Limits:        wr.Limits,
+				LowerBound:    wr.LowerBound,
+				UpperBound:    wr.UpperBound,
 			})
 		}
 
@@ -400,6 +406,8 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 					ContainerName: cr.ContainerName,
 					Requests:      cr.Requests,
 					Limits:        cr.Limits,
+					LowerBound:    cr.LowerBound,
+					UpperBound:    cr.UpperBound,
 				}
 			}
 			prr = append(prr, rec)

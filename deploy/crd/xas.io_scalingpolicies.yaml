@@ -312,9 +312,23 @@ spec:
                                 additionalProperties:
                                   type: string
                                 type: object
+                              lowerBound:
+                                additionalProperties:
+                                  type: string
+                                description: |-
+                                  LowerBound is the lowest request that is still good enough, per
+                                  resource. Pods requesting less are resized right away.
+                                type: object
                               requests:
                                 additionalProperties:
                                   type: string
+                                type: object
+                              upperBound:
+                                additionalProperties:
+                                  type: string
+                                description: |-
+                                  UpperBound is the highest request that is still good enough, per
+                                  resource. Pods requesting more are resized right away.
                                 type: object
                             type: object
                         required:
@@ -345,9 +359,23 @@ spec:
                             additionalProperties:
                               type: string
                             type: object
+                          lowerBound:
+                            additionalProperties:
+                              type: string
+                            description: |-
+                              LowerBound is the lowest request that is still good enough, per
+                              resource. Pods requesting less are resized right away.
+                            type: object
                           requests:
                             additionalProperties:
                               type: string
+                            type: object
+                          upperBound:
+                            additionalProperties:
+                              type: string
+                            description: |-
+                              UpperBound is the highest request that is still good enough, per
+                              resource. Pods requesting more are resized right away.
                             type: object
                         type: object
                       type: array

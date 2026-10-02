@@ -457,6 +457,20 @@ func (in *ResourceRecommendation) DeepCopyInto(out *ResourceRecommendation) {
 			(*out)[key] = val
 		}
 	}
+	if in.LowerBound != nil {
+		in, out := &in.LowerBound, &out.LowerBound
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.UpperBound != nil {
+		in, out := &in.UpperBound, &out.UpperBound
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 

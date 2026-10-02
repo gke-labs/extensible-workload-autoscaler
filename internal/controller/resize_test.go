@@ -115,9 +115,9 @@ func TestBuildResizePatch_PodLevel(t *testing.T) {
 			pod:      newPod(withContainer("a", nil, nil), withPodResources(rl("cpu", "200m", "memory", "64Mi"), rl("cpu", "400m", "memory", "64Mi"))),
 			requests: map[string]string{"cpu": "300m"},
 			limits:   map[string]string{"cpu": "300m"},
-			// The limit equal to the request is dropped; the existing 400m
-			// limit is kept by the strategic merge, so the pod stays Burstable.
-			wantPatch: map[string]map[string]string{"requests": {"cpu": "300m"}},
+			// The limit equal to the request is scaled with the current 2x
+			// limit/request ratio, so the pod stays Burstable.
+			wantPatch: map[string]map[string]string{"requests": {"cpu": "300m"}, "limits": {"cpu": "600m"}},
 		},
 		{
 			name:     "No patch when already at the recommended values",
@@ -220,8 +220,8 @@ func TestBuildResizePatch_Container(t *testing.T) {
 		{
 			name: "Burstable pod is not turned into a Guaranteed one",
 			// sidecar is already Guaranteed; main would become Guaranteed with
-			// limit == request, so that limit is dropped and the existing
-			// 1 CPU limit is kept by the strategic merge.
+			// limit == request, so that limit is scaled with main's current 2x
+			// limit/request ratio instead.
 			pod: newPod(
 				withContainer("main", rl("cpu", "500m", "memory", "64Mi"), rl("cpu", "1", "memory", "64Mi")),
 				withContainer("sidecar", rl("cpu", "100m", "memory", "32Mi"), rl("cpu", "100m", "memory", "32Mi")),
@@ -229,7 +229,21 @@ func TestBuildResizePatch_Container(t *testing.T) {
 			container: "main",
 			requests:  map[string]string{"cpu": "700m"},
 			limits:    map[string]string{"cpu": "700m"},
-			wantPatch: map[string]map[string]string{"requests": {"cpu": "700m"}},
+			wantPatch: map[string]map[string]string{"requests": {"cpu": "700m"}, "limits": {"cpu": "1400m"}},
+		},
+		{
+			name: "Burstable pod: limit raised above the current one is scaled, not dropped",
+			// Recommenders like VPA set limits == requests. Dropping the CPU
+			// limit would keep the current 500m limit below the 606m request,
+			// which the API server rejects.
+			pod:       newPod(withContainer("main", rl("cpu", "100m", "memory", "11Mi"), rl("cpu", "500m", "memory", "11Mi"))),
+			container: "main",
+			requests:  map[string]string{"cpu": "606m", "memory": "11Mi"},
+			limits:    map[string]string{"cpu": "606m", "memory": "11Mi"},
+			wantPatch: map[string]map[string]string{
+				"requests": {"cpu": "606m", "memory": "11Mi"},
+				"limits":   {"cpu": "3030m", "memory": "11Mi"},
+			},
 		},
 		{
 			name: "Burstable pod skipped when the request alone would make it Guaranteed",
