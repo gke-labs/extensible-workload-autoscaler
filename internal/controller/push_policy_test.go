@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 )
@@ -159,5 +160,67 @@ func TestPushPolicy(t *testing.T) {
 				t.Errorf("UpdatePolicy requests mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+// storeClient serves the policy calls of pushPolicy from a real MemoryStore.
+type storeClient struct {
+	pb.XASServerClient
+	store *store.MemoryStore
+}
+
+func (c *storeClient) ListPolicies(_ context.Context, req *pb.ListPoliciesRequest, _ ...grpc.CallOption) (*pb.ListPoliciesResponse, error) {
+	return &pb.ListPoliciesResponse{Policies: c.store.ListPolicies(req.GetClusterName())}, nil
+}
+
+func (c *storeClient) UpdatePolicy(_ context.Context, req *pb.UpdatePolicyRequest, _ ...grpc.CallOption) (*pb.Policy, error) {
+	return c.store.UpdatePolicy(req.GetPolicy().GetId().GetClusterName(), req.GetPolicy())
+}
+
+// TestPushPolicyRemovedRecommenderOwnedMetrics checks that removing a
+// recommender from the ScalingPolicy drops the metrics it owns on the Server,
+// although pushPolicy copies all the owned metrics from the Server's copy.
+func TestPushPolicyRemovedRecommenderOwnedMetrics(t *testing.T) {
+	s := store.NewMemoryStore()
+	id := &pb.PolicyId{ClusterName: "default", Namespace: "prod", Name: "web"}
+	owned := func(owner string) *pb.MetricDefinitionList {
+		return &pb.MetricDefinitionList{Definitions: []*pb.MetricDefinition{{Name: "cpu-target", RecommenderName: owner}}}
+	}
+	// The Server has the policy with a vpa recommender and the metrics it owns.
+	if _, err := s.UpdatePolicy("default", &pb.Policy{
+		Id:      id,
+		Scaling: []*pb.RecommenderDefinition{{Name: "linear"}, {Name: "vpa-sizing"}},
+		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+			"linear":     owned("linear"),
+			"vpa-sizing": owned("vpa-sizing"),
+		},
+	}); err != nil {
+		t.Fatalf("UpdatePolicy() error = %v", err)
+	}
+
+	// The user removes vpa-sizing from the ScalingPolicy.
+	sp := &xasv1.ScalingPolicy{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "web"},
+		Spec: xasv1.ScalingPolicySpec{
+			ScaleTargetRef: xasv1.CrossVersionObjectReference{Kind: "Deployment", Name: "web", APIVersion: "apps/v1"},
+			MaxReplicas:    10,
+			Scaling:        []xasv1.RecommenderDefinition{{Name: "linear", Recommender: "linear-class"}},
+		},
+	}
+	deployment := &appsv1.Deployment{Spec: appsv1.DeploymentSpec{
+		Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}},
+	}}
+	c := newPushPolicyController(t, &storeClient{store: s})
+	if err := c.pushPolicy(sp, deployment); err != nil {
+		t.Fatalf("pushPolicy() error = %v", err)
+	}
+
+	got, ok := s.GetPolicy(id)
+	if !ok {
+		t.Fatal("GetPolicy() not found")
+	}
+	want := map[string]*pb.MetricDefinitionList{"linear": owned("linear")}
+	if diff := cmp.Diff(want, got.GetRecommenderMetrics(), protocmp.Transform()); diff != "" {
+		t.Errorf("RecommenderMetrics mismatch (-want +got):\n%s", diff)
 	}
 }

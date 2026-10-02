@@ -1800,6 +1800,7 @@ func TestRecommenderOwnedMetricsGRPC(t *testing.T) {
 			Metrics: []*pb.MetricDefinition{
 				{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}},
 			},
+			Scaling: []*pb.RecommenderDefinition{{Name: "vpa", Recommender: "vpa"}},
 			RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 				"vpa": {Definitions: []*pb.MetricDefinition{
 					{Name: "cpu", RecommenderName: "vpa", Gauge: &pb.Gauge{Aggregation: "Max"}},

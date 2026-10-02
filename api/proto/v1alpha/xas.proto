@@ -261,6 +261,8 @@ message ContainerState {
   string name = 1;
   // Maps a resource to its target (i.e. spec) requested value (e.g. 'cpu: 5m', 'memory: 10Mi').
   map<string, string> requests = 2;
+  // Maps a resource to its target (i.e. spec) limit value (e.g. 'cpu: 500m', 'memory: 1Gi').
+  map<string, string> limits = 3;
 }
 
 // --- Control Metrics ---

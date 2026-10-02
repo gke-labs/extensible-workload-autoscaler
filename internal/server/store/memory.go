@@ -103,6 +103,10 @@ func (s *MemoryStore) UpdatePolicy(clusterName string, p *pb.Policy) (*pb.Policy
 	}
 
 	updated := proto.Clone(p).(*pb.Policy)
+	// Drop the metrics of removed recommenders before computing the ETag, so
+	// the ETag matches the stored policy, and before CleanupOrphaned below, so
+	// their series are freed in this update.
+	dropOrphanedRecommenderMetrics(updated)
 	etag, err := policy.CreateEtag(updated)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create etag: %w", err)
@@ -300,38 +304,17 @@ func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationR
 	var metricStatuses []*pb.MetricStatus
 	if ps.ControlMetrics != nil {
 		for _, def := range ps.Policy.Metrics {
-			status := &pb.MetricStatus{
-				Name:      def.Name,
-				Timestamp: ps.ControlMetrics.Timestamp,
-			}
-			if val, ok := ps.ControlMetrics.Values[def.Name]; ok {
-				status.Value = val
-			} else {
-				var sum float64
-				var count int
-				for _, pcm := range ps.ControlMetrics.PodContainerMetrics {
-					for _, cm := range pcm.GetContainerMetrics() {
-						if v, ok := cm.Values[def.Name]; ok {
-							sum += v
-							count++
-						}
-					}
-				}
-				if count == 0 {
-					for _, pm := range ps.ControlMetrics.PodMetrics {
-						if v, ok := pm.Values[def.Name]; ok {
-							sum += v
-							count++
-						}
-					}
-				}
-				if count > 0 {
-					status.Value = sum / float64(count)
-				} else {
-					status.Error = "No data available"
-				}
-			}
-			metricStatuses = append(metricStatuses, status)
+			metricStatuses = append(metricStatuses, metricStatus(def.Name, def.Name, ps.ControlMetrics))
+		}
+	}
+	// Metrics owned by recommenders are listed as <recommender>/<metric>.
+	for _, owner := range slices.Sorted(maps.Keys(ps.Policy.RecommenderMetrics)) {
+		cm, ok := ps.RecommenderControlMetrics[owner]
+		if !ok || cm == nil {
+			continue
+		}
+		for _, def := range ps.Policy.RecommenderMetrics[owner].GetDefinitions() {
+			metricStatuses = append(metricStatuses, metricStatus(owner+"/"+def.Name, def.Name, cm))
 		}
 	}
 
@@ -340,6 +323,43 @@ func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationR
 		MetricStatuses: metricStatuses,
 		Explanation:    ps.Explanation,
 	}, true
+}
+
+// metricStatus returns the status, named name, of the metric `metric` in cm.
+// Per-pod and per-container values are averaged.
+func metricStatus(name, metric string, cm *pb.ControlMetrics) *pb.MetricStatus {
+	status := &pb.MetricStatus{
+		Name:      name,
+		Timestamp: cm.Timestamp,
+	}
+	if val, ok := cm.Values[metric]; ok {
+		status.Value = val
+		return status
+	}
+	var sum float64
+	var count int
+	for _, pcm := range cm.PodContainerMetrics {
+		for _, c := range pcm.GetContainerMetrics() {
+			if v, ok := c.Values[metric]; ok {
+				sum += v
+				count++
+			}
+		}
+	}
+	if count == 0 {
+		for _, pm := range cm.PodMetrics {
+			if v, ok := pm.Values[metric]; ok {
+				sum += v
+				count++
+			}
+		}
+	}
+	if count > 0 {
+		status.Value = sum / float64(count)
+	} else {
+		status.Error = "No data available"
+	}
+	return status
 }
 
 // GetControlMetrics returns the aggregated metrics of a policy. An empty
@@ -403,18 +423,37 @@ func (s *MemoryStore) CalculateAll() {
 }
 
 func (s *MemoryStore) cleanupOrphanedRecommenderStatuses(ps *PolicyState) {
-	recommenderNames := make(map[string]bool)
-	for _, r := range ps.Policy.Scaling {
-		recommenderNames[r.Name] = true
-	}
-	for _, r := range ps.Policy.Activation {
-		recommenderNames[r.Name] = true
-	}
+	names := recommenderNames(ps.Policy)
 	for rName := range ps.RecommenderStatuses {
-		if !recommenderNames[rName] {
+		if !names[rName] {
 			delete(ps.RecommenderStatuses, rName)
 		}
 	}
+}
+
+// dropOrphanedRecommenderMetrics removes the metrics owned by recommenders
+// that are no longer in the policy. Only the server can do this: the component
+// running a removed recommender never sees it again.
+func dropOrphanedRecommenderMetrics(p *pb.Policy) {
+	names := recommenderNames(p)
+	for rName := range p.RecommenderMetrics {
+		if !names[rName] {
+			delete(p.RecommenderMetrics, rName)
+		}
+	}
+}
+
+// recommenderNames returns the names of the Scaling and Activation
+// recommenders of the policy.
+func recommenderNames(p *pb.Policy) map[string]bool {
+	names := make(map[string]bool, len(p.Scaling)+len(p.Activation))
+	for _, r := range p.Scaling {
+		names[r.Name] = true
+	}
+	for _, r := range p.Activation {
+		names[r.Name] = true
+	}
+	return names
 }
 
 func (s *MemoryStore) processRecommendations(ps *PolicyState, now int64) {

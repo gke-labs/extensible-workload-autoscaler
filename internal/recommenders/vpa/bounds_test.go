@@ -47,13 +47,20 @@ var allBounds = []string{
 	"mem-lower-bound-metric", "mem_p50", "mem-upper-bound-metric", "mem_p99",
 }
 
-// podWith returns a pod whose "app" container has the given requests.
+// podWith returns a pod whose "app" container has the given requests, and
+// limits equal to them (a limit/request ratio of 1).
 func podWith(name string, requests ...string) *pb.PodState {
 	reqs := map[string]string{}
 	for i := 0; i+1 < len(requests); i += 2 {
 		reqs[requests[i]] = requests[i+1]
 	}
-	return &pb.PodState{Name: name, Containers: []*pb.ContainerState{{Name: "app", Requests: reqs}}}
+	return podWithLimits(name, reqs, reqs)
+}
+
+// podWithLimits returns a pod whose "app" container has the given requests and
+// limits.
+func podWithLimits(name string, requests, limits map[string]string) *pb.PodState {
+	return &pb.PodState{Name: name, Containers: []*pb.ContainerState{{Name: "app", Requests: requests, Limits: limits}}}
 }
 
 // TestRecommendBounds checks the bounds computed around the target, reported
@@ -66,9 +73,10 @@ func TestRecommendBounds(t *testing.T) {
 		wantMsgContains string
 	}{
 		{
-			name:            "no bound metrics leaves both sides unbounded",
-			params:          boundsParams(),
-			wantMsgContains: "cpu: target 200m [-, -]; memory: target 200Mi [-, -]",
+			name:   "owned bound metrics without data leave both sides unbounded",
+			params: boundsParams(),
+			wantMsgContains: `owned metric "cpu-lower-bound" not found in state, no lower bound for cpu; ` +
+				`owned metric "cpu-upper-bound" not found in state, no upper bound for cpu`,
 		},
 		{
 			name:            "both bounds for cpu and memory",
@@ -192,11 +200,16 @@ func TestRecommendWorkload(t *testing.T) {
 			wantMsgContains: "memory request 199Mi differs from the target 200Mi",
 		},
 		{
-			name:            "a missing request moves to the target",
-			params:          boundsParams(allBounds...),
-			pods:            []*pb.PodState{podWith("pod-1", "cpu", "200m")},
-			wantActive:      true,
-			want:            target,
+			name:       "a missing request moves to the target",
+			params:     boundsParams(allBounds...),
+			pods:       []*pb.PodState{podWith("pod-1", "cpu", "200m")},
+			wantActive: true,
+			// Without a memory request, there's no ratio for the memory limit.
+			want: []*pb.ContainerResource{{
+				ContainerName: "app",
+				Requests:      map[string]string{"cpu": "200m", "memory": "200Mi"},
+				Limits:        map[string]string{"cpu": "200m"},
+			}},
 			wantMsgContains: "no current memory request",
 		},
 		{
@@ -244,64 +257,128 @@ func TestRecommendWorkload(t *testing.T) {
 	}
 }
 
-func TestParseConfigBounds(t *testing.T) {
+// TestRecommendLimits checks that the recommended limits keep the configured
+// limit/request ratio, or else the pods' current one.
+func TestRecommendLimits(t *testing.T) {
+	burstable := func(name string) *pb.PodState { // 5x CPU, 4x memory
+		return podWithLimits(name, map[string]string{"cpu": "100m", "memory": "100Mi"}, map[string]string{"cpu": "500m", "memory": "400Mi"})
+	}
 	tests := []struct {
-		name    string
-		params  map[string]string
-		want    *config
-		wantErr bool
+		name       string
+		params     map[string]string
+		pods       []*pb.PodState
+		wantReqs   map[string]string
+		wantLimits map[string]string
 	}{
 		{
-			name: "all bound metrics",
-			params: map[string]string{
-				"container":              "app",
-				"cpu-metric":             "cpu_p90",
-				"mem-metric":             "mem_p90",
-				"cpu-lower-bound-metric": "cpu_p50",
-				"cpu-upper-bound-metric": " cpu_p99 ",
-				"mem-lower-bound-metric": "mem_p50",
-				"mem-upper-bound-metric": "mem_p99",
-			},
-			want: &config{
-				containerName:       "app",
-				cpuMetric:           "cpu_p90",
-				memMetric:           "mem_p90",
-				cpuSafetyMargin:     defaultCPUSafetyMarginFloat,
-				memSafetyMargin:     defaultMemSafetyMarginFloat,
-				cpuLowerBoundMetric: "cpu_p50",
-				cpuUpperBoundMetric: "cpu_p99",
-				memLowerBoundMetric: "mem_p50",
-				memUpperBoundMetric: "mem_p99",
-			},
+			name:       "the pods' ratio is kept",
+			params:     boundsParams(),
+			pods:       []*pb.PodState{burstable("pod-1"), burstable("pod-2")},
+			wantReqs:   map[string]string{"cpu": "200m", "memory": "200Mi"},
+			wantLimits: map[string]string{"cpu": "1", "memory": "800Mi"},
 		},
 		{
-			name: "cpu bound without cpu-metric",
-			params: map[string]string{
-				"container":              "app",
-				"mem-metric":             "mem_p90",
-				"cpu-lower-bound-metric": "cpu_p50",
-			},
-			wantErr: true,
+			name:       "the limit-ratio params override the pods' ratio",
+			params:     boundsParams("cpu-limit-ratio", "1.5", "mem-limit-ratio", "1"),
+			pods:       []*pb.PodState{burstable("pod-1")},
+			wantReqs:   map[string]string{"cpu": "200m", "memory": "200Mi"},
+			wantLimits: map[string]string{"cpu": "300m", "memory": "200Mi"},
 		},
 		{
-			name: "memory bound without mem-metric",
-			params: map[string]string{
-				"container":              "app",
-				"cpu-metric":             "cpu_p90",
-				"mem-upper-bound-metric": "mem_p99",
+			name:       "a Guaranteed pod stays Guaranteed",
+			params:     boundsParams(),
+			pods:       []*pb.PodState{podWith("pod-1", "cpu", "100m", "memory", "100Mi")},
+			wantReqs:   map[string]string{"cpu": "200m", "memory": "200Mi"},
+			wantLimits: map[string]string{"cpu": "200m", "memory": "200Mi"},
+		},
+		{
+			name:     "no limit on the pods gives no limit",
+			params:   boundsParams(),
+			pods:     []*pb.PodState{podWithLimits("pod-1", map[string]string{"cpu": "100m", "memory": "100Mi"}, nil)},
+			wantReqs: map[string]string{"cpu": "200m", "memory": "200Mi"},
+		},
+		{
+			name:   "the ratio of most pods is used",
+			params: boundsParams(),
+			pods: []*pb.PodState{
+				burstable("pod-1"), burstable("pod-2"),
+				podWith("pod-3", "cpu", "100m", "memory", "100Mi"),
 			},
-			wantErr: true,
+			wantReqs:   map[string]string{"cpu": "200m", "memory": "200Mi"},
+			wantLimits: map[string]string{"cpu": "1", "memory": "800Mi"},
+		},
+		{
+			name:   "on a tie, the larger ratio is used",
+			params: boundsParams(),
+			pods: []*pb.PodState{
+				burstable("pod-1"),
+				podWithLimits("pod-2", map[string]string{"cpu": "100m", "memory": "100Mi"}, map[string]string{"cpu": "200m", "memory": "800Mi"}),
+			},
+			wantReqs:   map[string]string{"cpu": "200m", "memory": "200Mi"},
+			wantLimits: map[string]string{"cpu": "1", "memory": "1600Mi"},
+		},
+		{
+			name:   "on a tie, no limit wins",
+			params: boundsParams(),
+			pods: []*pb.PodState{
+				burstable("pod-1"),
+				podWithLimits("pod-2", map[string]string{"cpu": "100m", "memory": "100Mi"}, map[string]string{"memory": "400Mi"}),
+			},
+			wantReqs:   map[string]string{"cpu": "200m", "memory": "200Mi"},
+			wantLimits: map[string]string{"memory": "800Mi"},
+		},
+		{
+			name:   "keeping the current requests keeps the current limits exactly",
+			params: boundsParams(allBounds...),
+			pods: []*pb.PodState{
+				podWithLimits("pod-1", map[string]string{"cpu": "190m", "memory": "210Mi"}, map[string]string{"cpu": "951m", "memory": "841Mi"}),
+			},
+			wantReqs:   map[string]string{"cpu": "190m", "memory": "210Mi"},
+			wantLimits: map[string]string{"cpu": "951m", "memory": "841Mi"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseConfig(&pb.RecommenderDefinition{Params: tt.params})
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("parseConfig() error = %v, wantErr %v", err, tt.wantErr)
+			r := &VPARecommender{}
+			got := r.Recommend(&pb.RecommenderDefinition{Params: tt.params}, boundsState, nil, &pb.Workload{Pods: tt.pods})
+			if !got.IsActive {
+				t.Fatalf("Recommend() inactive: %s", got.Message)
 			}
-			if diff := cmp.Diff(tt.want, got, cmp.AllowUnexported(config{})); diff != "" {
-				t.Errorf("parseConfig() mismatch (-want +got):\n%s", diff)
+			want := []*pb.ContainerResource{{ContainerName: "app", Requests: tt.wantReqs, Limits: tt.wantLimits}}
+			if diff := cmp.Diff(want, got.WorkloadResources, protocmp.Transform()); diff != "" {
+				t.Errorf("Recommend() WorkloadResources mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestParseConfigLimitRatio(t *testing.T) {
+	tests := []struct {
+		name    string
+		params  map[string]string
+		wantErr string
+	}{
+		{name: "valid ratios", params: map[string]string{"container": "app", "cpu-limit-ratio": "5", "mem-limit-ratio": "1.25"}},
+		{name: "below 1", params: map[string]string{"container": "app", "cpu-limit-ratio": "0.5"}, wantErr: "it must be a number >= 1"},
+		{name: "not a number", params: map[string]string{"container": "app", "mem-limit-ratio": "x"}, wantErr: "it must be a number >= 1"},
+		{
+			name:    "uncontrolled resource",
+			params:  map[string]string{"container": "app", "controlled-resources": "cpu", "mem-limit-ratio": "2"},
+			wantErr: "mem-limit-ratio is set, but memory is not in controlled-resources",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseConfig(&pb.RecommenderDefinition{Params: tt.params})
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("parseConfig() error = %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("parseConfig() error = %v, want it to contain %q", err, tt.wantErr)
 			}
 		})
 	}

@@ -130,7 +130,10 @@ func TestUpdatePolicyReadModifyWriteGRPC(t *testing.T) {
 	_, client, cleanup := setupFunctionalGRPCServer(t, clock.RealClock{})
 	defer cleanup()
 	id := &pb.PolicyId{ClusterName: "c1", Namespace: "ns", Name: "p1"}
-	mustUpdatePolicy(t, client, &pb.Policy{Id: id, MinReplicas: 1, MaxReplicas: 10})
+	mustUpdatePolicy(t, client, &pb.Policy{
+		Id: id, MinReplicas: 1, MaxReplicas: 10,
+		Scaling: []*pb.RecommenderDefinition{{Name: "vpa", Recommender: "vpa"}},
+	})
 
 	// Both writers read the same version.
 	controllerCopy := getPolicy(t, client, id)

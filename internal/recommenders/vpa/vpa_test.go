@@ -21,8 +21,8 @@ func TestRecommend(t *testing.T) {
 			name: "Invalid cfg in def should return with error message in Message",
 			def: &pb.RecommenderDefinition{
 				Params: map[string]string{
-					"cpumetric": "cpu_p95", // this is incorrect. It should be cpu-metric
-					"memmetric": "mem_p95", // this is incorrect. It should be mem-metric
+					"container":            "app",
+					"controlled-resources": "gpu", // only cpu and memory are supported
 				},
 			},
 			state: nil, // not required here
@@ -202,7 +202,7 @@ func TestRecommend(t *testing.T) {
 					},
 				},
 			},
-			wantMsgContains: "warnings: mem-metric \"memp95\" not found in state",
+			wantMsgContains: "mem-metric \"memp95\" not found in state",
 		},
 		{
 			name: "Missing both cpu and mem metric definition should result in warning and nil WorkloadRecommendation",
@@ -292,7 +292,7 @@ func TestRecommend(t *testing.T) {
 					},
 				},
 			},
-			wantMsgContains: "resizing to the target",
+			wantMsgContains: "; warnings: owned metric \"cpu-lower-bound\" not found in state, no lower bound for cpu",
 		},
 		{
 			name: "verify that low cpu and mem values are clamped by the floors",
@@ -340,10 +340,12 @@ func TestRecommend(t *testing.T) {
 	}
 
 	// The single pod of the workload has requests far from any target, so the
-	// recommendation is always the target.
+	// recommendation is always the target. Its limits equal its requests, so
+	// the recommended limits equal the recommended requests.
+	current := map[string]string{"cpu": "1m", "memory": "1Mi"}
 	workload := &pb.Workload{Pods: []*pb.PodState{{
 		Name:       "pod-1",
-		Containers: []*pb.ContainerState{{Name: "app", Requests: map[string]string{"cpu": "1m", "memory": "1Mi"}}},
+		Containers: []*pb.ContainerState{{Name: "app", Requests: current, Limits: current}},
 	}}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -371,100 +373,174 @@ func TestRecommend(t *testing.T) {
 func TestParseConfig(t *testing.T) {
 	tests := []struct {
 		name    string
-		def     *pb.RecommenderDefinition
+		params  map[string]string
 		want    *config
-		wantErr bool
+		wantErr string
 	}{
 		{
-			name: "valid config with both metrics and custom margins",
-			def: &pb.RecommenderDefinition{
-				Params: map[string]string{
-					"container":         "app",
-					"cpu-metric":        "cpu_p95",
-					"mem-metric":        "mem_p95",
-					"cpu-safety-margin": "1.25",
-					"mem-safety-margin": "1.10",
-				},
+			name: "both targets and custom margins",
+			params: map[string]string{
+				"container":         "app",
+				"cpu-metric":        "cpu_p95",
+				"mem-metric":        "mem_p95",
+				"cpu-safety-margin": "1.25",
+				"mem-safety-margin": "1.10",
 			},
 			want: &config{
-				containerName:   "app",
-				cpuMetric:       "cpu_p95",
-				memMetric:       "mem_p95",
-				cpuSafetyMargin: 1.25,
-				memSafetyMargin: 1.10,
+				containerName: "app",
+				resources: map[string]*resourceConfig{
+					"cpu":    {safetyMargin: 1.25, metrics: refs(user("cpu_p95"), owned("cpu-lower-bound"), owned("cpu-upper-bound"))},
+					"memory": {safetyMargin: 1.10, metrics: refs(user("mem_p95"), owned("memory-lower-bound"), owned("memory-upper-bound"))},
+				},
 			},
-			wantErr: false,
 		},
 		{
-			name: "valid config with only mem metrics",
-			def: &pb.RecommenderDefinition{
-				Params: map[string]string{
-					"container":         "app",
-					"mem-metric":        "mem_p95",
-					"mem-safety-margin": "1.10",
-				},
+			name: "only mem metrics controls memory only",
+			params: map[string]string{
+				"container":         "app",
+				"mem-metric":        "mem_p95",
+				"mem-safety-margin": "1.10",
 			},
 			want: &config{
-				containerName:   "app",
-				memMetric:       "mem_p95",
-				cpuSafetyMargin: 1.15,
-				memSafetyMargin: 1.10,
+				containerName: "app",
+				resources: map[string]*resourceConfig{
+					"memory": {safetyMargin: 1.10, metrics: refs(user("mem_p95"), owned("memory-lower-bound"), owned("memory-upper-bound"))},
+				},
 			},
-			wantErr: false,
 		},
 		{
-			name: "valid config with only cpu metrics",
-			def: &pb.RecommenderDefinition{
-				Params: map[string]string{
-					"container":         "app",
-					"cpu-metric":        "cpu_p95",
-					"cpu-safety-margin": "1.10",
-				},
+			name: "only a cpu bound controls cpu only, and owns the target",
+			params: map[string]string{
+				"container":              "app",
+				"cpu-upper-bound-metric": " cpu_p99 ",
 			},
 			want: &config{
-				containerName:   "app",
-				cpuMetric:       "cpu_p95",
-				cpuSafetyMargin: 1.10,
-				memSafetyMargin: 1.15,
-			},
-			wantErr: false,
-		},
-		{
-			name: "invalid config with missing container",
-			def: &pb.RecommenderDefinition{
-				Params: map[string]string{
-					"cpu-metric": "cpu_p95",
-					"mem-metric": "mem_p95",
+				containerName: "app",
+				resources: map[string]*resourceConfig{
+					"cpu": {safetyMargin: defaultCPUSafetyMarginFloat, metrics: refs(owned("cpu-target"), owned("cpu-lower-bound"), user("cpu_p99"))},
 				},
 			},
-			want:    nil,
-			wantErr: true,
 		},
 		{
-			name: "invalid config with only no metrics",
-			def: &pb.RecommenderDefinition{
-				Params: map[string]string{
-					"container":         "app",
-					"mem-safety-margin": "1.25",
-					"cpu-safety-margin": "1.10",
+			name: "no metrics owns all of them for cpu and memory",
+			params: map[string]string{
+				"container":         "app",
+				"mem-safety-margin": "1.25",
+				"cpu-safety-margin": "1.10",
+			},
+			want: &config{
+				containerName: "app",
+				resources: map[string]*resourceConfig{
+					"cpu":    {safetyMargin: 1.10, metrics: refs(owned("cpu-target"), owned("cpu-lower-bound"), owned("cpu-upper-bound"))},
+					"memory": {safetyMargin: 1.25, metrics: refs(owned("memory-target"), owned("memory-lower-bound"), owned("memory-upper-bound"))},
 				},
 			},
-			want:    nil,
-			wantErr: true,
+		},
+		{
+			name: "all slots configured",
+			params: map[string]string{
+				"container":              "app",
+				"cpu-metric":             "cpu_p90",
+				"cpu-lower-bound-metric": "cpu_p50",
+				"cpu-upper-bound-metric": "cpu_p99",
+				"mem-metric":             "mem_p90",
+				"mem-lower-bound-metric": "mem_p50",
+				"mem-upper-bound-metric": "mem_p99",
+			},
+			want: &config{
+				containerName: "app",
+				resources: map[string]*resourceConfig{
+					"cpu":    {safetyMargin: defaultCPUSafetyMarginFloat, metrics: refs(user("cpu_p90"), user("cpu_p50"), user("cpu_p99"))},
+					"memory": {safetyMargin: defaultMemSafetyMarginFloat, metrics: refs(user("mem_p90"), user("mem_p50"), user("mem_p99"))},
+				},
+			},
+		},
+		{
+			name: "controlled-resources memory",
+			params: map[string]string{
+				"container":            "app",
+				"controlled-resources": "memory",
+			},
+			want: &config{
+				containerName: "app",
+				resources: map[string]*resourceConfig{
+					"memory": {safetyMargin: defaultMemSafetyMarginFloat, metrics: refs(owned("memory-target"), owned("memory-lower-bound"), owned("memory-upper-bound"))},
+				},
+			},
+		},
+		{
+			name: "controlled-resources adds a resource without metric params",
+			params: map[string]string{
+				"container":            "app",
+				"controlled-resources": " cpu , memory ",
+				"cpu-metric":           "cpu_p95",
+			},
+			want: &config{
+				containerName: "app",
+				resources: map[string]*resourceConfig{
+					"cpu":    {safetyMargin: defaultCPUSafetyMarginFloat, metrics: refs(user("cpu_p95"), owned("cpu-lower-bound"), owned("cpu-upper-bound"))},
+					"memory": {safetyMargin: defaultMemSafetyMarginFloat, metrics: refs(owned("memory-target"), owned("memory-lower-bound"), owned("memory-upper-bound"))},
+				},
+			},
+		},
+		{
+			name: "missing container",
+			params: map[string]string{
+				"cpu-metric": "cpu_p95",
+				"mem-metric": "mem_p95",
+			},
+			wantErr: "container is undefined",
+		},
+		{
+			name: "invalid safety margin",
+			params: map[string]string{
+				"container":         "app",
+				"cpu-safety-margin": "lots",
+			},
+			wantErr: "invalid cpu-safety-margin",
+		},
+		{
+			name: "unknown controlled resource",
+			params: map[string]string{
+				"container":            "app",
+				"controlled-resources": "cpu,gpu",
+			},
+			wantErr: `"gpu" is not one of cpu, memory`,
+		},
+		{
+			name: "metric param for an uncontrolled resource",
+			params: map[string]string{
+				"container":              "app",
+				"controlled-resources":   "cpu",
+				"mem-lower-bound-metric": "mem_p50",
+			},
+			wantErr: "memory metric params are set, but memory is not in controlled-resources",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseConfig(tt.def)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("parseConfig() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if !tt.wantErr {
-				if diff := cmp.Diff(tt.want, got, cmp.AllowUnexported(config{})); diff != "" {
-					t.Errorf("parseConfig() mismatch (-want +got):\n%s", diff)
+			got, err := parseConfig(&pb.RecommenderDefinition{Params: tt.params})
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("parseConfig() error = %v, want it to contain %q", err, tt.wantErr)
 				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseConfig() unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tt.want, got, cmp.AllowUnexported(config{}, resourceConfig{}, metricRef{})); diff != "" {
+				t.Errorf("parseConfig() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
+}
+
+func user(name string) metricRef  { return metricRef{name: name} }
+func owned(name string) metricRef { return metricRef{name: name, owned: true} }
+
+// refs returns the metrics of the target, lower bound and upper bound slots.
+func refs(target, lower, upper metricRef) [numSlots]metricRef {
+	return [numSlots]metricRef{targetSlot: target, lowerBoundSlot: lower, upperBoundSlot: upper}
 }

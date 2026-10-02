@@ -293,7 +293,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	// Helper to patch pod resize. An empty containerName targets the pod-level
 	// resources (pod.spec.resources).
 	patchPodResize := func(pod *corev1.Pod, containerName string, requests, limits map[string]string) {
-		patchBytes, skipReason, err := buildResizePatch(pod, &deployment.Spec.Template.Spec, containerName, requests, limits)
+		patchBytes, skipReason, err := buildResizePatch(pod, containerName, requests, limits)
 		if err != nil {
 			slog.Error("Failed to build pod resize patch", "pod", pod.Name, "container", containerName, "error", err)
 			return
@@ -648,16 +648,27 @@ func (c *Controller) syncWorkload(policy *xasv1.ScalingPolicy, deployment *appsv
 func buildContainerStates(pod *corev1.Pod) []*pb.ContainerState {
 	containers := make([]*pb.ContainerState, 0, len(pod.Spec.Containers))
 	for _, container := range pod.Spec.Containers {
-		state := &pb.ContainerState{Name: container.Name}
-		if len(container.Resources.Requests) > 0 {
-			state.Requests = make(map[string]string, len(container.Resources.Requests))
-			for name, quantity := range container.Resources.Requests {
-				state.Requests[string(name)] = quantity.String()
-			}
+		state := &pb.ContainerState{
+			Name:     container.Name,
+			Requests: resourceListStrings(container.Resources.Requests),
+			Limits:   resourceListStrings(container.Resources.Limits),
 		}
 		containers = append(containers, state)
 	}
 	return containers
+}
+
+// resourceListStrings returns the quantities of the list as strings, or nil
+// if the list is empty.
+func resourceListStrings(list corev1.ResourceList) map[string]string {
+	if len(list) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(list))
+	for name, quantity := range list {
+		out[string(name)] = quantity.String()
+	}
+	return out
 }
 
 func containsString(slice []string, s string) bool {
