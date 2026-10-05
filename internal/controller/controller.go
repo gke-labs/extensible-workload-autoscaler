@@ -293,7 +293,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	// Helper to patch pod resize. An empty containerName targets the pod-level
 	// resources (pod.spec.resources).
 	patchPodResize := func(pod *corev1.Pod, containerName string, requests, limits map[string]string) {
-		patchBytes, skipReason, err := buildResizePatch(pod, containerName, requests, limits)
+		patchBytes, skipReason, err := buildResizePatch(pod, &deployment.Spec.Template.Spec, containerName, requests, limits)
 		if err != nil {
 			slog.Error("Failed to build pod resize patch", "pod", pod.Name, "container", containerName, "error", err)
 			return

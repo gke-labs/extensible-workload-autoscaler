@@ -1952,3 +1952,47 @@ func TestRecommenderMetricsValidationGRPC(t *testing.T) {
 		})
 	}
 }
+
+// TestGetWorkloadGRPC checks that recommenders can read the pods (and their
+// requests) last reported by the controller.
+func TestGetWorkloadGRPC(t *testing.T) {
+	_, client, cleanup := setupGRPCServer(t, &clock.FakeClock{CurrentTime: time.Unix(1000, 0)})
+	defer cleanup()
+	ctx := context.Background()
+	id := &pb.PolicyId{ClusterName: "default", Namespace: "prod", Name: "web"}
+
+	_, err := client.GetWorkload(ctx, &pb.GetWorkloadRequest{Id: id})
+	if status.Code(err) != codes.NotFound {
+		t.Errorf("GetWorkload(unknown policy) code = %v, want NotFound", status.Code(err))
+	}
+	_, err = client.GetWorkload(ctx, &pb.GetWorkloadRequest{})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("GetWorkload(no id) code = %v, want InvalidArgument", status.Code(err))
+	}
+
+	mustUpdatePolicy(t, client, &pb.Policy{Id: id, MaxReplicas: 10})
+	got, err := client.GetWorkload(ctx, &pb.GetWorkloadRequest{Id: id})
+	if err != nil {
+		t.Fatalf("GetWorkload() error = %v", err)
+	}
+	if len(got.GetPods()) != 0 {
+		t.Errorf("GetWorkload() before any report = %v, want no pods", got.GetPods())
+	}
+
+	pods := []*pb.PodState{
+		{Name: "web-b", IsReady: true, Containers: []*pb.ContainerState{{Name: "app", Requests: map[string]string{"cpu": "200m"}}}},
+		{Name: "web-a", IsReady: false, Containers: []*pb.ContainerState{{Name: "app", Requests: map[string]string{"cpu": "100m", "memory": "64Mi"}}}},
+	}
+	if _, err := client.UpdateWorkload(ctx, &pb.UpdateWorkloadRequest{Id: id, Workload: &pb.Workload{Pods: pods}}); err != nil {
+		t.Fatalf("UpdateWorkload() error = %v", err)
+	}
+	got, err = client.GetWorkload(ctx, &pb.GetWorkloadRequest{Id: id})
+	if err != nil {
+		t.Fatalf("GetWorkload() error = %v", err)
+	}
+	// Pods are returned sorted by name.
+	want := &pb.Workload{Pods: []*pb.PodState{pods[1], pods[0]}}
+	if diff := cmp.Diff(want, got, protocmp.Transform()); diff != "" {
+		t.Errorf("GetWorkload() mismatch (-want +got):\n%s", diff)
+	}
+}

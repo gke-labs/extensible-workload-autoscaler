@@ -128,6 +128,13 @@ func validateGetControlMetricsRequest(req *pb.GetControlMetricsRequest) error {
 	return validatePolicyId(req.Id)
 }
 
+func validateGetWorkloadRequest(req *pb.GetWorkloadRequest) error {
+	if req == nil {
+		return status.Errorf(codes.InvalidArgument, "request is nil")
+	}
+	return validatePolicyId(req.Id)
+}
+
 func validateUpdateRecommenderStateRequest(req *pb.UpdateRecommenderStateRequest) error {
 	if req == nil {
 		return status.Errorf(codes.InvalidArgument, "request is nil")

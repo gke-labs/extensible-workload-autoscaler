@@ -3,6 +3,8 @@ package store
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -38,6 +40,9 @@ type ServerStore interface {
 	// recommenderName returns the policy-wide metrics, otherwise only the
 	// metrics owned by that recommender are reported.
 	GetControlMetrics(id *pb.PolicyId, recommenderName string) (*pb.ControlMetrics, bool)
+	// GetWorkload returns the pods of a policy's workload, as last reported
+	// with UpdateWorkload, sorted by name.
+	GetWorkload(id *pb.PolicyId) (*pb.Workload, bool)
 	CalculateAll()
 	Dump() interface{}
 }
@@ -157,6 +162,20 @@ func (s *MemoryStore) ListPolicies(clusterName string) []*pb.Policy {
 		policies = append(policies, ps.Policy)
 	}
 	return policies
+}
+
+func (s *MemoryStore) GetWorkload(id *pb.PolicyId) (*pb.Workload, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	ps, ok := s.state[newPolicyID(id)]
+	if !ok || ps.Policy == nil {
+		return nil, false
+	}
+	workload := &pb.Workload{Pods: make([]*pb.PodState, 0, len(ps.Workload))}
+	for _, name := range slices.Sorted(maps.Keys(ps.Workload)) {
+		workload.Pods = append(workload.Pods, proto.Clone(ps.Workload[name]).(*pb.PodState))
+	}
+	return workload, true
 }
 
 func (s *MemoryStore) UpdateWorkload(req *pb.UpdateWorkloadRequest) error {

@@ -51,7 +51,7 @@ type config struct {
 // not used: for resource metrics they are a request-weighted average of the
 // pod's containers, which is neither a single container's usage nor the pod's
 // total usage.
-func (r *PerPodVerticalRecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.ControlMetrics) *pb.Recommendation {
+func (r *PerPodVerticalRecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.ControlMetrics, _ *pb.Workload) *pb.Recommendation {
 	cfg, err := parseConfig(def)
 	if err != nil {
 		return &pb.Recommendation{

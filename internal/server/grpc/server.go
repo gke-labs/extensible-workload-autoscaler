@@ -85,6 +85,17 @@ func (s *Server) GetControlMetrics(ctx context.Context, req *pb.GetControlMetric
 	return metrics, nil
 }
 
+func (s *Server) GetWorkload(ctx context.Context, req *pb.GetWorkloadRequest) (*pb.Workload, error) {
+	if err := validateGetWorkloadRequest(req); err != nil {
+		return nil, err
+	}
+	workload, ok := s.store.GetWorkload(req.Id)
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "policy not found")
+	}
+	return workload, nil
+}
+
 func (s *Server) UpdateRecommenderState(ctx context.Context, req *pb.UpdateRecommenderStateRequest) (*pb.RecommenderState, error) {
 	if err := validateUpdateRecommenderStateRequest(req); err != nil {
 		return nil, err

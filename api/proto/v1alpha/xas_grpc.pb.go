@@ -25,6 +25,7 @@ const (
 	XASServer_ListPolicies_FullMethodName           = "/xas.v1alpha.XASServer/ListPolicies"
 	XASServer_UpdateWorkload_FullMethodName         = "/xas.v1alpha.XASServer/UpdateWorkload"
 	XASServer_GetControlMetrics_FullMethodName      = "/xas.v1alpha.XASServer/GetControlMetrics"
+	XASServer_GetWorkload_FullMethodName            = "/xas.v1alpha.XASServer/GetWorkload"
 	XASServer_UpdateRecommenderState_FullMethodName = "/xas.v1alpha.XASServer/UpdateRecommenderState"
 	XASServer_GetRecommendation_FullMethodName      = "/xas.v1alpha.XASServer/GetRecommendation"
 	XASServer_IngestMetrics_FullMethodName          = "/xas.v1alpha.XASServer/IngestMetrics"
@@ -54,6 +55,11 @@ type XASServerClient interface {
 	// Read the current aggregated metric values ("Control Metrics") for a policy.
 	// Recommenders use this to compute their recommendations.
 	GetControlMetrics(ctx context.Context, in *GetControlMetricsRequest, opts ...grpc.CallOption) (*ControlMetrics, error)
+	// --- Workload (Recommender -> Server) ---
+	// Read the Server's view of the workload (Pods and their requests) for a
+	// policy, as last reported by the Controller with UpdateWorkload.
+	// Recommenders use this to decide which pods to resize.
+	GetWorkload(ctx context.Context, in *GetWorkloadRequest, opts ...grpc.CallOption) (*Workload, error)
 	// --- Recommender State (Plugin -> Server) ---
 	// Update the status (recommendation) of a specific recommender.
 	// Recommenders push their calculated recommendation here.
@@ -125,6 +131,16 @@ func (c *xASServerClient) GetControlMetrics(ctx context.Context, in *GetControlM
 	return out, nil
 }
 
+func (c *xASServerClient) GetWorkload(ctx context.Context, in *GetWorkloadRequest, opts ...grpc.CallOption) (*Workload, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Workload)
+	err := c.cc.Invoke(ctx, XASServer_GetWorkload_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *xASServerClient) UpdateRecommenderState(ctx context.Context, in *UpdateRecommenderStateRequest, opts ...grpc.CallOption) (*RecommenderState, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RecommenderState)
@@ -179,6 +195,11 @@ type XASServerServer interface {
 	// Read the current aggregated metric values ("Control Metrics") for a policy.
 	// Recommenders use this to compute their recommendations.
 	GetControlMetrics(context.Context, *GetControlMetricsRequest) (*ControlMetrics, error)
+	// --- Workload (Recommender -> Server) ---
+	// Read the Server's view of the workload (Pods and their requests) for a
+	// policy, as last reported by the Controller with UpdateWorkload.
+	// Recommenders use this to decide which pods to resize.
+	GetWorkload(context.Context, *GetWorkloadRequest) (*Workload, error)
 	// --- Recommender State (Plugin -> Server) ---
 	// Update the status (recommendation) of a specific recommender.
 	// Recommenders push their calculated recommendation here.
@@ -214,6 +235,9 @@ func (UnimplementedXASServerServer) UpdateWorkload(context.Context, *UpdateWorkl
 }
 func (UnimplementedXASServerServer) GetControlMetrics(context.Context, *GetControlMetricsRequest) (*ControlMetrics, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetControlMetrics not implemented")
+}
+func (UnimplementedXASServerServer) GetWorkload(context.Context, *GetWorkloadRequest) (*Workload, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetWorkload not implemented")
 }
 func (UnimplementedXASServerServer) UpdateRecommenderState(context.Context, *UpdateRecommenderStateRequest) (*RecommenderState, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateRecommenderState not implemented")
@@ -335,6 +359,24 @@ func _XASServer_GetControlMetrics_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _XASServer_GetWorkload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWorkloadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(XASServerServer).GetWorkload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: XASServer_GetWorkload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(XASServerServer).GetWorkload(ctx, req.(*GetWorkloadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _XASServer_UpdateRecommenderState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateRecommenderStateRequest)
 	if err := dec(in); err != nil {
@@ -415,6 +457,10 @@ var XASServer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetControlMetrics",
 			Handler:    _XASServer_GetControlMetrics_Handler,
+		},
+		{
+			MethodName: "GetWorkload",
+			Handler:    _XASServer_GetWorkload_Handler,
 		},
 		{
 			MethodName: "UpdateRecommenderState",

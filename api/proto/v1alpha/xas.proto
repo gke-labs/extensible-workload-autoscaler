@@ -33,6 +33,12 @@ service XASServer {
   // Recommenders use this to compute their recommendations.
   rpc GetControlMetrics(GetControlMetricsRequest) returns (ControlMetrics);
 
+  // --- Workload (Recommender -> Server) ---
+  // Read the Server's view of the workload (Pods and their requests) for a
+  // policy, as last reported by the Controller with UpdateWorkload.
+  // Recommenders use this to decide which pods to resize.
+  rpc GetWorkload(GetWorkloadRequest) returns (Workload);
+
   // --- Recommender State (Plugin -> Server) ---
   // Update the status (recommendation) of a specific recommender.
   // Recommenders push their calculated recommendation here.
@@ -223,6 +229,12 @@ message UpdateWorkloadRequest {
   PolicyId id = 1;
   // The current state of the workload (pods).
   Workload workload = 2;
+}
+
+// GetWorkloadRequest retrieves the Server's view of the workload of a policy.
+message GetWorkloadRequest {
+  // The policy to fetch the workload for.
+  PolicyId id = 1;
 }
 
 // Workload represents the set of pods governed by a policy.
