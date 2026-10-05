@@ -2,9 +2,13 @@ package vpa
 
 import (
 	"fmt"
+	"maps"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 )
@@ -33,8 +37,14 @@ type config struct {
 	memUpperBoundMetric string
 }
 
-// Recommend calculates the resource recommendations based on control metrics
-func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.ControlMetrics) *pb.Recommendation {
+// Recommend calculates the resource recommendations based on control metrics.
+//
+// It computes the target and the bounds of each resource for the container,
+// and recommends the same requests for every pod of the workload: the pods'
+// current requests if they all agree and don't need an update (see
+// needsUpdate), otherwise the target. The target and bounds are reported in
+// the message.
+func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.ControlMetrics, workload *pb.Workload) *pb.Recommendation {
 	var warnings []string
 
 	//Parse the configuration from def.Params using parseConfig.
@@ -61,101 +71,115 @@ func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.C
 		}
 	}
 
-	cpuMetricFound := false
-	memMetricFound := false
-
 	requests := make(map[string]string, 2)
-	limits := make(map[string]string, 2)
-	lowerBound := make(map[string]string, 2)
-	upperBound := make(map[string]string, 2)
+	recs := make(map[string]resourceRecommendation, 2)
+	var summary []string
 
-	// addBounds sets the bounds of a resource from their metrics, clamped so
-	// that lower <= target <= upper. A bound whose metric is not configured,
-	// or has no data, is left out (unbounded).
-	addBounds := func(resName, unit, lowerParam, lowerMetric, upperParam, upperMetric string, target int64, value func(metric string) (int64, bool)) {
+	// recommend sets the target of a resource and its bounds from their
+	// metrics, clamped so that lower <= target <= upper. A bound whose metric
+	// is not configured, or has no data, is left out (unbounded).
+	recommend := func(resName, unit, targetParam, targetMetric, lowerParam, lowerMetric, upperParam, upperMetric string, value func(metric string) (int64, bool)) {
+		if targetMetric == "" {
+			return
+		}
+		target, ok := value(targetMetric)
+		if !ok {
+			warnings = append(warnings, fmt.Sprintf("%s %q not found in state", targetParam, targetMetric))
+			return
+		}
+		quantity := func(v int64) *resource.Quantity {
+			q := resource.MustParse(fmt.Sprintf("%d%s", v, unit))
+			return &q
+		}
+		rec := resourceRecommendation{Target: *quantity(target)}
+		lower, upper := "-", "-"
 		if lowerMetric != "" {
 			if v, ok := value(lowerMetric); ok {
-				lowerBound[resName] = fmt.Sprintf("%d%s", min(v, target), unit)
+				rec.Lower = quantity(min(v, target))
+				lower = rec.Lower.String()
 			} else {
 				warnings = append(warnings, fmt.Sprintf("%s %q not found in state, no lower bound for %s", lowerParam, lowerMetric, resName))
 			}
 		}
 		if upperMetric != "" {
 			if v, ok := value(upperMetric); ok {
-				upperBound[resName] = fmt.Sprintf("%d%s", max(v, target), unit)
+				rec.Upper = quantity(max(v, target))
+				upper = rec.Upper.String()
 			} else {
 				warnings = append(warnings, fmt.Sprintf("%s %q not found in state, no upper bound for %s", upperParam, upperMetric, resName))
 			}
 		}
+		requests[resName] = rec.Target.String()
+		recs[resName] = rec
+		summary = append(summary, fmt.Sprintf("%s: target %s [%s, %s]", resName, rec.Target.String(), lower, upper))
 	}
 
-	// If cpuMetric is configured (is not empty):
-	if cfg.cpuMetric != "" {
-		cpuValue := func(metric string) (int64, bool) {
+	recommend("cpu", "m", "cpu-metric", cfg.cpuMetric, "cpu-lower-bound-metric", cfg.cpuLowerBoundMetric, "cpu-upper-bound-metric", cfg.cpuUpperBoundMetric,
+		func(metric string) (int64, bool) {
 			return cpuMilliFor(state.PodContainerMetrics, cfg.containerName, metric, cfg.cpuSafetyMargin)
-		}
-		// Getting the max CPU usage value of that container across all pods
-		cpuVal, found := cpuValue(cfg.cpuMetric)
-		if found {
-			cpuValString := fmt.Sprintf("%dm", cpuVal)
-			cpuMetricFound = true
-			requests["cpu"] = cpuValString
-			limits["cpu"] = cpuValString
-			addBounds("cpu", "m", "cpu-lower-bound-metric", cfg.cpuLowerBoundMetric, "cpu-upper-bound-metric", cfg.cpuUpperBoundMetric, cpuVal, cpuValue)
-
-		} else {
-			warnings = append(warnings, fmt.Sprintf("cpuMetric %q not found in state", cfg.cpuMetric))
-		}
-	}
-
-	if cfg.memMetric != "" {
-		memValue := func(metric string) (int64, bool) {
+		})
+	recommend("memory", "Mi", "mem-metric", cfg.memMetric, "mem-lower-bound-metric", cfg.memLowerBoundMetric, "mem-upper-bound-metric", cfg.memUpperBoundMetric,
+		func(metric string) (int64, bool) {
 			return memMiBFor(state.PodContainerMetrics, cfg.containerName, metric, cfg.memSafetyMargin)
-		}
-		memVal, found := memValue(cfg.memMetric)
-		if found {
-			memValString := fmt.Sprintf("%dMi", memVal)
-			memMetricFound = true
-			requests["memory"] = memValString
-			limits["memory"] = memValString
-			addBounds("memory", "Mi", "mem-lower-bound-metric", cfg.memLowerBoundMetric, "mem-upper-bound-metric", cfg.memUpperBoundMetric, memVal, memValue)
-
-		} else {
-			warnings = append(warnings, fmt.Sprintf("memMetric %q not found in state", cfg.memMetric))
-		}
-	}
+		})
 
 	// If no valid recommendations were generated, returning a recommendation with an error
-	if !cpuMetricFound && !memMetricFound {
+	if len(requests) == 0 {
 		warnings = append(warnings, "Unable to create recommendation as no value memory or cpu values were found")
-
 		return &pb.Recommendation{
 			IsActive: false,
 			Message:  fmt.Sprintf("No Recommendations generated: %s", strings.Join(warnings, "; ")),
 		}
+	}
+
+	// Without the pods' current requests, every pod would be resized.
+	if len(workload.GetPods()) == 0 {
+		return &pb.Recommendation{
+			IsActive: false,
+			Message:  fmt.Sprintf("%s; no pods reported for the workload yet", strings.Join(summary, "; ")),
+		}
+	}
+	var current []map[string]string
+	for _, pod := range workload.GetPods() {
+		idx := slices.IndexFunc(pod.GetContainers(), func(c *pb.ContainerState) bool { return c.GetName() == cfg.containerName })
+		if idx >= 0 {
+			current = append(current, pod.Containers[idx].GetRequests())
+		}
+	}
+	if len(current) == 0 {
+		return &pb.Recommendation{
+			IsActive: false,
+			Message:  fmt.Sprintf("%s; no pod of the workload has the container %q", strings.Join(summary, "; "), cfg.containerName),
+		}
+	}
+
+	// Every pod gets the same requests. Keep the pods' current requests while
+	// they agree and don't need an update; otherwise move all pods to the
+	// target.
+	decision := "resizing to the target"
+	if agreed, ok := commonRequests(current, recs); !ok {
+		decision += fmt.Sprintf(": pods have different requests (%d pods)", len(current))
+	} else if update, reason := needsUpdate(agreed, recs); update {
+		decision += ": " + reason
 	} else {
-		res := &pb.ContainerResource{
+		decision = fmt.Sprintf("keeping the current requests: %s", reason)
+		for name := range requests {
+			requests[name] = agreed[name]
+		}
+	}
+
+	msg := fmt.Sprintf("%s; %s", strings.Join(summary, "; "), decision)
+	if len(warnings) > 0 {
+		msg += fmt.Sprintf("; warnings: %s", strings.Join(warnings, "; "))
+	}
+	return &pb.Recommendation{
+		IsActive: true,
+		WorkloadResources: []*pb.ContainerResource{{
 			ContainerName: cfg.containerName,
 			Requests:      requests,
-			Limits:        limits,
-		}
-		if len(lowerBound) > 0 {
-			res.LowerBound = lowerBound
-		}
-		if len(upperBound) > 0 {
-			res.UpperBound = upperBound
-		}
-		return &pb.Recommendation{
-			IsActive:          true,
-			WorkloadResources: []*pb.ContainerResource{res},
-			Message: func() string {
-				if len(warnings) > 0 {
-					return fmt.Sprintf("Recommendation generated with warnings: %s", strings.Join(warnings, "; "))
-				} else {
-					return "Recommendation generated successfully."
-				}
-			}(),
-		}
+			Limits:        maps.Clone(requests),
+		}},
+		Message: msg,
 	}
 }
 

@@ -404,7 +404,7 @@ func TestPerPodVerticalRecommender(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := rec.Recommend(tc.def, tc.state, nil)
+			got := rec.Recommend(tc.def, tc.state, nil, nil)
 			if diff := cmp.Diff(tc.wantVote, got, opts...); diff != "" {
 				t.Errorf("Recommend() mismatch (-want +got):\n%s", diff)
 			}

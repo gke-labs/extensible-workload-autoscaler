@@ -213,12 +213,6 @@ type ResourceRecommendation struct {
 	ContainerName string            `json:"containerName,omitempty"`
 	Requests      map[string]string `json:"requests,omitempty"`
 	Limits        map[string]string `json:"limits,omitempty"`
-	// LowerBound is the lowest request that is still good enough, per
-	// resource. Pods requesting less are resized right away.
-	LowerBound map[string]string `json:"lowerBound,omitempty"`
-	// UpperBound is the highest request that is still good enough, per
-	// resource. Pods requesting more are resized right away.
-	UpperBound map[string]string `json:"upperBound,omitempty"`
 }
 
 // PodResourceRecommendation targets a specific pod.

@@ -3,77 +3,11 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
-	"math"
+	"math/big"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
-
-// significantChangeRatio is the relative change of a request, compared to the
-// current one, from which a pod within its bounds is still resized.
-const significantChangeRatio = 0.10
-
-// shouldResize decides whether to resize the pod to the recommended requests:
-//   - without bounds, the pod is always resized (buildResizePatch skips pods
-//     that already have the recommended values);
-//   - a pod with a request missing, below its lower bound or above its upper
-//     bound is resized;
-//   - a pod within its bounds is only resized if some request changes by at
-//     least significantChangeRatio.
-//
-// An empty containerName targets the pod-level resources. When the pod is left
-// as is, it returns a non-empty reason.
-func shouldResize(pod *corev1.Pod, containerName string, requests, lowerBound, upperBound map[string]string) (bool, string) {
-	if len(lowerBound) == 0 && len(upperBound) == 0 {
-		return true, ""
-	}
-
-	var current corev1.ResourceList
-	if containerName == "" {
-		if pod.Spec.Resources != nil {
-			current = pod.Spec.Resources.Requests
-		}
-	} else {
-		found := false
-		for i := range pod.Spec.Containers {
-			if pod.Spec.Containers[i].Name == containerName {
-				current = pod.Spec.Containers[i].Resources.Requests
-				found = true
-				break
-			}
-		}
-		if !found {
-			// Let buildResizePatch report it.
-			return true, ""
-		}
-	}
-
-	target := parseResourceList(requests)
-	lower := parseResourceList(lowerBound)
-	upper := parseResourceList(upperBound)
-	significant := false
-	for name, t := range target {
-		cur, ok := current[name]
-		if !ok {
-			return true, ""
-		}
-		if l, ok := lower[name]; ok && cur.Cmp(l) < 0 {
-			return true, ""
-		}
-		if u, ok := upper[name]; ok && cur.Cmp(u) > 0 {
-			return true, ""
-		}
-		curF := cur.AsApproximateFloat64()
-		if curF <= 0 || math.Abs(t.AsApproximateFloat64()-curF)/curF >= significantChangeRatio {
-			significant = true
-		}
-	}
-
-	if !significant {
-		return false, fmt.Sprintf("requests are within bounds and change by less than %.0f%%", significantChangeRatio*100)
-	}
-	return true, ""
-}
 
 // buildResizePatch returns the strategic merge patch to send to the pod's
 // "resize" subresource to apply the given resources.
@@ -82,9 +16,14 @@ func shouldResize(pod *corev1.Pod, containerName string, requests, lowerBound, u
 // containerName targets the pod-level resources (pod.spec.resources), as
 // documented in ContainerResource.container_name.
 //
+// template is the pod template of the workload (nil if unknown). For a
+// container, the template container's limit/request ratios are used to scale
+// recommended limits equal to their request, so that every pod of the
+// workload gets the same limits whatever its current ones (see scaleLimits).
+//
 // It returns a nil patch when the pod already has the requested values, and a
 // non-empty skipReason when the pod cannot be resized in place.
-func buildResizePatch(pod *corev1.Pod, containerName string, requests, limits map[string]string) (patch []byte, skipReason string, err error) {
+func buildResizePatch(pod *corev1.Pod, template *corev1.PodSpec, containerName string, requests, limits map[string]string) (patch []byte, skipReason string, err error) {
 	// In-place resize cannot change the QoS class of a pod, and a BestEffort pod
 	// becomes Burstable or Guaranteed as soon as any request or limit is set.
 	if pod.Status.QOSClass == corev1.PodQOSBestEffort {
@@ -100,7 +39,16 @@ func buildResizePatch(pod *corev1.Pod, containerName string, requests, limits ma
 	if containerName == "" {
 		return buildPodLevelResizePatch(pod, reqs, lims)
 	}
-	return buildContainerResizePatch(pod, containerName, reqs, lims)
+	var tmpl *corev1.ResourceRequirements
+	if template != nil {
+		for i := range template.Containers {
+			if template.Containers[i].Name == containerName {
+				tmpl = &template.Containers[i].Resources
+				break
+			}
+		}
+	}
+	return buildContainerResizePatch(pod, tmpl, containerName, reqs, lims)
 }
 
 // buildContainerResizePatch adjusts the recommended container resources so that
@@ -110,12 +58,14 @@ func buildResizePatch(pod *corev1.Pod, containerName string, requests, limits ma
 //   - when the pod has pod-level resources, the container fits under them:
 //     aggregate container requests <= pod requests, and container limits <=
 //     pod limits;
+//   - in a Burstable pod without pod-level resources, recommended limits equal
+//     to their request are scaled with the template's limit/request ratio (see
+//     scaleLimits), so every pod of the workload gets the same limits;
 //   - the QoS class is preserved: in a Guaranteed pod without pod-level
 //     resources the container keeps limits == requests, and a Burstable pod is
-//     not turned into a Guaranteed one. When the recommended limits would make
-//     it Guaranteed, the limits equal to their request are instead scaled with
-//     the container's current limit/request ratio (see scaleLimits).
-func buildContainerResizePatch(pod *corev1.Pod, containerName string, reqs, lims corev1.ResourceList) ([]byte, string, error) {
+//     not turned into a Guaranteed one. When the resulting limits would still
+//     make it Guaranteed, the limits equal to their request are scaled too.
+func buildContainerResizePatch(pod *corev1.Pod, tmpl *corev1.ResourceRequirements, containerName string, reqs, lims corev1.ResourceList) ([]byte, string, error) {
 	var target *corev1.Container
 	for i := range pod.Spec.Containers {
 		if pod.Spec.Containers[i].Name == containerName {
@@ -137,6 +87,9 @@ func buildContainerResizePatch(pod *corev1.Pod, containerName string, reqs, lims
 			lims[name] = q.DeepCopy()
 		}
 	} else {
+		if podLevel == nil {
+			scaleLimits(reqs, lims, tmpl, current)
+		}
 		for name, q := range lims {
 			req, ok := reqs[name]
 			if !ok {
@@ -186,7 +139,7 @@ func buildContainerResizePatch(pod *corev1.Pod, containerName string, reqs, lims
 
 	if podLevel == nil && pod.Status.QOSClass != corev1.PodQOSGuaranteed &&
 		containersGuaranteed(pod, containerName, merge(current.Requests, reqs), merge(current.Limits, lims)) {
-		scaleLimits(reqs, lims, current)
+		scaleLimits(reqs, lims, tmpl, current)
 		if containersGuaranteed(pod, containerName, merge(current.Requests, reqs), merge(current.Limits, lims)) {
 			return nil, "resize would change the pod QoS class from Burstable to Guaranteed", nil
 		}
@@ -290,7 +243,7 @@ func buildPodLevelResizePatch(pod *corev1.Pod, reqs, lims corev1.ResourceList) (
 			}
 		}
 		if isGuaranteed(merge(current.Requests, reqs), merge(current.Limits, lims)) {
-			scaleLimits(reqs, lims, current)
+			scaleLimits(reqs, lims, nil, current)
 			if isGuaranteed(merge(current.Requests, reqs), merge(current.Limits, lims)) {
 				return nil, "resize would change the pod QoS class from Burstable to Guaranteed", nil
 			}
@@ -308,21 +261,31 @@ func buildPodLevelResizePatch(pod *corev1.Pod, reqs, lims corev1.ResourceList) (
 }
 
 // scaleLimits replaces each recommended limit equal to its recommended request
-// with the request scaled by the current limit/request ratio, as OSS VPA does,
-// so that a resize does not turn a Burstable pod into a Guaranteed one. A
-// limit is dropped (the current limit is kept) when there is no current
-// request and limit to compute the ratio from, unless the new request is above
-// the current limit, in which case it is kept as is.
-func scaleLimits(reqs, lims corev1.ResourceList, current corev1.ResourceRequirements) {
+// with the request scaled by a limit/request ratio, as OSS VPA does, so that a
+// resize keeps the pod Burstable. The ratio comes from the template (tmpl,
+// may be nil) when it sets both, so that every pod of the workload gets the
+// same limits; otherwise from the current resources. A limit is dropped (the
+// current limit is kept) when neither has a request and limit to compute the
+// ratio from, unless the new request is above the current limit, in which
+// case it is kept as is.
+func scaleLimits(reqs, lims corev1.ResourceList, tmpl *corev1.ResourceRequirements, current corev1.ResourceRequirements) {
 	for name, lim := range lims {
 		req, ok := reqs[name]
 		if !ok || req.Cmp(lim) != 0 {
 			continue
 		}
+		if tmpl != nil {
+			tmplReq, okReq := tmpl.Requests[name]
+			tmplLim, okLim := tmpl.Limits[name]
+			if okReq && okLim && tmplReq.Sign() > 0 {
+				lims[name] = scaleQuantity(name, req, tmplLim, tmplReq)
+				continue
+			}
+		}
 		curReq, okReq := current.Requests[name]
 		curLim, okLim := current.Limits[name]
 		if okReq && okLim && curReq.Sign() > 0 {
-			lims[name] = scaleQuantity(name, req, curLim.AsApproximateFloat64()/curReq.AsApproximateFloat64())
+			lims[name] = scaleQuantity(name, req, curLim, curReq)
 			continue
 		}
 		if okLim && req.Cmp(curLim) > 0 {
@@ -332,13 +295,27 @@ func scaleLimits(reqs, lims corev1.ResourceList, current corev1.ResourceRequirem
 	}
 }
 
-// scaleQuantity returns q multiplied by ratio, rounded up to a whole millicore
-// for CPU and to a whole unit otherwise.
-func scaleQuantity(name corev1.ResourceName, q resource.Quantity, ratio float64) resource.Quantity {
-	if name == corev1.ResourceCPU {
-		return *resource.NewMilliQuantity(int64(math.Ceil(float64(q.MilliValue())*ratio)), q.Format)
+// scaleQuantity returns q multiplied by the ratio num/den, rounded up to a
+// whole millicore for CPU and to a whole unit otherwise. It uses exact integer
+// arithmetic, so that scaling a request by the limit/request ratio it already
+// has gives back the same limit: with floats, e.g. 1156m * (5780m / 1156m)
+// would round up to 5781m and trigger another resize.
+func scaleQuantity(name corev1.ResourceName, q, num, den resource.Quantity) resource.Quantity {
+	value := func(x resource.Quantity) *big.Int {
+		if name == corev1.ResourceCPU {
+			return big.NewInt(x.MilliValue())
+		}
+		return big.NewInt(x.Value())
 	}
-	return *resource.NewQuantity(int64(math.Ceil(float64(q.Value())*ratio)), q.Format)
+	// ceil(q * num / den), for non-negative values.
+	scaled := new(big.Int).Mul(value(q), value(num))
+	d := value(den)
+	scaled.Add(scaled, new(big.Int).Sub(d, big.NewInt(1)))
+	scaled.Quo(scaled, d)
+	if name == corev1.ResourceCPU {
+		return *resource.NewMilliQuantity(scaled.Int64(), q.Format)
+	}
+	return *resource.NewQuantity(scaled.Int64(), q.Format)
 }
 
 // containerResourceBounds returns the aggregate requests of the pod's

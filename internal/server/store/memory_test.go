@@ -1405,3 +1405,40 @@ func TestUpdatePolicyConcurrentSameEtag(t *testing.T) {
 		t.Errorf("%d writers succeeded with the same ETag, want exactly 1", wins)
 	}
 }
+
+// TestGetWorkload checks that the reported pods are returned sorted by name,
+// as copies the caller can't use to change the store.
+func TestGetWorkload(t *testing.T) {
+	s := NewMemoryStore()
+	id := &pb.PolicyId{ClusterName: "default", Namespace: "prod", Name: "web"}
+	if _, ok := s.GetWorkload(id); ok {
+		t.Fatal("GetWorkload(unknown policy) found, want not found")
+	}
+	if _, err := s.UpdatePolicy("default", &pb.Policy{Id: id}); err != nil {
+		t.Fatalf("UpdatePolicy() error = %v", err)
+	}
+	if err := s.UpdateWorkload(&pb.UpdateWorkloadRequest{Id: id, Workload: &pb.Workload{Pods: []*pb.PodState{
+		{Name: "b", Containers: []*pb.ContainerState{{Name: "app", Requests: map[string]string{"cpu": "200m"}}}},
+		{Name: "a", Containers: []*pb.ContainerState{{Name: "app", Requests: map[string]string{"cpu": "100m"}}}},
+	}}}); err != nil {
+		t.Fatalf("UpdateWorkload() error = %v", err)
+	}
+
+	got, ok := s.GetWorkload(id)
+	if !ok {
+		t.Fatal("GetWorkload() not found")
+	}
+	var names []string
+	for _, p := range got.Pods {
+		names = append(names, p.Name)
+	}
+	if diff := cmp.Diff([]string{"a", "b"}, names); diff != "" {
+		t.Errorf("GetWorkload() pods mismatch (-want +got):\n%s", diff)
+	}
+
+	got.Pods[0].Containers[0].Requests["cpu"] = "1"
+	again, _ := s.GetWorkload(id)
+	if v := again.Pods[0].Containers[0].Requests["cpu"]; v != "100m" {
+		t.Errorf("stored request changed through a returned workload: got %q, want 100m", v)
+	}
+}

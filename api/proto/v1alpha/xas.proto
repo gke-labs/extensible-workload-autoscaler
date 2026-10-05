@@ -33,6 +33,12 @@ service XASServer {
   // Recommenders use this to compute their recommendations.
   rpc GetControlMetrics(GetControlMetricsRequest) returns (ControlMetrics);
 
+  // --- Workload (Recommender -> Server) ---
+  // Read the Server's view of the workload (Pods and their requests) for a
+  // policy, as last reported by the Controller with UpdateWorkload.
+  // Recommenders use this to decide which pods to resize.
+  rpc GetWorkload(GetWorkloadRequest) returns (Workload);
+
   // --- Recommender State (Plugin -> Server) ---
   // Update the status (recommendation) of a specific recommender.
   // Recommenders push their calculated recommendation here.
@@ -225,6 +231,12 @@ message UpdateWorkloadRequest {
   Workload workload = 2;
 }
 
+// GetWorkloadRequest retrieves the Server's view of the workload of a policy.
+message GetWorkloadRequest {
+  // The policy to fetch the workload for.
+  PolicyId id = 1;
+}
+
 // Workload represents the set of pods governed by a policy.
 message Workload {
   // List of known pods.
@@ -319,20 +331,6 @@ message ContainerResource {
   map<string, string> requests = 1;
   // Maps a resource to its value limit (e.g. 'cpu: 5m').
   map<string, string> limits = 2;
-  // Optional. Maps a resource to the lowest request that is still good enough
-  // (e.g. 'cpu: 100m'). Pods whose current request is below it are resized
-  // to `requests` right away. A resource missing from the map has no lower
-  // bound.
-  map<string, string> lower_bound = 4;
-  // Optional. Maps a resource to the highest request that is still good
-  // enough (e.g. 'memory: 1Gi'). Pods whose current request is above it are
-  // resized to `requests` right away. A resource missing from the map has no
-  // upper bound.
-  //
-  // Pods whose current requests are within [lower_bound, upper_bound] are
-  // only resized when the change is significant. When neither bound is set,
-  // pods are always resized to `requests`.
-  map<string, string> upper_bound = 5;
 }
 
 // The resources requests/limits (e.g. CPU and Memory) for a given pod.

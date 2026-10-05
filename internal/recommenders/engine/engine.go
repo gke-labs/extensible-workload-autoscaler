@@ -21,7 +21,10 @@ import (
 )
 
 type Recommender interface {
-	Recommend(def *pb.RecommenderDefinition, metrics, ownedMetrics *pb.ControlMetrics) *pb.Recommendation
+	// Recommend returns the recommendation of a recommender, given the
+	// policy-wide metrics, the metrics it owns, and the workload's pods with
+	// their current requests (e.g. to only resize the pods that need it).
+	Recommend(def *pb.RecommenderDefinition, metrics, ownedMetrics *pb.ControlMetrics, workload *pb.Workload) *pb.Recommendation
 }
 
 type Engine struct {
@@ -95,9 +98,15 @@ func (e *Engine) processPolicy(policy *pb.Policy) {
 	if err != nil {
 		return
 	}
+	workload, err := e.fetchWorkload(policy.Id.Namespace, policy.Id.Name)
+	if err != nil {
+		slog.Error("Failed to fetch the workload", "policy", policy.Id.Name, "error", err)
+		return
+	}
 
-	// Call each recommender to get their recommendation. Provide both policy-wide
-	// metrics and the metrics owned by the recommender.
+	// Call each recommender to get their recommendation. Provide the
+	// policy-wide metrics, the metrics owned by the recommender, and the
+	// workload.
 	var recommendations []namedRecommendation
 	for _, def := range slices.Concat(policy.Activation, policy.Scaling) {
 		ownedMetrics, err := e.fetchControlMetrics(policy.Id.Namespace, policy.Id.Name, def.Name)
@@ -110,7 +119,7 @@ func (e *Engine) processPolicy(policy *pb.Policy) {
 			slog.Warn("RecommenderClass not found for policy", "recommender", def.Recommender, "policy", policy.Id.Name, "error", err)
 			return
 		}
-		if v := rec.Recommend(def, metrics, ownedMetrics); v != nil {
+		if v := rec.Recommend(def, metrics, ownedMetrics, workload); v != nil {
 			recommendations = append(recommendations, namedRecommendation{name: def.Name, recommendation: v})
 		}
 	}
@@ -144,6 +153,17 @@ func (e *Engine) fetchControlMetrics(ns, name, recommenderName string) (*pb.Cont
 	return e.client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{
 		Id:              &pb.PolicyId{ClusterName: e.clusterName, Namespace: ns, Name: name},
 		RecommenderName: recommenderName,
+	})
+}
+
+// fetchWorkload reads the workload of a policy: its pods and their current
+// requests, as last reported by the controller.
+func (e *Engine) fetchWorkload(ns, name string) (*pb.Workload, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	return e.client.GetWorkload(ctx, &pb.GetWorkloadRequest{
+		Id: &pb.PolicyId{ClusterName: e.clusterName, Namespace: ns, Name: name},
 	})
 }
 

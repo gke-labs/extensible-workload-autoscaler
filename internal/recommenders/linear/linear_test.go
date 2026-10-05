@@ -85,7 +85,7 @@ func TestLinearRecommend(t *testing.T) {
 				Values:        tc.controlMetrics,
 				ReadyReplicas: tc.readyReplicas,
 			}
-			got := rec.Recommend(tc.def, state, nil)
+			got := rec.Recommend(tc.def, state, nil, nil)
 			if diff := cmp.Diff(tc.want, got, protocmp.Transform()); diff != "" {
 				t.Errorf("Recommend() mismatch (-want +got):\n%s", diff)
 			}

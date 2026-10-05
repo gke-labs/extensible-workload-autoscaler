@@ -15,7 +15,7 @@ type config struct {
 	target float64
 }
 
-func (r *LinearRecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.ControlMetrics) *pb.Recommendation {
+func (r *LinearRecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.ControlMetrics, _ *pb.Workload) *pb.Recommendation {
 	cfg, err := parseConfig(def)
 	if err != nil {
 		return &pb.Recommendation{

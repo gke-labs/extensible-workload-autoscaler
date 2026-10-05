@@ -161,7 +161,7 @@ func TestRecommend(t *testing.T) {
 					},
 				},
 			},
-			wantMsgContains: "Recommendation generated with warnings: cpuMetric \"cpup95\" not found in state",
+			wantMsgContains: "warnings: cpu-metric \"cpup95\" not found in state",
 		},
 		{
 			name: "Missing mem metric definition, present cpu metric definition should result in message with warnings, request limit with no mem values",
@@ -202,7 +202,7 @@ func TestRecommend(t *testing.T) {
 					},
 				},
 			},
-			wantMsgContains: "Recommendation generated with warnings: memMetric \"memp95\" not found in state",
+			wantMsgContains: "warnings: mem-metric \"memp95\" not found in state",
 		},
 		{
 			name: "Missing both cpu and mem metric definition should result in warning and nil WorkloadRecommendation",
@@ -292,7 +292,7 @@ func TestRecommend(t *testing.T) {
 					},
 				},
 			},
-			wantMsgContains: "Recommendation generated successfully",
+			wantMsgContains: "resizing to the target",
 		},
 		{
 			name: "verify that low cpu and mem values are clamped by the floors",
@@ -335,14 +335,20 @@ func TestRecommend(t *testing.T) {
 					},
 				},
 			},
-			wantMsgContains: "Recommendation generated successfully",
+			wantMsgContains: "resizing to the target",
 		},
 	}
 
+	// The single pod of the workload has requests far from any target, so the
+	// recommendation is always the target.
+	workload := &pb.Workload{Pods: []*pb.PodState{{
+		Name:       "pod-1",
+		Containers: []*pb.ContainerState{{Name: "app", Requests: map[string]string{"cpu": "1m", "memory": "1Mi"}}},
+	}}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &VPARecommender{}
-			got := r.Recommend(tt.def, tt.state, nil)
+			got := r.Recommend(tt.def, tt.state, nil, workload)
 
 			if tt.wantMsgContains != "" {
 				if !strings.Contains(got.Message, tt.wantMsgContains) {

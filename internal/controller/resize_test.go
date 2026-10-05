@@ -37,6 +37,14 @@ func withContainer(name string, req, lim corev1.ResourceList) podOpt {
 	}
 }
 
+// templateWith returns a pod template with one container.
+func templateWith(name string, req, lim corev1.ResourceList) *corev1.PodSpec {
+	return &corev1.PodSpec{Containers: []corev1.Container{{
+		Name:      name,
+		Resources: corev1.ResourceRequirements{Requests: req, Limits: lim},
+	}}}
+}
+
 func newPod(opts ...podOpt) *corev1.Pod {
 	p := &corev1.Pod{}
 	p.Name = "p"
@@ -66,6 +74,7 @@ func TestBuildResizePatch_PodLevel(t *testing.T) {
 	tests := []struct {
 		name      string
 		pod       *corev1.Pod
+		template  *corev1.PodSpec
 		requests  map[string]string
 		limits    map[string]string
 		wantPatch map[string]map[string]string // nil: no patch
@@ -135,7 +144,7 @@ func TestBuildResizePatch_PodLevel(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			patch, skip, err := buildResizePatch(tc.pod, "", tc.requests, tc.limits)
+			patch, skip, err := buildResizePatch(tc.pod, tc.template, "", tc.requests, tc.limits)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -173,6 +182,7 @@ func TestBuildResizePatch_Container(t *testing.T) {
 	tests := []struct {
 		name      string
 		pod       *corev1.Pod
+		template  *corev1.PodSpec
 		container string
 		requests  map[string]string
 		limits    map[string]string
@@ -246,6 +256,63 @@ func TestBuildResizePatch_Container(t *testing.T) {
 			},
 		},
 		{
+			name: "Burstable pod: no patch when the scaled limit is already set",
+			// The pod was resized to 1156m with a 5x limit. Recommending
+			// 1156m again must give back exactly 5780m: with floats,
+			// 1156m * (5780m / 1156m) rounded up to 5781m.
+			pod:       newPod(withContainer("main", rl("cpu", "1156m", "memory", "11Mi"), rl("cpu", "5780m", "memory", "44Mi"))),
+			container: "main",
+			requests:  map[string]string{"cpu": "1156m", "memory": "11Mi"},
+			limits:    map[string]string{"cpu": "1156m", "memory": "11Mi"},
+		},
+		{
+			name: "Burstable pod: large memory limits are scaled exactly",
+			// CPU has limit == request, so memory limit == request would make
+			// the pod Guaranteed and is scaled with the 32x memory ratio.
+			// 3Gi * 64Gi overflows int64 bytes; the ratio is applied exactly.
+			pod:       newPod(withContainer("main", rl("cpu", "1", "memory", "2Gi"), rl("cpu", "1", "memory", "64Gi"))),
+			container: "main",
+			requests:  map[string]string{"memory": "3Gi"},
+			limits:    map[string]string{"memory": "3Gi"},
+			wantPatch: map[string]map[string]string{
+				"requests": {"memory": "3Gi"},
+				"limits":   {"memory": "96Gi"},
+			},
+		},
+		{
+			name: "Burstable pod: limits scaled with the template ratio, not the pod's current one",
+			// The pod lost its memory ratio in an earlier resize (11Mi/11Mi).
+			// The template ratios (5x CPU, 4x memory) give every pod of the
+			// workload the same limits.
+			pod:       newPod(withContainer("main", rl("cpu", "1156m", "memory", "11Mi"), rl("cpu", "5780m", "memory", "11Mi"))),
+			template:  templateWith("main", rl("cpu", "100m", "memory", "128Mi"), rl("cpu", "500m", "memory", "512Mi")),
+			container: "main",
+			requests:  map[string]string{"cpu": "1375m", "memory": "11Mi"},
+			limits:    map[string]string{"cpu": "1375m", "memory": "11Mi"},
+			wantPatch: map[string]map[string]string{
+				"requests": {"cpu": "1375m", "memory": "11Mi"},
+				"limits":   {"cpu": "6875m", "memory": "44Mi"},
+			},
+		},
+		{
+			name: "Burstable pod: a limit equal to its request is scaled even if the pod stays Burstable",
+			// Only memory is recommended, and CPU keeps the pod Burstable.
+			pod:       newPod(withContainer("main", rl("cpu", "100m", "memory", "128Mi"), rl("cpu", "500m", "memory", "512Mi"))),
+			container: "main",
+			requests:  map[string]string{"memory": "11Mi"},
+			limits:    map[string]string{"memory": "11Mi"},
+			wantPatch: map[string]map[string]string{"requests": {"memory": "11Mi"}, "limits": {"memory": "44Mi"}},
+		},
+		{
+			name:      "Burstable pod: template without a limit falls back to the current ratio",
+			pod:       newPod(withContainer("main", rl("cpu", "200m"), rl("cpu", "400m"))),
+			template:  templateWith("main", rl("cpu", "100m"), nil),
+			container: "main",
+			requests:  map[string]string{"cpu": "300m"},
+			limits:    map[string]string{"cpu": "300m"},
+			wantPatch: map[string]map[string]string{"requests": {"cpu": "300m"}, "limits": {"cpu": "600m"}},
+		},
+		{
 			name: "Burstable pod skipped when the request alone would make it Guaranteed",
 			pod: newPod(
 				withContainer("main", rl("cpu", "500m", "memory", "64Mi"), rl("cpu", "1", "memory", "64Mi")),
@@ -316,7 +383,7 @@ func TestBuildResizePatch_Container(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			patch, skip, err := buildResizePatch(tc.pod, tc.container, tc.requests, tc.limits)
+			patch, skip, err := buildResizePatch(tc.pod, tc.template, tc.container, tc.requests, tc.limits)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

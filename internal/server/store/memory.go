@@ -3,6 +3,8 @@ package store
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -38,6 +40,9 @@ type ServerStore interface {
 	// recommenderName returns the policy-wide metrics, otherwise only the
 	// metrics owned by that recommender are reported.
 	GetControlMetrics(id *pb.PolicyId, recommenderName string) (*pb.ControlMetrics, bool)
+	// GetWorkload returns the pods of a policy's workload, as last reported
+	// with UpdateWorkload, sorted by name.
+	GetWorkload(id *pb.PolicyId) (*pb.Workload, bool)
 	CalculateAll()
 	Dump() interface{}
 }
@@ -157,6 +162,20 @@ func (s *MemoryStore) ListPolicies(clusterName string) []*pb.Policy {
 		policies = append(policies, ps.Policy)
 	}
 	return policies
+}
+
+func (s *MemoryStore) GetWorkload(id *pb.PolicyId) (*pb.Workload, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	ps, ok := s.state[newPolicyID(id)]
+	if !ok || ps.Policy == nil {
+		return nil, false
+	}
+	workload := &pb.Workload{Pods: make([]*pb.PodState, 0, len(ps.Workload))}
+	for _, name := range slices.Sorted(maps.Keys(ps.Workload)) {
+		workload.Pods = append(workload.Pods, proto.Clone(ps.Workload[name]).(*pb.PodState))
+	}
+	return workload, true
 }
 
 func (s *MemoryStore) UpdateWorkload(req *pb.UpdateWorkloadRequest) error {
@@ -480,12 +499,6 @@ func (s *MemoryStore) processRecommendations(ps *PolicyState, now int64) {
 //   - If multiple active recommenders specify resources for the same pod container,
 //     their requests and limits are arbitrated by taking the maximum quantity for each resource.
 //
-// In both cases, bounds are arbitrated per resource by taking the widest band:
-// the minimum of the lower bounds and the maximum of the upper bounds. A
-// recommender that sets no bound on a side is skipped for that side. The
-// arbitrated bounds are then clamped around the arbitrated requests, so that
-// lower bound <= request <= upper bound.
-//
 // Recommenders running in "DryRun" mode or reporting IsActive = false are excluded from arbitration.
 func (s *MemoryStore) calculateArbitratedResources(ps *PolicyState, isActive bool) ([]*pb.ContainerResource, []*pb.PodContainerResource) {
 	if !isActive {
@@ -525,27 +538,21 @@ func (s *MemoryStore) calculateArbitratedResources(ps *PolicyState, isActive boo
 					ContainerName: cName,
 					Requests:      newReqs,
 					Limits:        newLims,
-					LowerBound:    copyResourceMap(wr.LowerBound),
-					UpperBound:    copyResourceMap(wr.UpperBound),
 				}
 				workloadKeys = append(workloadKeys, cName)
 			} else {
 				arbitrateResourceMap(existing.Requests, wr.Requests)
 				arbitrateResourceMap(existing.Limits, wr.Limits)
-				existing.LowerBound = arbitrateBoundMap(existing.LowerBound, wr.LowerBound, true)
-				existing.UpperBound = arbitrateBoundMap(existing.UpperBound, wr.UpperBound, false)
 			}
 		}
 
 		for _, pr := range d.PodResources {
 			cName := ""
-			var reqs, lims, lower, upper map[string]string
+			var reqs, lims map[string]string
 			if pr.ContainerResources != nil {
 				cName = pr.ContainerResources.ContainerName
 				reqs = pr.ContainerResources.Requests
 				lims = pr.ContainerResources.Limits
-				lower = pr.ContainerResources.LowerBound
-				upper = pr.ContainerResources.UpperBound
 			}
 			key := fmt.Sprintf("%s|%s", pr.PodName, cName)
 			existing, ok := podMap[key]
@@ -564,18 +571,13 @@ func (s *MemoryStore) calculateArbitratedResources(ps *PolicyState, isActive boo
 						ContainerName: cName,
 						Requests:      newReqs,
 						Limits:        newLims,
-						LowerBound:    copyResourceMap(lower),
-						UpperBound:    copyResourceMap(upper),
 					},
 				}
 				podKeys = append(podKeys, key)
 			} else {
 				if existing.ContainerResources != nil {
-					cr := existing.ContainerResources
-					arbitrateResourceMap(cr.Requests, reqs)
-					arbitrateResourceMap(cr.Limits, lims)
-					cr.LowerBound = arbitrateBoundMap(cr.LowerBound, lower, true)
-					cr.UpperBound = arbitrateBoundMap(cr.UpperBound, upper, false)
+					arbitrateResourceMap(existing.ContainerResources.Requests, reqs)
+					arbitrateResourceMap(existing.ContainerResources.Limits, lims)
 				}
 			}
 		}
@@ -583,13 +585,11 @@ func (s *MemoryStore) calculateArbitratedResources(ps *PolicyState, isActive boo
 
 	var arbitratedWorkload []*pb.ContainerResource
 	for _, key := range workloadKeys {
-		clampBounds(workloadMap[key])
 		arbitratedWorkload = append(arbitratedWorkload, workloadMap[key])
 	}
 
 	var arbitratedPods []*pb.PodContainerResource
 	for _, key := range podKeys {
-		clampBounds(podMap[key].ContainerResources)
 		arbitratedPods = append(arbitratedPods, podMap[key])
 	}
 
@@ -612,69 +612,6 @@ func arbitrateResourceMap(dest map[string]string, src map[string]string) {
 		if err1 == nil && err2 == nil {
 			if destQ.Cmp(srcQ) < 0 {
 				dest[resName] = srcVal
-			}
-		}
-	}
-}
-
-// copyResourceMap returns a copy of m, or nil if m is empty.
-func copyResourceMap(m map[string]string) map[string]string {
-	if len(m) == 0 {
-		return nil
-	}
-	out := make(map[string]string, len(m))
-	for k, v := range m {
-		out[k] = v
-	}
-	return out
-}
-
-// arbitrateBoundMap merges the src bounds into dest, keeping the minimum
-// quantity for each resource when lower is true, and the maximum otherwise. A
-// resource missing from either map keeps the other's bound. It returns the
-// merged map, which may be newly allocated.
-func arbitrateBoundMap(dest, src map[string]string, lower bool) map[string]string {
-	for resName, srcVal := range src {
-		destVal, ok := dest[resName]
-		if !ok || destVal == "" {
-			if dest == nil {
-				dest = make(map[string]string, len(src))
-			}
-			dest[resName] = srcVal
-			continue
-		}
-		destQ, err1 := resource.ParseQuantity(destVal)
-		srcQ, err2 := resource.ParseQuantity(srcVal)
-		if err1 != nil || err2 != nil {
-			continue
-		}
-		if (lower && srcQ.Cmp(destQ) < 0) || (!lower && srcQ.Cmp(destQ) > 0) {
-			dest[resName] = srcVal
-		}
-	}
-	return dest
-}
-
-// clampBounds lowers the lower bounds and raises the upper bounds as needed so
-// that lower bound <= request <= upper bound, for every resource with a
-// request.
-func clampBounds(cr *pb.ContainerResource) {
-	if cr == nil {
-		return
-	}
-	for resName, reqVal := range cr.Requests {
-		reqQ, err := resource.ParseQuantity(reqVal)
-		if err != nil {
-			continue
-		}
-		if v, ok := cr.LowerBound[resName]; ok {
-			if q, err := resource.ParseQuantity(v); err == nil && q.Cmp(reqQ) > 0 {
-				cr.LowerBound[resName] = reqVal
-			}
-		}
-		if v, ok := cr.UpperBound[resName]; ok {
-			if q, err := resource.ParseQuantity(v); err == nil && q.Cmp(reqQ) < 0 {
-				cr.UpperBound[resName] = reqVal
 			}
 		}
 	}
