@@ -84,7 +84,7 @@ spec:
               metrics:
                 description: |-
                   Metrics defines how to process the collected raw data into useful control metrics.
-                  Optional: some recommenders (e.g. VPA) create the metrics they need.
+                  Optional.
                 items:
                   description: MetricDefinition defines how to transform raw scraped
                     data into a single control metric value

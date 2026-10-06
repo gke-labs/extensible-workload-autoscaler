@@ -304,7 +304,7 @@ func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationR
 	var metricStatuses []*pb.MetricStatus
 	if ps.ControlMetrics != nil {
 		for _, def := range ps.Policy.Metrics {
-			metricStatuses = append(metricStatuses, metricStatus(def.Name, def.Name, ps.ControlMetrics))
+			metricStatuses = append(metricStatuses, metricStatus(def.Name, "", ps.ControlMetrics))
 		}
 	}
 	// Metrics owned by recommenders are listed as <recommender>/<metric>.
@@ -314,7 +314,7 @@ func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationR
 			continue
 		}
 		for _, def := range ps.Policy.RecommenderMetrics[owner].GetDefinitions() {
-			metricStatuses = append(metricStatuses, metricStatus(owner+"/"+def.Name, def.Name, cm))
+			metricStatuses = append(metricStatuses, metricStatus(def.Name, owner, cm))
 		}
 	}
 
@@ -325,14 +325,19 @@ func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationR
 	}, true
 }
 
-// metricStatus returns the status, named name, of the metric `metric` in cm.
-// Per-pod and per-container values are averaged.
-func metricStatus(name, metric string, cm *pb.ControlMetrics) *pb.MetricStatus {
+// metricStatus returns the status of the metric name in cm, owned by owner
+// (empty for policy-wide metrics). Owned metrics are displayed as
+// "<owner>/<name>". Per-pod and per-container values are averaged.
+func metricStatus(name, owner string, cm *pb.ControlMetrics) *pb.MetricStatus {
+	displayName := name
+	if owner != "" {
+		displayName = owner + "/" + name
+	}
 	status := &pb.MetricStatus{
-		Name:      name,
+		Name:      displayName,
 		Timestamp: cm.Timestamp,
 	}
-	if val, ok := cm.Values[metric]; ok {
+	if val, ok := cm.Values[name]; ok {
 		status.Value = val
 		return status
 	}
@@ -340,7 +345,7 @@ func metricStatus(name, metric string, cm *pb.ControlMetrics) *pb.MetricStatus {
 	var count int
 	for _, pcm := range cm.PodContainerMetrics {
 		for _, c := range pcm.GetContainerMetrics() {
-			if v, ok := c.Values[metric]; ok {
+			if v, ok := c.Values[name]; ok {
 				sum += v
 				count++
 			}
@@ -348,7 +353,7 @@ func metricStatus(name, metric string, cm *pb.ControlMetrics) *pb.MetricStatus {
 	}
 	if count == 0 {
 		for _, pm := range cm.PodMetrics {
-			if v, ok := pm.Values[metric]; ok {
+			if v, ok := pm.Values[name]; ok {
 				sum += v
 				count++
 			}

@@ -38,7 +38,7 @@ type ScalingPolicySpec struct {
 	MaxReplicas int32 `json:"maxReplicas"`
 
 	// Metrics defines how to process the collected raw data into useful control metrics.
-	// Optional: some recommenders (e.g. VPA) create the metrics they need.
+	// Optional.
 	Metrics []MetricDefinition `json:"metrics,omitempty"`
 
 	// Activation defines the list of recommenders that determine if the workload should be Active (>=MinReplicas) or Idle (0).
