@@ -27,6 +27,9 @@ type Recommender interface {
 	Recommend(def *pb.RecommenderDefinition, metrics, ownedMetrics *pb.ControlMetrics, workload *pb.Workload) *pb.Recommendation
 }
 
+// The VPA recommender owns the metrics the user doesn't configure.
+var _ MetricsOwner = (*vpa.VPARecommender)(nil)
+
 type Engine struct {
 	grpcConn               *grpc.ClientConn
 	client                 pb.XASServerClient
@@ -92,7 +95,7 @@ func (e *Engine) Tick() {
 func (e *Engine) processPolicy(policy *pb.Policy) {
 	// Make sure the metrics owned by our recommenders are registered on the
 	// policy, so the providers collect them before we read them back.
-	policy = e.syncRecommenderMetrics(policy)
+	policy, configErrs := e.syncRecommenderMetrics(policy)
 
 	metrics, err := e.fetchControlMetrics(policy.Id.Namespace, policy.Id.Name, "")
 	if err != nil {
@@ -109,6 +112,13 @@ func (e *Engine) processPolicy(policy *pb.Policy) {
 	// workload.
 	var recommendations []namedRecommendation
 	for _, def := range slices.Concat(policy.Activation, policy.Scaling) {
+		if err, ok := configErrs[def.Name]; ok {
+			recommendations = append(recommendations, namedRecommendation{name: def.Name, recommendation: &pb.Recommendation{
+				IsActive: false,
+				Message:  fmt.Sprintf("Invalid configuration: %v", err),
+			}})
+			continue
+		}
 		ownedMetrics, err := e.fetchControlMetrics(policy.Id.Namespace, policy.Id.Name, def.Name)
 		if err != nil {
 			return

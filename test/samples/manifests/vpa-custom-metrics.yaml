@@ -1,26 +1,26 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: sample-vpa
+  name: sample-vpa-custom
   labels:
-    sample: vpa
+    sample: vpa-custom
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sample-vpa-app
-  namespace: sample-vpa
+  name: sample-vpa-custom-app
+  namespace: sample-vpa-custom
   labels:
-    sample: vpa
+    sample: vpa-custom
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: sample-vpa-app
+      app: sample-vpa-custom-app
   template:
     metadata:
       labels:
-        app: sample-vpa-app
+        app: sample-vpa-custom-app
     spec:
       containers:
         - name: stress
@@ -44,28 +44,40 @@ spec:
 apiVersion: xas.io/v1
 kind: ScalingPolicy
 metadata:
-  name: sample-vpa-policy
-  namespace: sample-vpa
+  name: sample-vpa-custom-policy
+  namespace: sample-vpa-custom
   labels:
-    sample: vpa
+    sample: vpa-custom
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: sample-vpa-app
+    name: sample-vpa-custom-app
   minReplicas: 1
   maxReplicas: 5
 
-  # VPA creates the metrics it needs: for CPU and memory, the P90 of the usage
-  # as the target, and the P50 and P99 as the bounds. Pods whose requests fall
-  # outside [P50, P99] are resized. Pods within these bounds are only resized
-  # when some request changes by at least 10%.
-  # The limits keep the pods' limit/request ratio (here 5x CPU, 4x memory, from
-  # the template); set cpu-limit-ratio / mem-limit-ratio to override it.
+  # The CPU target is the P95 of the usage, with a shorter half-life. VPA
+  # creates the other metrics it needs: the CPU bounds (P50 and P99) with the
+  # same source, half-life and bucket size as cpu_p95, and the memory target
+  # and bounds (P90, P50 and P99) with the defaults.
+  metrics:
+    - name: "cpu_p95"
+      scope: PodContainer
+      provider: "kubelet"
+      params:
+        type: "cpu"
+      decayingDistribution:
+        percentile: "p95"
+        halfLife: "12h"
+        bucketSize: "0.05"
+
   scaling:
     - recommender: "vpa"
       name: "vpa-sizing"
       params:
         container: "stress"
+        cpu-metric: "cpu_p95"
+        # Setting a metric param only controls that resource by default.
+        controlled-resources: "cpu,memory"
         cpu-safety-margin: "1.10"
         mem-safety-margin: "1.10"

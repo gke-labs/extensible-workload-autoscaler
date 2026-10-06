@@ -37,8 +37,9 @@ type ScalingPolicySpec struct {
 	// MaxReplicas is the upper limit for the number of replicas
 	MaxReplicas int32 `json:"maxReplicas"`
 
-	// Metrics defines how to process the collected raw data into useful control metrics
-	Metrics []MetricDefinition `json:"metrics"`
+	// Metrics defines how to process the collected raw data into useful control metrics.
+	// Optional.
+	Metrics []MetricDefinition `json:"metrics,omitempty"`
 
 	// Activation defines the list of recommenders that determine if the workload should be Active (>=MinReplicas) or Idle (0).
 	// Logic: Active = Recommender1.Active || Recommender2.Active ...

@@ -3,7 +3,9 @@ package store
 import (
 	"encoding/json"
 	"errors"
+	"maps"
 	"math"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +16,7 @@ import (
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
+	"github.com/gke-labs/extensible-workload-autoscaler/internal/policy"
 )
 
 func TestMetricCalculations(t *testing.T) {
@@ -1152,6 +1155,7 @@ func TestRecommenderOwnedMetrics(t *testing.T) {
 		Metrics: []*pb.MetricDefinition{
 			{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}},
 		},
+		Scaling: []*pb.RecommenderDefinition{{Name: "vpa"}, {Name: "hpa"}},
 		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 			"vpa": {Definitions: []*pb.MetricDefinition{
 				{Name: "cpu", RecommenderName: "vpa", Gauge: &pb.Gauge{Aggregation: "Max"}},
@@ -1216,6 +1220,7 @@ func TestRecommenderOwnedMetricsCleanup(t *testing.T) {
 		Metrics: []*pb.MetricDefinition{
 			{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}},
 		},
+		Scaling: []*pb.RecommenderDefinition{{Name: "vpa"}},
 		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 			"vpa": {Definitions: []*pb.MetricDefinition{
 				{Name: "cpu", RecommenderName: "vpa", Gauge: &pb.Gauge{Aggregation: "Avg"}},
@@ -1440,5 +1445,125 @@ func TestGetWorkload(t *testing.T) {
 	again, _ := s.GetWorkload(id)
 	if v := again.Pods[0].Containers[0].Requests["cpu"]; v != "100m" {
 		t.Errorf("stored request changed through a returned workload: got %q, want 100m", v)
+	}
+}
+
+// TestRemovedRecommenderOwnedMetricsGC checks that the metrics owned by a
+// recommender removed from the policy are dropped, with their series, while
+// those of the remaining recommenders are kept.
+func TestRemovedRecommenderOwnedMetricsGC(t *testing.T) {
+	s := NewMemoryStore()
+	ns, name := "default", "pol"
+	key := policyID{cluster: "default", ns: ns, name: name}
+	id := &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: name}
+	owned := func(owner string) *pb.MetricDefinitionList {
+		return &pb.MetricDefinitionList{Definitions: []*pb.MetricDefinition{
+			{Name: "cpu", RecommenderName: owner, Gauge: &pb.Gauge{Aggregation: "Avg"}},
+		}}
+	}
+
+	pol := &pb.Policy{
+		Id:         id,
+		Scaling:    []*pb.RecommenderDefinition{{Name: "vpa"}},
+		Activation: []*pb.RecommenderDefinition{{Name: "act"}},
+		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+			"vpa": owned("vpa"),
+			"act": owned("act"),
+		},
+	}
+	stored := mustUpdatePolicy(t, s, "default", pol)
+	if got := slices.Sorted(maps.Keys(stored.RecommenderMetrics)); !slices.Equal(got, []string{"act", "vpa"}) {
+		t.Fatalf("recommender_metrics = %v, want [act vpa]", got)
+	}
+
+	now := time.Now().Unix()
+	ingestOwned(s, now, ns, name, "p1", "vpa", "cpu", 10)
+	ingestOwned(s, now, ns, name, "p1", "act", "cpu", 1)
+
+	// The controller removes vpa, but still sends the entry it copied from
+	// the server.
+	pol = proto.Clone(stored).(*pb.Policy)
+	pol.Scaling = nil
+	stored = mustUpdatePolicy(t, s, "default", pol)
+
+	if got := slices.Sorted(maps.Keys(stored.RecommenderMetrics)); !slices.Equal(got, []string{"act"}) {
+		t.Errorf("recommender_metrics after removing vpa = %v, want [act]", got)
+	}
+	series := s.Dump().(map[policyID]*PolicyState)[key].Metrics.Series
+	if _, ok := series[metricID{name: "cpu", recommenderName: "vpa"}]; ok {
+		t.Error("series of the removed recommender's metric still exists")
+	}
+	if _, ok := series[metricID{name: "cpu", recommenderName: "act"}]; !ok {
+		t.Error("series of the remaining Activation recommender's metric was deleted")
+	}
+
+	// The returned ETag matches the stored, cleaned-up policy.
+	want, err := policy.CreateEtag(stored)
+	if err != nil {
+		t.Fatalf("CreateEtag() error = %v", err)
+	}
+	if stored.Etag != want {
+		t.Errorf("returned etag = %q, want the etag of the stored policy %q", stored.Etag, want)
+	}
+	got, _ := s.GetPolicy(id)
+	if got.Etag != stored.Etag {
+		t.Errorf("stored etag = %q, want the returned one %q", got.Etag, stored.Etag)
+	}
+	// A follow-up update with the returned ETag succeeds.
+	next := proto.Clone(stored).(*pb.Policy)
+	next.MaxReplicas = 7
+	if _, err := s.UpdatePolicy("default", next); err != nil {
+		t.Errorf("UpdatePolicy() with the returned etag error = %v", err)
+	}
+}
+
+// TestOwnedMetricStatuses checks that owned metrics are reported in the
+// metric statuses as <recommender>/<metric>, after the policy-wide ones.
+func TestOwnedMetricStatuses(t *testing.T) {
+	s := NewMemoryStore()
+	ns, name := "default", "pol"
+	id := &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: name}
+	pol := &pb.Policy{
+		Id:      id,
+		Metrics: []*pb.MetricDefinition{{Name: "cpu", Gauge: &pb.Gauge{Aggregation: "Avg"}}},
+		Scaling: []*pb.RecommenderDefinition{{Name: "vpa"}},
+		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+			"vpa": {Definitions: []*pb.MetricDefinition{
+				{Name: "cpu-target", RecommenderName: "vpa", Gauge: &pb.Gauge{Aggregation: "Max"}},
+				{Name: "memory-target", RecommenderName: "vpa", Gauge: &pb.Gauge{Aggregation: "Max"}},
+			}},
+		},
+	}
+	mustUpdatePolicy(t, s, "default", pol)
+	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
+		Id:       id,
+		Workload: &pb.Workload{Pods: []*pb.PodState{{Name: "p1", IsReady: true}}},
+	})
+
+	now := time.Now().Unix()
+	ingest(s, now, ns, name, "p1", "cpu", 2)
+	ingestOwned(s, now, ns, name, "p1", "vpa", "cpu-target", 20)
+	s.CalculateAll()
+
+	resp, ok := s.GetRecommendation(id)
+	if !ok {
+		t.Fatal("GetRecommendation() not found")
+	}
+	type st struct {
+		Name  string
+		Value float64
+		Error string
+	}
+	var got []st
+	for _, ms := range resp.MetricStatuses {
+		got = append(got, st{ms.Name, ms.Value, ms.Error})
+	}
+	want := []st{
+		{Name: "cpu", Value: 2},
+		{Name: "vpa/cpu-target", Value: 20},
+		{Name: "vpa/memory-target", Error: "No data available"},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("MetricStatuses mismatch (-want +got):\n%s", diff)
 	}
 }
