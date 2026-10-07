@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The XAS Authors.
+Copyright 2024 The xAS Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,18 +30,18 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	XasV1() xasv1.XasV1Interface
+	XASV1() xasv1.XASV1Interface
 }
 
 // Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	xasV1 *xasv1.XasV1Client
+	xASV1 *xasv1.XASV1Client
 }
 
-// XasV1 retrieves the XasV1Client
-func (c *Clientset) XasV1() xasv1.XasV1Interface {
-	return c.xasV1
+// XASV1 retrieves the XASV1Client
+func (c *Clientset) XASV1() xasv1.XASV1Interface {
+	return c.xASV1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -88,7 +88,7 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 
 	var cs Clientset
 	var err error
-	cs.xasV1, err = xasv1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	cs.xASV1, err = xasv1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.xasV1 = xasv1.New(c)
+	cs.xASV1 = xasv1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

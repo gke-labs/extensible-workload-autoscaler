@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The XAS Authors.
+Copyright 2024 The xAS Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,10 +27,10 @@ import (
 // fakeScalingPolicies implements ScalingPolicyInterface
 type fakeScalingPolicies struct {
 	*gentype.FakeClientWithList[*v1.ScalingPolicy, *v1.ScalingPolicyList]
-	Fake *FakeXasV1
+	Fake *FakeXASV1
 }
 
-func newFakeScalingPolicies(fake *FakeXasV1, namespace string) xasv1.ScalingPolicyInterface {
+func newFakeScalingPolicies(fake *FakeXASV1, namespace string) xasv1.ScalingPolicyInterface {
 	return &fakeScalingPolicies{
 		gentype.NewFakeClientWithList[*v1.ScalingPolicy, *v1.ScalingPolicyList](
 			fake.Fake,

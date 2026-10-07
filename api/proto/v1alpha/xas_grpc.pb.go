@@ -35,7 +35,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// XASServer defines the gRPC interface for the XAS Server.
+// XASServer defines the gRPC interface for the xAS Server.
 // It acts as the central state manager for autoscaling policies, workload state,
 // metric ingestion, and decision making.
 type XASServerClient interface {
@@ -175,7 +175,7 @@ func (c *xASServerClient) IngestMetrics(ctx context.Context, in *IngestMetricsRe
 // All implementations must embed UnimplementedXASServerServer
 // for forward compatibility.
 //
-// XASServer defines the gRPC interface for the XAS Server.
+// XASServer defines the gRPC interface for the xAS Server.
 // It acts as the central state manager for autoscaling policies, workload state,
 // metric ingestion, and decision making.
 type XASServerServer interface {

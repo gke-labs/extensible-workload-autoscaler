@@ -25,7 +25,7 @@ func main() {
 	var kubeconfig string
 	var debug bool
 
-	flag.StringVar(&serverAddress, "server-address", "xas-server:8080", "Address of the XAS Server (host:port)")
+	flag.StringVar(&serverAddress, "server-address", "xas-server:8080", "Address of the xAS Server (host:port)")
 	flag.StringVar(&clusterName, "cluster-name", "default", "Name of the cluster this controller is running in")
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.BoolVar(&debug, "debug", false, "Enable debug logging")
@@ -65,9 +65,9 @@ func main() {
 	ctl := controller.NewController(
 		kubeClient,
 		xasClient,
-		xasInformerFactory.Xas().V1().ScalingPolicies(),
-		xasInformerFactory.Xas().V1().MetricProviderClasses(),
-		xasInformerFactory.Xas().V1().RecommenderClasses(),
+		xasInformerFactory.XAS().V1().ScalingPolicies(),
+		xasInformerFactory.XAS().V1().MetricProviderClasses(),
+		xasInformerFactory.XAS().V1().RecommenderClasses(),
 		serverAddress,
 		clusterName,
 	)

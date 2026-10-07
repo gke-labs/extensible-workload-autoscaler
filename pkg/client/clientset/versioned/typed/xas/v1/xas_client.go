@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The XAS Authors.
+Copyright 2024 The xAS Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,34 +26,34 @@ import (
 	rest "k8s.io/client-go/rest"
 )
 
-type XasV1Interface interface {
+type XASV1Interface interface {
 	RESTClient() rest.Interface
 	MetricProviderClassesGetter
 	RecommenderClassesGetter
 	ScalingPoliciesGetter
 }
 
-// XasV1Client is used to interact with features provided by the xas.io group.
-type XasV1Client struct {
+// XASV1Client is used to interact with features provided by the xas.io group.
+type XASV1Client struct {
 	restClient rest.Interface
 }
 
-func (c *XasV1Client) MetricProviderClasses() MetricProviderClassInterface {
+func (c *XASV1Client) MetricProviderClasses() MetricProviderClassInterface {
 	return newMetricProviderClasses(c)
 }
 
-func (c *XasV1Client) RecommenderClasses() RecommenderClassInterface {
+func (c *XASV1Client) RecommenderClasses() RecommenderClassInterface {
 	return newRecommenderClasses(c)
 }
 
-func (c *XasV1Client) ScalingPolicies(namespace string) ScalingPolicyInterface {
+func (c *XASV1Client) ScalingPolicies(namespace string) ScalingPolicyInterface {
 	return newScalingPolicies(c, namespace)
 }
 
-// NewForConfig creates a new XasV1Client for the given config.
+// NewForConfig creates a new XASV1Client for the given config.
 // NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
 // where httpClient was generated with rest.HTTPClientFor(c).
-func NewForConfig(c *rest.Config) (*XasV1Client, error) {
+func NewForConfig(c *rest.Config) (*XASV1Client, error) {
 	config := *c
 	setConfigDefaults(&config)
 	httpClient, err := rest.HTTPClientFor(&config)
@@ -63,21 +63,21 @@ func NewForConfig(c *rest.Config) (*XasV1Client, error) {
 	return NewForConfigAndClient(&config, httpClient)
 }
 
-// NewForConfigAndClient creates a new XasV1Client for the given config and http client.
+// NewForConfigAndClient creates a new XASV1Client for the given config and http client.
 // Note the http client provided takes precedence over the configured transport values.
-func NewForConfigAndClient(c *rest.Config, h *http.Client) (*XasV1Client, error) {
+func NewForConfigAndClient(c *rest.Config, h *http.Client) (*XASV1Client, error) {
 	config := *c
 	setConfigDefaults(&config)
 	client, err := rest.RESTClientForConfigAndClient(&config, h)
 	if err != nil {
 		return nil, err
 	}
-	return &XasV1Client{client}, nil
+	return &XASV1Client{client}, nil
 }
 
-// NewForConfigOrDie creates a new XasV1Client for the given config and
+// NewForConfigOrDie creates a new XASV1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *XasV1Client {
+func NewForConfigOrDie(c *rest.Config) *XASV1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -85,9 +85,9 @@ func NewForConfigOrDie(c *rest.Config) *XasV1Client {
 	return client
 }
 
-// New creates a new XasV1Client for the given RESTClient.
-func New(c rest.Interface) *XasV1Client {
-	return &XasV1Client{c}
+// New creates a new XASV1Client for the given RESTClient.
+func New(c rest.Interface) *XASV1Client {
+	return &XASV1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) {
@@ -103,7 +103,7 @@ func setConfigDefaults(config *rest.Config) {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *XasV1Client) RESTClient() rest.Interface {
+func (c *XASV1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

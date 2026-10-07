@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The XAS Authors.
+Copyright 2024 The xAS Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,25 +24,25 @@ import (
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeXasV1 struct {
+type FakeXASV1 struct {
 	*testing.Fake
 }
 
-func (c *FakeXasV1) MetricProviderClasses() v1.MetricProviderClassInterface {
+func (c *FakeXASV1) MetricProviderClasses() v1.MetricProviderClassInterface {
 	return newFakeMetricProviderClasses(c)
 }
 
-func (c *FakeXasV1) RecommenderClasses() v1.RecommenderClassInterface {
+func (c *FakeXASV1) RecommenderClasses() v1.RecommenderClassInterface {
 	return newFakeRecommenderClasses(c)
 }
 
-func (c *FakeXasV1) ScalingPolicies(namespace string) v1.ScalingPolicyInterface {
+func (c *FakeXASV1) ScalingPolicies(namespace string) v1.ScalingPolicyInterface {
 	return newFakeScalingPolicies(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeXasV1) RESTClient() rest.Interface {
+func (c *FakeXASV1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

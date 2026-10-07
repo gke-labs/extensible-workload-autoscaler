@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The XAS Authors.
+Copyright 2024 The xAS Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ type scalingPolicies struct {
 }
 
 // newScalingPolicies returns a ScalingPolicies
-func newScalingPolicies(c *XasV1Client, namespace string) *scalingPolicies {
+func newScalingPolicies(c *XASV1Client, namespace string) *scalingPolicies {
 	return &scalingPolicies{
 		gentype.NewClientWithList[*xasv1.ScalingPolicy, *xasv1.ScalingPolicyList](
 			"scalingpolicies",

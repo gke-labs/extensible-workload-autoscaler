@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The XAS Authors.
+Copyright 2024 The xAS Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -73,25 +73,25 @@ func NewScalingPolicyInformerWithOptions(client versioned.Interface, namespace s
 				if tweakListOptions != nil {
 					tweakListOptions(&opts)
 				}
-				return client.XasV1().ScalingPolicies(namespace).List(context.Background(), opts)
+				return client.XASV1().ScalingPolicies(namespace).List(context.Background(), opts)
 			},
 			WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&opts)
 				}
-				return client.XasV1().ScalingPolicies(namespace).Watch(context.Background(), opts)
+				return client.XASV1().ScalingPolicies(namespace).Watch(context.Background(), opts)
 			},
 			ListWithContextFunc: func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&opts)
 				}
-				return client.XasV1().ScalingPolicies(namespace).List(ctx, opts)
+				return client.XASV1().ScalingPolicies(namespace).List(ctx, opts)
 			},
 			WatchFuncWithContext: func(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&opts)
 				}
-				return client.XasV1().ScalingPolicies(namespace).Watch(ctx, opts)
+				return client.XASV1().ScalingPolicies(namespace).Watch(ctx, opts)
 			},
 		}, client),
 		&apisxasv1.ScalingPolicy{},

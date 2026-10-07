@@ -10,7 +10,7 @@ CLUSTER_NAME="xas-e2e"
 IMAGE_TAG="e2e"
 
 echo "=========================================================="
-echo "Setting up XAS on Kind..."
+echo "Setting up xAS on Kind..."
 echo "=========================================================="
 
 # 2. Deploy System using shared script

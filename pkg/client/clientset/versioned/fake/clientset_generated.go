@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The XAS Authors.
+Copyright 2024 The xAS Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -95,7 +95,7 @@ var (
 	_ testing.FakeClient  = &Clientset{}
 )
 
-// XasV1 retrieves the XasV1Client
-func (c *Clientset) XasV1() xasv1.XasV1Interface {
-	return &fakexasv1.FakeXasV1{Fake: &c.Fake}
+// XASV1 retrieves the XASV1Client
+func (c *Clientset) XASV1() xasv1.XASV1Interface {
+	return &fakexasv1.FakeXASV1{Fake: &c.Fake}
 }

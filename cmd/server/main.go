@@ -64,7 +64,7 @@ func main() {
 	pb.RegisterXASServerServer(grpcServer, servergrpc.NewServer(metricsStore, clock.RealClock{}))
 	reflection.Register(grpcServer)
 
-	slog.Info("XAS Server gRPC starting", "port", port)
+	slog.Info("xAS Server gRPC starting", "port", port)
 	go func() {
 		if err := grpcServer.Serve(lis); err != nil {
 			slog.Error("gRPC server stopped", "error", err)
@@ -92,7 +92,7 @@ func main() {
 		Handler: mux,
 	}
 
-	slog.Info("XAS Metrics starting", "port", metricsPort)
+	slog.Info("xAS Metrics starting", "port", metricsPort)
 	go func() {
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("Metrics server failed", "error", err)
