@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The XAS Authors.
+Copyright 2024 The xAS Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,7 +54,7 @@ type metricProviderClasses struct {
 }
 
 // newMetricProviderClasses returns a MetricProviderClasses
-func newMetricProviderClasses(c *XasV1Client) *metricProviderClasses {
+func newMetricProviderClasses(c *XASV1Client) *metricProviderClasses {
 	return &metricProviderClasses{
 		gentype.NewClientWithList[*xasv1.MetricProviderClass, *xasv1.MetricProviderClassList](
 			"metricproviderclasses",

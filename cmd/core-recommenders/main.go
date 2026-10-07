@@ -21,7 +21,7 @@ import (
 )
 
 func main() {
-	serverAddress := flag.String("server-address", "localhost:8080", "XAS Server Address (host:port)")
+	serverAddress := flag.String("server-address", "localhost:8080", "xAS Server Address (host:port)")
 	clusterName := flag.String("cluster-name", "default", "Name of the cluster")
 	kubeconfig := flag.String("kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	debug := flag.Bool("debug", false, "Enable debug logging")
@@ -56,7 +56,7 @@ func main() {
 	}
 
 	factory := informers.NewSharedInformerFactory(xasClient, time.Second*30)
-	recommenderLister := factory.Xas().V1().RecommenderClasses().Lister()
+	recommenderLister := factory.XAS().V1().RecommenderClasses().Lister()
 
 	kubeFactory := k8sinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
 	nodeLister := kubeFactory.Core().V1().Nodes().Lister()

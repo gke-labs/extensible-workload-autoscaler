@@ -145,7 +145,7 @@ func main() {
 
 		requestCount.Inc()
 
-		w.Write([]byte("Hello from XAS Sample App"))
+		w.Write([]byte("Hello from xAS Sample App"))
 	})
 
 	// Latency Endpoint
@@ -160,7 +160,7 @@ func main() {
 
 		time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond)
 
-		w.Write([]byte("Hello from XAS Sample App"))
+		w.Write([]byte("Hello from xAS Sample App"))
 	})
 
 	// 2. CPU Burn Endpoint

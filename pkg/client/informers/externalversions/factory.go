@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The XAS Authors.
+Copyright 2024 The xAS Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -325,9 +325,9 @@ type SharedInformerFactory interface {
 	// client.
 	InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer
 
-	Xas() xas.Interface
+	XAS() xas.Interface
 }
 
-func (f *sharedInformerFactory) Xas() xas.Interface {
+func (f *sharedInformerFactory) XAS() xas.Interface {
 	return xas.New(f, f.namespace, f.tweakListOptions)
 }

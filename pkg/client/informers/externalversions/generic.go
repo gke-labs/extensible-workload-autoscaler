@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The XAS Authors.
+Copyright 2024 The xAS Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,11 +54,11 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	switch resource {
 	// Group=xas.io, Version=v1
 	case v1.SchemeGroupVersion.WithResource("metricproviderclasses"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Xas().V1().MetricProviderClasses().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.XAS().V1().MetricProviderClasses().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("recommenderclasses"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Xas().V1().RecommenderClasses().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.XAS().V1().RecommenderClasses().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("scalingpolicies"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Xas().V1().ScalingPolicies().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.XAS().V1().ScalingPolicies().Informer()}, nil
 
 	}
 

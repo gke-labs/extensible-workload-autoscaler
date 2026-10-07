@@ -252,7 +252,7 @@ spec:
                 type: integer
               desiredReplicas:
                 description: DesiredReplicas is the number of replicas calculated
-                  by the XAS Server.
+                  by the xAS Server.
                 format: int32
                 type: integer
               lastUpdated:

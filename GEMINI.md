@@ -1,6 +1,6 @@
-# XAS (Extensible Autoscaling System)
+# xAS (Extensible Workload Autoscaler)
 
-XAS is a decoupled, model-based autoscaling system for Kubernetes. It separates metric collection, decision making, and actuation into distinct microservices, allowing for greater flexibility and extensibility compared to the standard Horizontal Pod Autoscaler (HPA).
+xAS is a decoupled, model-based autoscaling system for Kubernetes. It separates metric collection, decision making, and actuation into distinct microservices, allowing for greater flexibility and extensibility compared to the standard Horizontal Pod Autoscaler (HPA).
 
 ## Project Overview
 

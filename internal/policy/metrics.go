@@ -1,4 +1,4 @@
-// Package policy provides helpers to interpret the policies served by the XAS
+// Package policy provides helpers to interpret the policies served by the xAS
 // Server.
 package policy
 

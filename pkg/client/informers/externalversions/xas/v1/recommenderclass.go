@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The XAS Authors.
+Copyright 2024 The xAS Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -72,25 +72,25 @@ func NewRecommenderClassInformerWithOptions(client versioned.Interface, options 
 				if tweakListOptions != nil {
 					tweakListOptions(&opts)
 				}
-				return client.XasV1().RecommenderClasses().List(context.Background(), opts)
+				return client.XASV1().RecommenderClasses().List(context.Background(), opts)
 			},
 			WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&opts)
 				}
-				return client.XasV1().RecommenderClasses().Watch(context.Background(), opts)
+				return client.XASV1().RecommenderClasses().Watch(context.Background(), opts)
 			},
 			ListWithContextFunc: func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&opts)
 				}
-				return client.XasV1().RecommenderClasses().List(ctx, opts)
+				return client.XASV1().RecommenderClasses().List(ctx, opts)
 			},
 			WatchFuncWithContext: func(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&opts)
 				}
-				return client.XasV1().RecommenderClasses().Watch(ctx, opts)
+				return client.XASV1().RecommenderClasses().Watch(ctx, opts)
 			},
 		}, client),
 		&apisxasv1.RecommenderClass{},

@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The XAS Authors.
+Copyright 2024 The xAS Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,10 +27,10 @@ import (
 // fakeRecommenderClasses implements RecommenderClassInterface
 type fakeRecommenderClasses struct {
 	*gentype.FakeClientWithList[*v1.RecommenderClass, *v1.RecommenderClassList]
-	Fake *FakeXasV1
+	Fake *FakeXASV1
 }
 
-func newFakeRecommenderClasses(fake *FakeXasV1) xasv1.RecommenderClassInterface {
+func newFakeRecommenderClasses(fake *FakeXASV1) xasv1.RecommenderClassInterface {
 	return &fakeRecommenderClasses{
 		gentype.NewFakeClientWithList[*v1.RecommenderClass, *v1.RecommenderClassList](
 			fake.Fake,

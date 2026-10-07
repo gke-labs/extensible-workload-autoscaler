@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The XAS Authors.
+Copyright 2024 The xAS Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,10 +27,10 @@ import (
 // fakeMetricProviderClasses implements MetricProviderClassInterface
 type fakeMetricProviderClasses struct {
 	*gentype.FakeClientWithList[*v1.MetricProviderClass, *v1.MetricProviderClassList]
-	Fake *FakeXasV1
+	Fake *FakeXASV1
 }
 
-func newFakeMetricProviderClasses(fake *FakeXasV1) xasv1.MetricProviderClassInterface {
+func newFakeMetricProviderClasses(fake *FakeXASV1) xasv1.MetricProviderClassInterface {
 	return &fakeMetricProviderClasses{
 		gentype.NewFakeClientWithList[*v1.MetricProviderClass, *v1.MetricProviderClassList](
 			fake.Fake,

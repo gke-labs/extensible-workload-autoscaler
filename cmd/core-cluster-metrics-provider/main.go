@@ -31,7 +31,7 @@ func main() {
 	var kubeconfig string
 	var debug bool
 
-	flag.StringVar(&serverAddress, "server-address", "xas-server:8080", "Address of the XAS Server (host:port)")
+	flag.StringVar(&serverAddress, "server-address", "xas-server:8080", "Address of the xAS Server (host:port)")
 	flag.StringVar(&clusterName, "cluster-name", "default", "Name of the cluster this provider is running in")
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.BoolVar(&debug, "debug", false, "Enable debug logging")
@@ -86,13 +86,13 @@ func main() {
 	}
 
 	factory := informers.NewSharedInformerFactory(xasClient, time.Second*30)
-	providerLister := factory.Xas().V1().MetricProviderClasses().Lister()
+	providerLister := factory.XAS().V1().MetricProviderClasses().Lister()
 
 	p := provider.NewCoreClusterMetricsProvider(kubeClient, externalMetricsClient, customMetricsClient, providerLister, serverAddress, clusterName)
 
 	factory.Start(ctx.Done())
 	factory.WaitForCacheSync(ctx.Done())
 
-	slog.Info("XAS Core Cluster Metrics Provider starting...")
+	slog.Info("xAS Core Cluster Metrics Provider starting...")
 	p.Run(ctx)
 }

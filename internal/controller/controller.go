@@ -94,7 +94,7 @@ func (c *Controller) Run(workers int, ctx context.Context) error {
 	defer c.workqueue.ShutDown()
 	defer c.grpcConn.Close()
 
-	slog.Info("Starting XAS controller")
+	slog.Info("Starting xAS controller")
 
 	if ok := cache.WaitForCacheSync(ctx.Done(), c.policiesSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
@@ -215,7 +215,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 
 			// remove our finalizer from the list and update it.
 			policy.ObjectMeta.Finalizers = removeString(policy.ObjectMeta.Finalizers, xasFinalizer)
-			if _, err := c.xasclientset.XasV1().ScalingPolicies(policy.Namespace).Update(context.TODO(), policy, metav1.UpdateOptions{}); err != nil {
+			if _, err := c.xasclientset.XASV1().ScalingPolicies(policy.Namespace).Update(context.TODO(), policy, metav1.UpdateOptions{}); err != nil {
 				return err
 			}
 		}
@@ -225,7 +225,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	// Add finalizer if missing
 	if !containsString(policy.ObjectMeta.Finalizers, xasFinalizer) {
 		policy.ObjectMeta.Finalizers = append(policy.ObjectMeta.Finalizers, xasFinalizer)
-		if _, err := c.xasclientset.XasV1().ScalingPolicies(policy.Namespace).Update(context.TODO(), policy, metav1.UpdateOptions{}); err != nil {
+		if _, err := c.xasclientset.XASV1().ScalingPolicies(policy.Namespace).Update(context.TODO(), policy, metav1.UpdateOptions{}); err != nil {
 			return err
 		}
 	}
@@ -428,7 +428,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		}
 	}
 
-	_, err = c.xasclientset.XasV1().ScalingPolicies(policy.Namespace).UpdateStatus(context.TODO(), policyCopy, metav1.UpdateOptions{})
+	_, err = c.xasclientset.XASV1().ScalingPolicies(policy.Namespace).UpdateStatus(context.TODO(), policyCopy, metav1.UpdateOptions{})
 	return err
 }
 
