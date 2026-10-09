@@ -23,6 +23,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
@@ -422,7 +423,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	for i, ms := range resp.MetricStatuses {
 		policyCopy.Status.MetricStatuses[i] = xasv1.MetricStatus{
 			Name:        ms.Name,
-			LastUpdated: time.Unix(ms.Timestamp, 0).Format(time.RFC3339),
+			LastUpdated: ms.GetTimestamp().AsTime().Local().Format(time.RFC3339),
 			Value:       fmt.Sprintf("%g", ms.Value),
 			Error:       ms.Error,
 		}
@@ -472,7 +473,7 @@ func (c *Controller) pushPolicy(p *xasv1.ScalingPolicy, deployment *appsv1.Deplo
 		}
 		if m.Rate != nil {
 			pm.Rate = &pb.Rate{
-				Window:      m.Rate.Window.Duration.String(),
+				Window:      durationpb.New(m.Rate.Window.Duration),
 				Aggregation: m.Rate.Aggregation,
 			}
 		}
@@ -484,12 +485,12 @@ func (c *Controller) pushPolicy(p *xasv1.ScalingPolicy, deployment *appsv1.Deplo
 		}
 		if m.DecayingDistribution != nil {
 			pm.DecayingDistribution = &pb.DecayingDistribution{
-				HalfLife:   m.DecayingDistribution.HalfLife.Duration.String(),
+				HalfLife:   durationpb.New(m.DecayingDistribution.HalfLife.Duration),
 				BucketSize: m.DecayingDistribution.BucketSize,
 				Percentile: m.DecayingDistribution.Percentile,
 			}
 			if m.DecayingDistribution.Rate != nil {
-				pm.DecayingDistribution.Rate = m.DecayingDistribution.Rate.Duration.String()
+				pm.DecayingDistribution.Rate = durationpb.New(m.DecayingDistribution.Rate.Duration)
 			}
 		}
 

@@ -9,6 +9,7 @@ import (
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/metrics"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -167,13 +168,13 @@ func (ms *MetricStore) processSample(policy *pb.Policy, podName, containerName s
 
 		// INTENT-BASED INITIALIZATION
 		if def.Rate != nil {
-			d, _ := time.ParseDuration(def.Rate.Window)
+			d := def.Rate.GetWindow().AsDuration()
 			// TEMPORAL Aggregation for Rate is always Avg (averaging instantaneous rates)
 			// SPATIAL Aggregation is handled in calculateMetric via def.Rate.Aggregation
 			ser.Window = NewSlidingWindow(d, "Avg")
-		} else if def.DecayingDistribution != nil && def.DecayingDistribution.Rate != "" {
+		} else if def.DecayingDistribution.GetRate() != nil {
 			// Pre-processing Rate for DecayingDistribution
-			d, _ := time.ParseDuration(def.DecayingDistribution.Rate)
+			d := def.DecayingDistribution.GetRate().AsDuration()
 			ser.Window = NewSlidingWindow(d, "Avg")
 		}
 
@@ -184,7 +185,7 @@ func (ms *MetricStore) processSample(policy *pb.Policy, podName, containerName s
 	if def.DecayingDistribution != nil {
 		if isPodBreakdown(def.Scope) {
 			if ser.DecayingHistogram == nil {
-				hl, _ := time.ParseDuration(def.DecayingDistribution.HalfLife)
+				hl := def.DecayingDistribution.GetHalfLife().AsDuration()
 				ser.DecayingHistogram, _ = NewDecayingHistogram(time.Unix(ingestTime, 0), hl, def.DecayingDistribution.BucketSize)
 			}
 		} else {
@@ -194,7 +195,7 @@ func (ms *MetricStore) processSample(policy *pb.Policy, podName, containerName s
 			var ok bool
 			gh, ok = ms.GlobalHistograms[id]
 			if !ok {
-				hl, _ := time.ParseDuration(def.DecayingDistribution.HalfLife)
+				hl := def.DecayingDistribution.GetHalfLife().AsDuration()
 				gh, _ = NewDecayingHistogram(time.Unix(ingestTime, 0), hl, def.DecayingDistribution.BucketSize)
 				ms.GlobalHistograms[id] = gh
 			}
@@ -206,9 +207,9 @@ func (ms *MetricStore) processSample(policy *pb.Policy, podName, containerName s
 }
 
 func (ms *MetricStore) updateSeries(ser *Series, def *pb.MetricDefinition, m *pb.MetricSample, ingestTime int64, gh *DecayingHistogram) {
-	ts := m.Timestamp
-	if ts == 0 {
-		ts = ingestTime
+	ts := ingestTime
+	if m.GetTimestamp() != nil {
+		ts = m.GetTimestamp().AsTime().Unix()
 	}
 
 	var value float64
@@ -221,7 +222,7 @@ func (ms *MetricStore) updateSeries(ser *Series, def *pb.MetricDefinition, m *pb
 	} else if def.Distribution != nil {
 		defType = "Histogram"
 	} else if def.DecayingDistribution != nil {
-		if def.DecayingDistribution.Rate != "" {
+		if def.DecayingDistribution.GetRate() != nil {
 			defType = "Counter"
 		}
 	}
@@ -381,7 +382,7 @@ func (ms *MetricStore) Calculate(policy *pb.Policy, defs []*pb.MetricDefinition,
 		PodMetrics:          currentPodMetrics,
 		PodContainerMetrics: currentPodContainerMetrics,
 		ReadyReplicas:       int32(readyReplicas),
-		Timestamp:           now,
+		Timestamp:           timestamppb.New(time.Unix(now, 0)),
 	}
 	// Left unset when no Container-scoped metric reported a value, so that the
 	// snapshot does not carry an empty message.

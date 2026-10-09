@@ -13,6 +13,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
@@ -30,7 +32,7 @@ func TestMetricCalculations(t *testing.T) {
 		{
 			name: "Counters: Rate Calculation (Avg)",
 			metrics: []*pb.MetricDefinition{
-				{Name: "requests", Rate: &pb.Rate{Window: "1m", Aggregation: "Avg"}},
+				{Name: "requests", Rate: &pb.Rate{Window: durationpb.New(time.Minute), Aggregation: "Avg"}},
 			},
 			workload: []*pb.PodState{{Name: "p1", IsReady: true}, {Name: "p2", IsReady: true}},
 			ingest: func(s *MemoryStore, clk *clock.FakeClock, ns, pol string) {
@@ -50,7 +52,7 @@ func TestMetricCalculations(t *testing.T) {
 		{
 			name: "Counters: Rate Calculation (Sum)",
 			metrics: []*pb.MetricDefinition{
-				{Name: "requests", Rate: &pb.Rate{Window: "1m", Aggregation: "Sum"}},
+				{Name: "requests", Rate: &pb.Rate{Window: durationpb.New(time.Minute), Aggregation: "Sum"}},
 			},
 			workload: []*pb.PodState{{Name: "p1", IsReady: true}, {Name: "p2", IsReady: true}},
 			ingest: func(s *MemoryStore, clk *clock.FakeClock, ns, pol string) {
@@ -153,7 +155,7 @@ func TestMetricCalculations(t *testing.T) {
 		{
 			name: "Counters: Rapid Updates (Same Timestamp)",
 			metrics: []*pb.MetricDefinition{
-				{Name: "reqs", Rate: &pb.Rate{Window: "1m", Aggregation: "Sum"}},
+				{Name: "reqs", Rate: &pb.Rate{Window: durationpb.New(time.Minute), Aggregation: "Sum"}},
 			},
 			workload: []*pb.PodState{{Name: "p1", IsReady: true}},
 			ingest: func(s *MemoryStore, clk *clock.FakeClock, ns, pol string) {
@@ -170,7 +172,7 @@ func TestMetricCalculations(t *testing.T) {
 		{
 			name: "Counters: Rapid Updates (Same Timestamp)",
 			metrics: []*pb.MetricDefinition{
-				{Name: "reqs", Rate: &pb.Rate{Window: "1m", Aggregation: "Sum"}},
+				{Name: "reqs", Rate: &pb.Rate{Window: durationpb.New(time.Minute), Aggregation: "Sum"}},
 			},
 			workload: []*pb.PodState{{Name: "p1", IsReady: true}},
 			ingest: func(s *MemoryStore, clk *clock.FakeClock, ns, pol string) {
@@ -268,7 +270,7 @@ func ingest(s *MemoryStore, ts int64, ns, pol, pod, metric string, val float64) 
 func ingestWithLabels(s *MemoryStore, ts int64, ns, pol, pod, metric string, val float64, labels map[string]string) {
 	s.AddBatch(&pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: pol,
 			Batches: []*pb.MetricBatch{{
@@ -277,7 +279,7 @@ func ingestWithLabels(s *MemoryStore, ts int64, ns, pol, pod, metric string, val
 					Name:      metric,
 					Value:     val,
 					Labels:    labels,
-					Timestamp: ts,
+					Timestamp: timestamppb.New(time.Unix(ts, 0)),
 				}},
 			}},
 		}},
@@ -287,7 +289,7 @@ func ingestWithLabels(s *MemoryStore, ts int64, ns, pol, pod, metric string, val
 func ingestHist(s *MemoryStore, ts int64, ns, pol, pod, metric string, buckets map[string]uint64) {
 	s.AddBatch(&pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: pol,
 			Batches: []*pb.MetricBatch{{
@@ -295,7 +297,7 @@ func ingestHist(s *MemoryStore, ts int64, ns, pol, pod, metric string, buckets m
 				Samples: []*pb.MetricSample{{
 					Name:      metric,
 					Histogram: &pb.Histogram{Buckets: buckets},
-					Timestamp: ts,
+					Timestamp: timestamppb.New(time.Unix(ts, 0)),
 				}},
 			}},
 		}},
@@ -396,13 +398,13 @@ func TestDump(t *testing.T) {
 	// 3. Ingest (Series)
 	s.AddBatch(&pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   1000,
+		Timestamp:   timestamppb.New(time.Unix(1000, 0)),
 		Policies: []*pb.PolicyBatch{{
 			Namespace: "default", Name: "dump-pol",
 			Batches: []*pb.MetricBatch{{
 				PodName: "p1",
 				Samples: []*pb.MetricSample{{
-					Name: "cpu", Value: 1.0, Timestamp: 1000,
+					Name: "cpu", Value: 1.0, Timestamp: timestamppb.New(time.Unix(1000, 0)),
 				}},
 			}},
 		}},
@@ -498,9 +500,7 @@ func TestDump(t *testing.T) {
     "Explanation": [
       {
         "is_active": true,
-        "last_updated": {
-          "seconds": 1000
-        },
+        "last_updated": "1970-01-01T00:16:40Z",
         "phase": "Scaling",
         "name": "cpu-rec",
         "type": "Linear",
@@ -511,9 +511,7 @@ func TestDump(t *testing.T) {
     "RecommenderStatuses": {
       "cpu-rec": {
         "is_active": true,
-        "last_updated": {
-          "seconds": 1000
-        },
+        "last_updated": "1970-01-01T00:16:40Z",
         "phase": "Scaling",
         "name": "cpu-rec",
         "type": "Linear",
@@ -521,7 +519,7 @@ func TestDump(t *testing.T) {
       }
     },
     "ControlMetrics": {
-      "timestamp": 1000,
+      "timestamp": "1970-01-01T00:16:40Z",
       "ready_replicas": 1,
       "values": {
         "cpu": 1
@@ -549,7 +547,7 @@ func TestWindowedMetrics(t *testing.T) {
 		Metrics: []*pb.MetricDefinition{
 			{
 				Name: "cpu_hist", DecayingDistribution: &pb.DecayingDistribution{
-					HalfLife:   "24h",
+					HalfLife:   durationpb.New(24 * time.Hour),
 					BucketSize: "0.1",
 					Percentile: "p100",
 				},
@@ -630,7 +628,7 @@ func TestAggregatedDecayingHistogram(t *testing.T) {
 		Metrics: []*pb.MetricDefinition{
 			{
 				Name: "cpu", DecayingDistribution: &pb.DecayingDistribution{
-					HalfLife:   "24h",
+					HalfLife:   durationpb.New(24 * time.Hour),
 					BucketSize: "0.1",
 					Percentile: "p95",
 				},
@@ -728,17 +726,17 @@ func TestMultiTenantIsolation(t *testing.T) {
 
 	// 3. Ingest Data (Value 100 for A, 200 for B)
 	s.AddBatch(&pb.IngestMetricsRequest{
-		ClusterName: "cluster-A", Timestamp: 1000,
+		ClusterName: "cluster-A", Timestamp: timestamppb.New(time.Unix(1000, 0)),
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: name,
-			Batches: []*pb.MetricBatch{{PodName: "pod-a", Samples: []*pb.MetricSample{{Name: "m", Value: 100, Timestamp: 1000}}}},
+			Batches: []*pb.MetricBatch{{PodName: "pod-a", Samples: []*pb.MetricSample{{Name: "m", Value: 100, Timestamp: timestamppb.New(time.Unix(1000, 0))}}}},
 		}},
 	})
 	s.AddBatch(&pb.IngestMetricsRequest{
-		ClusterName: "cluster-B", Timestamp: 1000,
+		ClusterName: "cluster-B", Timestamp: timestamppb.New(time.Unix(1000, 0)),
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: name,
-			Batches: []*pb.MetricBatch{{PodName: "pod-b", Samples: []*pb.MetricSample{{Name: "m", Value: 200, Timestamp: 1000}}}},
+			Batches: []*pb.MetricBatch{{PodName: "pod-b", Samples: []*pb.MetricSample{{Name: "m", Value: 200, Timestamp: timestamppb.New(time.Unix(1000, 0))}}}},
 		}},
 	})
 
@@ -880,7 +878,7 @@ func TestPodScopedDecayingHistogram(t *testing.T) {
 				Name:  "cpu",
 				Scope: "Pod",
 				DecayingDistribution: &pb.DecayingDistribution{
-					HalfLife:   "24h",
+					HalfLife:   durationpb.New(24 * time.Hour),
 					BucketSize: "0.1",
 					Percentile: "p95",
 				},
@@ -1104,7 +1102,7 @@ func TestVerticalResourceArbitration(t *testing.T) {
 func ingestResource(s *MemoryStore, ts int64, ns, pol, pod, container, metric, resourceName string, val float64) {
 	s.AddBatch(&pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: pol,
 			Batches: []*pb.MetricBatch{{
@@ -1114,7 +1112,7 @@ func ingestResource(s *MemoryStore, ts int64, ns, pol, pod, container, metric, r
 					Name:         metric,
 					ResourceName: resourceName,
 					Value:        val,
-					Timestamp:    ts,
+					Timestamp:    timestamppb.New(time.Unix(ts, 0)),
 				}},
 			}},
 		}},
@@ -1125,7 +1123,7 @@ func ingestResource(s *MemoryStore, ts int64, ns, pol, pod, container, metric, r
 func ingestOwned(s *MemoryStore, ts int64, ns, pol, pod, owner, metric string, val float64) {
 	s.AddBatch(&pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: pol,
 			Batches: []*pb.MetricBatch{{
@@ -1134,7 +1132,7 @@ func ingestOwned(s *MemoryStore, ts int64, ns, pol, pod, owner, metric string, v
 					Name:            metric,
 					RecommenderName: owner,
 					Value:           val,
-					Timestamp:       ts,
+					Timestamp:       timestamppb.New(time.Unix(ts, 0)),
 				}},
 			}},
 		}},

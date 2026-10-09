@@ -3,10 +3,12 @@ package core_node_metrics_provider
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/testing/protocmp"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,12 +76,12 @@ func TestProcessKubeletMetric(t *testing.T) {
 				{
 					PodName:       "test-pod",
 					ContainerName: "main",
-					Samples:       []*pb.MetricSample{{Name: "cpu_cores", ResourceName: "cpu", Value: 0.1, Timestamp: 1000010}},
+					Samples:       []*pb.MetricSample{{Name: "cpu_cores", ResourceName: "cpu", Value: 0.1, Timestamp: timestamppb.New(time.Unix(1000010, 0))}},
 				},
 				{
 					PodName:       "test-pod",
 					ContainerName: "sidecar",
-					Samples:       []*pb.MetricSample{{Name: "cpu_cores", ResourceName: "cpu", Value: 0.05, Timestamp: 1000010}},
+					Samples:       []*pb.MetricSample{{Name: "cpu_cores", ResourceName: "cpu", Value: 0.05, Timestamp: timestamppb.New(time.Unix(1000010, 0))}},
 				},
 			},
 		},
@@ -110,12 +112,12 @@ func TestProcessKubeletMetric(t *testing.T) {
 				{
 					PodName:       "test-pod",
 					ContainerName: "main",
-					Samples:       []*pb.MetricSample{{Name: "cpu_util", ResourceName: "cpu", Value: 1.0, Timestamp: 1000010}},
+					Samples:       []*pb.MetricSample{{Name: "cpu_util", ResourceName: "cpu", Value: 1.0, Timestamp: timestamppb.New(time.Unix(1000010, 0))}},
 				},
 				{
 					PodName:       "test-pod",
 					ContainerName: "sidecar",
-					Samples:       []*pb.MetricSample{{Name: "cpu_util", ResourceName: "cpu", Value: 1.0, Timestamp: 1000010}},
+					Samples:       []*pb.MetricSample{{Name: "cpu_util", ResourceName: "cpu", Value: 1.0, Timestamp: timestamppb.New(time.Unix(1000010, 0))}},
 				},
 			},
 		},
@@ -132,7 +134,7 @@ func TestProcessKubeletMetric(t *testing.T) {
 			want: []*pb.MetricBatch{{
 				PodName:       "test-pod",
 				ContainerName: "main",
-				Samples:       []*pb.MetricSample{{Name: "mem_bytes", ResourceName: "memory", Value: 1048576, Timestamp: 1000000}},
+				Samples:       []*pb.MetricSample{{Name: "mem_bytes", ResourceName: "memory", Value: 1048576, Timestamp: timestamppb.New(time.Unix(1000000, 0))}},
 			}},
 		},
 		{
@@ -149,7 +151,7 @@ func TestProcessKubeletMetric(t *testing.T) {
 			want: []*pb.MetricBatch{{
 				PodName:       "test-pod",
 				ContainerName: "main",
-				Samples:       []*pb.MetricSample{{Name: "mem_util", ResourceName: "memory", Value: 0.5, Timestamp: 1000000}},
+				Samples:       []*pb.MetricSample{{Name: "mem_util", ResourceName: "memory", Value: 0.5, Timestamp: timestamppb.New(time.Unix(1000000, 0))}},
 			}},
 		},
 		{
@@ -172,12 +174,12 @@ func TestProcessKubeletMetric(t *testing.T) {
 				{
 					PodName:       "test-pod",
 					ContainerName: "main",
-					Samples:       []*pb.MetricSample{{Name: "cpu_per_container", ResourceName: "cpu", Value: 1.0, Timestamp: 1000010}},
+					Samples:       []*pb.MetricSample{{Name: "cpu_per_container", ResourceName: "cpu", Value: 1.0, Timestamp: timestamppb.New(time.Unix(1000010, 0))}},
 				},
 				{
 					PodName:       "test-pod",
 					ContainerName: "sidecar",
-					Samples:       []*pb.MetricSample{{Name: "cpu_per_container", ResourceName: "cpu", Value: 0.01, Timestamp: 1000010}},
+					Samples:       []*pb.MetricSample{{Name: "cpu_per_container", ResourceName: "cpu", Value: 0.01, Timestamp: timestamppb.New(time.Unix(1000010, 0))}},
 				},
 			},
 		},

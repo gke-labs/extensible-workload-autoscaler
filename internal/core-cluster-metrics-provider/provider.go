@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/client-go/kubernetes"
 	customclient "k8s.io/metrics/pkg/client/custom_metrics"
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
@@ -121,7 +122,7 @@ func (p *CoreClusterMetricsProvider) scrapeAndSend() {
 	if len(policyBatches) > 0 {
 		req := &pb.IngestMetricsRequest{
 			ClusterName: p.clusterName,
-			Timestamp:   time.Now().Unix(),
+			Timestamp:   timestamppb.Now(),
 			Policies:    policyBatches,
 		}
 		p.sendBatch(req)

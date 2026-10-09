@@ -6,6 +6,7 @@ import (
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -116,7 +117,7 @@ func (p *CoreClusterMetricsProvider) processCustomMetric(
 						Name:            m.Name,
 						RecommenderName: m.RecommenderName,
 						Value:           val,
-						Timestamp:       ts,
+						Timestamp:       timestamppb.New(time.Unix(ts, 0)),
 					},
 				},
 			})
@@ -150,7 +151,7 @@ func (p *CoreClusterMetricsProvider) processCustomMetric(
 				{
 					Name:      m.Name,
 					Value:     val,
-					Timestamp: ts,
+					Timestamp: timestamppb.New(time.Unix(ts, 0)),
 				},
 			},
 		},

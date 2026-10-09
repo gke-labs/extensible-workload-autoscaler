@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/testing/protocmp"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -76,7 +77,7 @@ func TestProcessExternalMetric(t *testing.T) {
 							Name:      "queue_depth",
 							Labels:    map[string]string{"sub": "task-sub"},
 							Value:     150,
-							Timestamp: 1720000000,
+							Timestamp: timestamppb.New(time.Unix(1720000000, 0)),
 						},
 					},
 				},

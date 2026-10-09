@@ -11,6 +11,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	corev1 "k8s.io/api/core/v1"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
@@ -197,7 +198,7 @@ func (a *CoreNodeMetricsProvider) processKubeletMetric(pod corev1.Pod, m *pb.Met
 					RecommenderName: m.RecommenderName,
 					ResourceName:    metricType,
 					Value:           val,
-					Timestamp:       ts,
+					Timestamp:       timestamppb.New(time.Unix(ts, 0)),
 				},
 			},
 		})
