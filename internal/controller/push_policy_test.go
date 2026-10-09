@@ -7,6 +7,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	appsv1 "k8s.io/api/apps/v1"
@@ -19,25 +21,26 @@ import (
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 )
 
-// fakePolicyClient serves ListPolicies from a fixed list and records the
+// fakePolicyClient serves GetPolicy from a fixed list and records the
 // UpdatePolicy requests. The embedded interface makes any other method panic.
 type fakePolicyClient struct {
 	pb.XASServerClient
 	policies  []*pb.Policy
-	listErr   error
+	getErr    error
 	updateErr error
 	requests  []*pb.UpdatePolicyRequest
 }
 
-func (f *fakePolicyClient) ListPolicies(_ context.Context, _ *pb.ListPoliciesRequest, _ ...grpc.CallOption) (*pb.ListPoliciesResponse, error) {
-	if f.listErr != nil {
-		return nil, f.listErr
+func (f *fakePolicyClient) GetPolicy(_ context.Context, req *pb.GetPolicyRequest, _ ...grpc.CallOption) (*pb.Policy, error) {
+	if f.getErr != nil {
+		return nil, f.getErr
 	}
-	resp := &pb.ListPoliciesResponse{}
 	for _, p := range f.policies {
-		resp.Policies = append(resp.Policies, proto.Clone(p).(*pb.Policy))
+		if proto.Equal(p.GetId(), req.GetId()) {
+			return proto.Clone(p).(*pb.Policy), nil
+		}
 	}
-	return resp, nil
+	return nil, status.Error(codes.NotFound, "policy not found")
 }
 
 func (f *fakePolicyClient) UpdatePolicy(_ context.Context, req *pb.UpdatePolicyRequest, _ ...grpc.CallOption) (*pb.Policy, error) {
@@ -101,7 +104,7 @@ func TestPushPolicy(t *testing.T) {
 	tests := []struct {
 		name         string
 		serverHas    []*pb.Policy
-		listErr      error
+		getErr       error
 		updateErr    error
 		wantErr      bool
 		wantRequests []*pb.UpdatePolicyRequest
@@ -111,7 +114,7 @@ func TestPushPolicy(t *testing.T) {
 			serverHas: []*pb.Policy{
 				{Id: &pb.PolicyId{ClusterName: "default", Namespace: "prod", Name: "other"}, Etag: "other-etag"},
 			},
-			wantRequests: []*pb.UpdatePolicyRequest{{Policy: fromCRD()}},
+			wantRequests: []*pb.UpdatePolicyRequest{{Policy: fromCRD(), AllowMissing: true}},
 		},
 		{
 			name: "Sends the stored ETag and keeps the engine's metrics when the policy exists",
@@ -130,25 +133,25 @@ func TestPushPolicy(t *testing.T) {
 				want := fromCRD()
 				want.RecommenderMetrics = engineMetrics
 				want.Etag = "v1"
-				return []*pb.UpdatePolicyRequest{{Policy: want}}
+				return []*pb.UpdatePolicyRequest{{Policy: want, AllowMissing: true}}
 			}(),
 		},
 		{
-			name:    "Does not write when the policies cannot be read",
-			listErr: errors.New("server unavailable"),
+			name:    "Does not write when the policy cannot be read",
+			getErr:  errors.New("server unavailable"),
 			wantErr: true,
 		},
 		{
 			name:         "Returns the error of a rejected write so the policy is requeued",
 			updateErr:    errors.New("etag mismatch"),
 			wantErr:      true,
-			wantRequests: []*pb.UpdatePolicyRequest{{Policy: fromCRD()}},
+			wantRequests: []*pb.UpdatePolicyRequest{{Policy: fromCRD(), AllowMissing: true}},
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			client := &fakePolicyClient{policies: tc.serverHas, listErr: tc.listErr, updateErr: tc.updateErr}
+			client := &fakePolicyClient{policies: tc.serverHas, getErr: tc.getErr, updateErr: tc.updateErr}
 			c := newPushPolicyController(t, client)
 
 			err := c.pushPolicy(sp, deployment)
@@ -169,12 +172,16 @@ type storeClient struct {
 	store *store.MemoryStore
 }
 
-func (c *storeClient) ListPolicies(_ context.Context, req *pb.ListPoliciesRequest, _ ...grpc.CallOption) (*pb.ListPoliciesResponse, error) {
-	return &pb.ListPoliciesResponse{Policies: c.store.ListPolicies(req.GetClusterName())}, nil
+func (c *storeClient) GetPolicy(_ context.Context, req *pb.GetPolicyRequest, _ ...grpc.CallOption) (*pb.Policy, error) {
+	p := c.store.GetPolicy(req.GetId())
+	if p == nil {
+		return nil, status.Error(codes.NotFound, "policy not found")
+	}
+	return p, nil
 }
 
 func (c *storeClient) UpdatePolicy(_ context.Context, req *pb.UpdatePolicyRequest, _ ...grpc.CallOption) (*pb.Policy, error) {
-	return c.store.UpdatePolicy(req.GetPolicy().GetId().GetClusterName(), req.GetPolicy())
+	return c.store.UpdatePolicy(req.GetPolicy().GetId().GetClusterName(), req.GetAllowMissing(), req.GetPolicy())
 }
 
 // TestPushPolicyRemovedRecommenderOwnedMetrics checks that removing a
@@ -187,7 +194,7 @@ func TestPushPolicyRemovedRecommenderOwnedMetrics(t *testing.T) {
 		return &pb.MetricDefinitionList{Definitions: []*pb.MetricDefinition{{Name: "cpu-target", RecommenderName: owner}}}
 	}
 	// The Server has the policy with a vpa recommender and the metrics it owns.
-	if _, err := s.UpdatePolicy("default", &pb.Policy{
+	if _, err := s.UpdatePolicy("default", true, &pb.Policy{
 		Id:      id,
 		Scaling: []*pb.RecommenderDefinition{{Name: "linear"}, {Name: "vpa-sizing"}},
 		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
@@ -215,8 +222,8 @@ func TestPushPolicyRemovedRecommenderOwnedMetrics(t *testing.T) {
 		t.Fatalf("pushPolicy() error = %v", err)
 	}
 
-	got, ok := s.GetPolicy(id)
-	if !ok {
+	got := s.GetPolicy(id)
+	if got == nil {
 		t.Fatal("GetPolicy() not found")
 	}
 	want := map[string]*pb.MetricDefinitionList{"linear": owned("linear")}

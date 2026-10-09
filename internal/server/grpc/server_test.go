@@ -87,7 +87,7 @@ func TestServerEndToEndGRPC(t *testing.T) {
 	ns := "default"
 
 	// 1. Policy
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "web-app", Namespace: ns},
@@ -201,7 +201,7 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 	policyName := "dist-app-policy"
 	ns := "default"
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "dist-app", Namespace: ns},
@@ -318,7 +318,7 @@ func TestExternalMetricGRPC(t *testing.T) {
 	policyName := "ext-app-policy"
 	ns := "default"
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:          &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload:    &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "ext-app", Namespace: ns},
@@ -393,7 +393,7 @@ func TestPerPodExternalMetricGRPC(t *testing.T) {
 	policyName := "per-pod-ext-policy"
 	ns := "default"
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:          &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload:    &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app", Namespace: ns},
@@ -469,7 +469,7 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	ns := "default"
 	window := "5"
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:          &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload:    &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "zero-app", Namespace: ns},
@@ -613,7 +613,7 @@ func TestDryRunGRPC(t *testing.T) {
 	policyName := "dry-policy"
 	ns := "default"
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "dry-app", Namespace: ns},
@@ -693,7 +693,7 @@ func TestHistogramWithFilterGRPC(t *testing.T) {
 	policyName := "filter-policy"
 	ns := "default"
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "filter-app", Namespace: ns},
@@ -777,7 +777,7 @@ func TestHistogramLatencyScalingGRPC(t *testing.T) {
 	policyName := "hist-policy"
 	ns := "default"
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "hist-app", Namespace: ns},
@@ -868,7 +868,7 @@ func TestWindowedMetricsGRPC(t *testing.T) {
 	policyName := "window-policy"
 	ns := "default"
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app", Namespace: ns},
@@ -1068,7 +1068,7 @@ func TestMultiplePoliciesGRPC(t *testing.T) {
 
 	// Policy 1: CPU
 	p1 := "policy-cpu"
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:          &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: p1},
 			Workload:    &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app-cpu", Namespace: "default"},
@@ -1079,7 +1079,7 @@ func TestMultiplePoliciesGRPC(t *testing.T) {
 
 	// Policy 2: Memory
 	p2 := "policy-mem"
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:          &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: p2},
 			Workload:    &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app-mem", Namespace: "default"},
@@ -1146,7 +1146,7 @@ func TestNamespaceIsolationGRPC(t *testing.T) {
 	name := "shared-name"
 
 	// NS 1
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:          &pb.PolicyId{ClusterName: "default", Namespace: "ns1", Name: name},
 			Workload:    &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app", Namespace: "ns1"},
@@ -1156,7 +1156,7 @@ func TestNamespaceIsolationGRPC(t *testing.T) {
 	})
 
 	// NS 2
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:          &pb.PolicyId{ClusterName: "default", Namespace: "ns2", Name: name},
 			Workload:    &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app", Namespace: "ns2"},
@@ -1227,7 +1227,7 @@ func TestMetricAggregationGRPC(t *testing.T) {
 	policyName := "agg-policy"
 	ns := "default"
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app", Namespace: ns},
@@ -1305,7 +1305,7 @@ func TestRecommenderInactiveGRPC(t *testing.T) {
 	policyName := "inactive-rec-policy"
 	ns := "default"
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app", Namespace: ns},
@@ -1372,7 +1372,7 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 	ns := "default"
 
 	// 1. Configure Policy (10s Half-Life)
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app", Namespace: ns},
@@ -1557,7 +1557,7 @@ func TestSlidingWindowGRPC(t *testing.T) {
 	policyName := "sliding-policy"
 	ns := "default"
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app", Namespace: ns},
@@ -1619,7 +1619,7 @@ func TestMetricGCGRPC(t *testing.T) {
 	policyName := "gc-policy"
 	ns := "default"
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:          &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload:    &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app", Namespace: ns},
@@ -1673,7 +1673,7 @@ func TestRecommenderArbitrationGRPC(t *testing.T) {
 	policyName := "arbitration-policy"
 	ns := "default"
 
-	client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app", Namespace: ns},
@@ -1794,7 +1794,7 @@ func TestRecommenderOwnedMetricsGRPC(t *testing.T) {
 	ctx := context.Background()
 
 	id := &pb.PolicyId{ClusterName: "default", Namespace: "prod", Name: "web"}
-	_, err := client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{
+	_, err := client.CreatePolicy(ctx, &pb.CreatePolicyRequest{
 		Policy: &pb.Policy{
 			Id: id,
 			Metrics: []*pb.MetricDefinition{
@@ -1945,7 +1945,7 @@ func TestRecommenderMetricsValidationGRPC(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := client.UpdatePolicy(ctx, &pb.UpdatePolicyRequest{Policy: tc.policy})
+			_, err := client.CreatePolicy(ctx, &pb.CreatePolicyRequest{Policy: tc.policy})
 			st, _ := status.FromError(err)
 			if st.Code() != tc.wantCode {
 				t.Errorf("Want code %v, got %v (err: %v)", tc.wantCode, st.Code(), err)

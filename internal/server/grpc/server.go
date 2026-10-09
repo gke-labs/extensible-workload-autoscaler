@@ -26,15 +26,33 @@ func NewServer(s store.ServerStore, c clock.Clock) *Server {
 
 // --- Policy Management ---
 
+func (s *Server) CreatePolicy(ctx context.Context, req *pb.CreatePolicyRequest) (*pb.Policy, error) {
+	if err := validateCreatePolicyRequest(req); err != nil {
+		return nil, err
+	}
+	created, err := s.store.CreatePolicy(req.Policy.Id.ClusterName, req.Policy)
+	if errors.Is(err, store.ErrPolicyAlreadyExists) {
+		return nil, status.Error(codes.AlreadyExists, err.Error())
+	}
+	if errors.Is(err, store.ErrUnknownEtag) {
+		return nil, status.Error(codes.NotFound, err.Error())
+	}
+	if err != nil {
+		return nil, err
+	}
+	s.store.CalculateAll()
+	return created, nil
+}
+
 func (s *Server) UpdatePolicy(ctx context.Context, req *pb.UpdatePolicyRequest) (*pb.Policy, error) {
 	if err := validateUpdatePolicyRequest(req); err != nil {
 		return nil, err
 	}
-	updated, err := s.store.UpdatePolicy(req.Policy.Id.ClusterName, req.Policy)
+	updated, err := s.store.UpdatePolicy(req.Policy.Id.ClusterName, req.AllowMissing, req.Policy)
 	if errors.Is(err, store.ErrStaleEtag) {
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
-	if errors.Is(err, store.ErrUnknownEtag) {
+	if errors.Is(err, store.ErrUnknownPolicy) || errors.Is(err, store.ErrUnknownEtag) {
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
 
@@ -53,6 +71,17 @@ func (s *Server) DeletePolicy(ctx context.Context, req *pb.DeletePolicyRequest) 
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest) (*pb.Policy, error) {
+	if err := validateGetPolicyRequest(req); err != nil {
+		return nil, err
+	}
+	policy := s.store.GetPolicy(req.Id)
+	if policy == nil {
+		return nil, status.Errorf(codes.NotFound, "policy not found")
+	}
+	return policy, nil
 }
 
 func (s *Server) ListPolicies(ctx context.Context, req *pb.ListPoliciesRequest) (*pb.ListPoliciesResponse, error) {
