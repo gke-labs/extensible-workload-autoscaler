@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
@@ -719,8 +720,8 @@ func TestGetControlMetrics_PodScopeOmitsContainerBreakdown(t *testing.T) {
 	}
 }
 
-func TestGetControlMetrics_IgnoreNotReadyPods(t *testing.T) {
-	clk := &clock.FakeClock{CurrentTime: time.Unix(1000, 0)}
+func TestGetControlMetrics_PodEligibility(t *testing.T) {
+	clk := &clock.FakeClock{CurrentTime: time.Unix(10000, 0)}
 	memStore, client, cleanup := setupFunctionalGRPCServer(t, clk)
 	defer cleanup()
 	ctx := context.Background()
@@ -733,13 +734,22 @@ func TestGetControlMetrics_IgnoreNotReadyPods(t *testing.T) {
 		},
 	})
 
-	// Register one ready pod and one not ready pod
+	start := timestamppb.New(time.Unix(1000, 0))
+	at := func(offset time.Duration) *timestamppb.Timestamp {
+		return timestamppb.New(time.Unix(1000, 0).Add(offset))
+	}
 	client.UpdateWorkload(ctx, &pb.UpdateWorkloadRequest{
 		Id: id,
 		Workload: &pb.Workload{
 			Pods: []*pb.PodState{
-				{Name: "pod-ready", IsReady: true},
-				{Name: "pod-not-ready", IsReady: false},
+				{Name: "pod-ready", Phase: "Running", StartTime: start, IsReady: true, ReadyLastTransitionTime: at(10 * time.Second)},
+				// Was ready, and became unready later in its life (e.g. its
+				// readiness probe fails under load): still eligible.
+				{Name: "pod-unready-later", Phase: "Running", StartTime: start, IsReady: false, ReadyLastTransitionTime: at(time.Hour)},
+				// Its Ready condition has been false since it started.
+				{Name: "pod-never-ready", Phase: "Running", StartTime: start, IsReady: false, ReadyLastTransitionTime: at(time.Second)},
+				{Name: "pod-pending", Phase: "Pending"},
+				{Name: "pod-succeeded", Phase: "Succeeded", StartTime: start, IsReady: false, ReadyLastTransitionTime: at(time.Hour)},
 			},
 		},
 	})
@@ -751,8 +761,11 @@ func TestGetControlMetrics_IgnoreNotReadyPods(t *testing.T) {
 			Namespace: "ns", Name: "p1",
 			Batches: []*pb.MetricBatch{
 				{PodName: "pod-ready", Samples: []*pb.MetricSample{{Name: "m1", Value: 10}}},
-				{PodName: "pod-not-ready", Samples: []*pb.MetricSample{{Name: "m1", Value: 100}}}, // Should be ignored
-				{PodName: "pod-unknown", Samples: []*pb.MetricSample{{Name: "m1", Value: 50}}},    // Should be ignored
+				{PodName: "pod-unready-later", Samples: []*pb.MetricSample{{Name: "m1", Value: 20}}},
+				{PodName: "pod-never-ready", Samples: []*pb.MetricSample{{Name: "m1", Value: 100}}}, // Should be ignored
+				{PodName: "pod-pending", Samples: []*pb.MetricSample{{Name: "m1", Value: 200}}},     // Should be ignored
+				{PodName: "pod-succeeded", Samples: []*pb.MetricSample{{Name: "m1", Value: 300}}},   // Should be ignored
+				{PodName: "pod-unknown", Samples: []*pb.MetricSample{{Name: "m1", Value: 50}}},      // Should be ignored
 			},
 		}},
 	})
@@ -761,9 +774,9 @@ func TestGetControlMetrics_IgnoreNotReadyPods(t *testing.T) {
 	cm, _ := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: id})
 
 	wantCM := &pb.ControlMetrics{
-		Values:        map[string]float64{"m1": 10},
+		Values:        map[string]float64{"m1": 30},
 		Timestamp:     ts,
-		ReadyReplicas: 1,
+		ReadyReplicas: 2,
 	}
 	if diff := cmp.Diff(wantCM, cm, protocmp.Transform()); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)

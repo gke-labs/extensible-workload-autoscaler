@@ -8,6 +8,7 @@ import (
 	"time"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	"github.com/gke-labs/extensible-workload-autoscaler/internal/podutil"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/metrics"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -330,12 +331,10 @@ func (ms *MetricStore) Calculate(policy *pb.Policy, defs []*pb.MetricDefinition,
 	cutoff := now - 60
 	gcCutoff := now - 600
 
-	readyReplicas := 0
-	for _, p := range workload {
-		if p.IsReady {
-			readyReplicas++
-		}
-	}
+	// Only the metrics of eligible pods are considered, and only eligible pods
+	// count as replicas.
+	eligible := eligiblePods(workload)
+	readyReplicas := len(eligible)
 	if readyReplicas == 0 {
 		readyReplicas = 1
 	}
@@ -347,7 +346,7 @@ func (ms *MetricStore) Calculate(policy *pb.Policy, defs []*pb.MetricDefinition,
 
 	for _, def := range defs {
 		id := newMetricID(def)
-		res, ok := ms.calculateMetric(id, def, ms.Series[id], workload, readyReplicas, now, cutoff, gcCutoff)
+		res, ok := ms.calculateMetric(id, def, ms.Series[id], eligible, readyReplicas, now, cutoff, gcCutoff)
 		if !ok {
 			continue
 		}
@@ -389,6 +388,18 @@ func (ms *MetricStore) Calculate(policy *pb.Policy, defs []*pb.MetricDefinition,
 		cm.ContainerMetrics = &pb.ContainerMetrics{ContainerMetrics: currentContainerMetrics}
 	}
 	return cm
+}
+
+// eligiblePods returns the pods of the workload whose metrics should be
+// considered, keyed by name. See podutil.IsEligible.
+func eligiblePods(workload map[string]*pb.PodState) map[string]*pb.PodState {
+	eligible := make(map[string]*pb.PodState, len(workload))
+	for name, p := range workload {
+		if podutil.IsEligible(podutil.FromPodState(p)) {
+			eligible[name] = p
+		}
+	}
+	return eligible
 }
 
 // metricValues returns the MetricValues entry stored under key, creating it
@@ -529,8 +540,8 @@ func (ms *MetricStore) calculateMetric(id metricID, def *pb.MetricDefinition, se
 			continue
 		}
 
-		// Pod readiness
-		if podState, ok := workload[ser.PodName]; !ok || !podState.IsReady {
+		// Pod eligibility: workload only holds the eligible pods.
+		if _, ok := workload[ser.PodName]; !ok {
 			continue
 		}
 
