@@ -18,21 +18,24 @@ import (
 )
 
 var (
-	ErrStaleEtag   = errors.New("etag does not match the stored policy")
-	ErrUnknownEtag = errors.New("etag given for unknown policy")
+	ErrStaleEtag           = errors.New("etag does not match the stored policy")
+	ErrUnknownEtag         = errors.New("etag given for unknown policy")
+	ErrPolicyAlreadyExists = errors.New("policy being created already exists")
+	ErrUnknownPolicy       = errors.New("policy not found")
 )
 
 type ServerStore interface {
 	AddBatch(req *pb.IngestMetricsRequest) error
 	UpdateRecommenderState(req *pb.UpdateRecommenderStateRequest) error
+	CreatePolicy(clusterName string, p *pb.Policy) (*pb.Policy, error)
 	// UpdatePolicy replaces the stored policy with p and returns the stored
 	// result with a new ETag. If the policy exists, a non-empty p.Etag must
 	// match the stored one (ErrStaleEtag); an empty p.Etag overwrites it
-	// unconditionally. If the policy does not exist, p.Etag must be empty
-	// (ErrUnknownEtag). On error the stored policy is left unchanged.
-	UpdatePolicy(clusterName string, p *pb.Policy) (*pb.Policy, error)
+	// unconditionally. If the policy does not exist and allowMissing is true,
+	// p.Etag must be empty. (ErrUnknownEtag). On error the stored policy is left unchanged.
+	UpdatePolicy(clusterName string, allowMissing bool, p *pb.Policy) (*pb.Policy, error)
 	DeletePolicy(id *pb.PolicyId) error
-	GetPolicy(id *pb.PolicyId) (*pb.Policy, bool)
+	GetPolicy(id *pb.PolicyId) *pb.Policy
 	ListPolicies(clusterName string) []*pb.Policy
 	UpdateWorkload(req *pb.UpdateWorkloadRequest) error
 	GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationResponse, bool)
@@ -81,37 +84,38 @@ func NewMemoryStoreWithClock(c clock.Clock) *MemoryStore {
 	}
 }
 
-func (s *MemoryStore) UpdatePolicy(clusterName string, p *pb.Policy) (*pb.Policy, error) {
+func (s *MemoryStore) CreatePolicy(clusterName string, p *pb.Policy) (*pb.Policy, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	key := policyID{cluster: clusterName, ns: p.Id.GetNamespace(), name: p.Id.GetName()}
-
-	ps := s.state[key]
-	var current *pb.Policy
-
+	key, ps := s.fetchPolicy(clusterName, p)
 	if ps != nil {
-		current = ps.Policy
+		return nil, ErrPolicyAlreadyExists
 	}
-	if current != nil {
-		// A sent ETag must match the stored one; an empty ETag overwrites.
-		if p.Etag != "" && p.Etag != current.Etag {
-			return nil, fmt.Errorf("%w: got %q, want %q", ErrStaleEtag, p.Etag, current.Etag)
-		}
-	} else if p.Etag != "" {
-		// An ETag was sent for a policy that does not exist.
+	if p.Etag != "" {
 		return nil, ErrUnknownEtag
 	}
+	return s.savePolicy(p, ps, key)
+}
 
-	updated := proto.Clone(p).(*pb.Policy)
+func (s *MemoryStore) fetchPolicy(clusterName string, p *pb.Policy) (policyID, *PolicyState) {
+	key := policyID{cluster: clusterName, ns: p.Id.GetNamespace(), name: p.Id.GetName()}
+	ps := s.state[key]
+	return key, ps
+}
+
+func (s *MemoryStore) savePolicy(p *pb.Policy, ps *PolicyState, key policyID) (*pb.Policy, error) {
+	created := proto.Clone(p).(*pb.Policy)
+
 	// Drop the metrics of removed recommenders before computing the ETag, so
 	// the ETag matches the stored policy, and before CleanupOrphaned below, so
 	// their series are freed in this update.
-	dropOrphanedRecommenderMetrics(updated)
-	etag, err := policy.CreateEtag(updated)
+	dropOrphanedRecommenderMetrics(created)
+
+	etag, err := policy.CreateEtag(created)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create etag: %w", err)
 	}
-	updated.Etag = etag
+	created.Etag = etag
 
 	if ps == nil {
 		ps = &PolicyState{
@@ -121,7 +125,7 @@ func (s *MemoryStore) UpdatePolicy(clusterName string, p *pb.Policy) (*pb.Policy
 		}
 		s.state[key] = ps
 	}
-	ps.Policy = updated
+	ps.Policy = created
 	ps.Recommendation = nil
 	ps.Explanation = nil
 	ps.ControlMetrics = nil
@@ -130,7 +134,29 @@ func (s *MemoryStore) UpdatePolicy(clusterName string, p *pb.Policy) (*pb.Policy
 	ps.Metrics.CleanupOrphaned(ps.Policy)
 	s.cleanupOrphanedRecommenderStatuses(ps)
 
-	return updated, nil
+	return created, nil
+}
+
+func (s *MemoryStore) UpdatePolicy(clusterName string, allowMissing bool, p *pb.Policy) (*pb.Policy, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key, ps := s.fetchPolicy(clusterName, p)
+	if ps != nil && ps.Policy != nil {
+		// A sent ETag must match the stored one; an empty ETag overwrites.
+		if p.Etag != "" && p.Etag != ps.Policy.Etag {
+			return nil, fmt.Errorf("%w: got %q, want %q", ErrStaleEtag, p.Etag, ps.Policy.Etag)
+		}
+	} else {
+		if !allowMissing {
+			return nil, ErrUnknownPolicy
+		}
+		if p.Etag != "" {
+			// An ETag was sent for a policy that does not exist.
+			return nil, ErrUnknownEtag
+		}
+	}
+
+	return s.savePolicy(p, ps, key)
 }
 
 func (s *MemoryStore) DeletePolicy(id *pb.PolicyId) error {
@@ -141,15 +167,15 @@ func (s *MemoryStore) DeletePolicy(id *pb.PolicyId) error {
 	return nil
 }
 
-func (s *MemoryStore) GetPolicy(id *pb.PolicyId) (*pb.Policy, bool) {
+func (s *MemoryStore) GetPolicy(id *pb.PolicyId) *pb.Policy {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	key := newPolicyID(id)
 	ps, ok := s.state[key]
 	if !ok || ps.Policy == nil {
-		return nil, false
+		return nil
 	}
-	return ps.Policy, true
+	return ps.Policy
 }
 
 func (s *MemoryStore) ListPolicies(clusterName string) []*pb.Policy {

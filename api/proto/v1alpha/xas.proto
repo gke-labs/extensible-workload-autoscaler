@@ -13,7 +13,13 @@ option go_package = "github.com/gke-labs/extensible-workload-autoscaler/api/v1al
 service XASServer {
   
   // --- Policy Management ---
-  // Create or Update a ScalingPolicy. This is an idempotent "Upsert".
+  // Get a ScalingPolicy. 
+  rpc GetPolicy(GetPolicyRequest) returns (Policy);
+
+  // Create a ScalingPolicy.
+  rpc CreatePolicy(CreatePolicyRequest) returns (Policy);
+
+  // Updates an existing ScalingPolicy, or creates it if allow_missing is set.
   rpc UpdatePolicy(UpdatePolicyRequest) returns (Policy);
   
   // Delete a ScalingPolicy.
@@ -72,10 +78,24 @@ message PolicyId {
 
 // --- Policy ---
 
+// CreatePolicyRequest is used to create a policy definition.
+message CreatePolicyRequest { 
+  // The policy definition.
+  Policy policy = 1;
+}
+
 // UpdatePolicyRequest is used to create or update a policy definition.
 message UpdatePolicyRequest { 
   // The policy definition.
   Policy policy = 1;
+  // Creates a new policy only if allow_missing is true
+  bool allow_missing = 2;
+}
+
+// GetPolicyRequest identifies a policy by PolicyId to get.
+message GetPolicyRequest {
+  // The unique ID of the policy.
+  PolicyId id = 1; 
 }
 
 // DeletePolicyRequest identifies a policy to delete.

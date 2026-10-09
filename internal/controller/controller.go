@@ -21,8 +21,9 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/proto"
+	"google.golang.org/grpc/status"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
@@ -528,21 +529,21 @@ func (c *Controller) pushPolicy(p *xasv1.ScalingPolicy, deployment *appsv1.Deplo
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	listPoliciesReq := &pb.ListPoliciesRequest{
+	policyId := &pb.PolicyId{
 		ClusterName: c.clusterName,
+		Namespace:   p.Namespace,
+		Name:        p.Name,
 	}
-	policiesList, err := c.grpcClient.ListPolicies(ctx, listPoliciesReq)
-	if err != nil {
-		return fmt.Errorf("unable to list policies: %w", err)
+	getPoliciesReq := &pb.GetPolicyRequest{
+		Id: policyId,
 	}
 
+	sp, err := c.grpcClient.GetPolicy(ctx, getPoliciesReq)
+	if err != nil && status.Code(err) != codes.NotFound {
+		return fmt.Errorf("unable to get policy: %w", err)
+	}
 	pol := &pb.Policy{
-		Id: &pb.PolicyId{
-			ClusterName: c.clusterName,
-			Namespace:   p.Namespace,
-			Name:        p.Name,
-		},
+		Id: policyId,
 		Workload: &pb.WorkloadRef{
 			Group:     group,
 			Version:   version,
@@ -557,20 +558,17 @@ func (c *Controller) pushPolicy(p *xasv1.ScalingPolicy, deployment *appsv1.Deplo
 		Scaling:     scaling,
 		Selector:    labels.Set(deployment.Spec.Selector.MatchLabels).String(),
 	}
+	if err == nil {
+		pol.Etag = sp.GetEtag()
+		pol.RecommenderMetrics = sp.GetRecommenderMetrics()
+	}
 	if p.Spec.MinReplicas != nil {
 		pol.MinReplicas = *p.Spec.MinReplicas
 	}
 
-	for _, sp := range policiesList.Policies {
-		if proto.Equal(sp.GetId(), pol.Id) {
-			pol.Etag = sp.Etag
-			pol.RecommenderMetrics = sp.RecommenderMetrics
-			break
-		}
-	}
-
 	updatePolicyRequest := &pb.UpdatePolicyRequest{
-		Policy: pol,
+		Policy:       pol,
+		AllowMissing: true,
 	}
 
 	_, err = c.grpcClient.UpdatePolicy(ctx, updatePolicyRequest)

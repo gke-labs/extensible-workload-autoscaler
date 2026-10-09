@@ -228,7 +228,7 @@ func TestMetricCalculations(t *testing.T) {
 				Metrics:  tc.metrics,
 				Workload: &pb.WorkloadRef{Name: "app"},
 			}
-			s.UpdatePolicy("default", policy)
+			s.UpdatePolicy("default", true, policy)
 
 			if tc.workload != nil {
 				s.UpdateWorkload(&pb.UpdateWorkloadRequest{
@@ -320,7 +320,7 @@ func TestRecommendationArbitration(t *testing.T) {
 			{Name: "a1", Recommender: "Threshold", Type: "Threshold"},
 		},
 	}
-	s.UpdatePolicy("default", policy)
+	s.UpdatePolicy("default", true, policy)
 
 	// Case 1: All Active. R1=3, R2=5. Result=5.
 	s.UpdateRecommenderState(&pb.UpdateRecommenderStateRequest{
@@ -562,7 +562,7 @@ func TestWindowedMetrics(t *testing.T) {
 		},
 		Workload: &pb.WorkloadRef{Name: "app"},
 	}
-	s.UpdatePolicy("default", policy)
+	s.UpdatePolicy("default", true, policy)
 
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
 		Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol},
@@ -638,7 +638,7 @@ func TestAggregatedDecayingHistogram(t *testing.T) {
 		},
 		Workload: &pb.WorkloadRef{Name: "app"},
 	}
-	s.UpdatePolicy("default", policy)
+	s.UpdatePolicy("default", true, policy)
 
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
 		Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol},
@@ -676,7 +676,7 @@ func TestDeletePolicy(t *testing.T) {
 	id := &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: name}
 
 	// 1. Setup state
-	s.UpdatePolicy("default", &pb.Policy{
+	s.UpdatePolicy("default", true, &pb.Policy{
 		Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: name},
 	})
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{Id: id, Workload: &pb.Workload{Pods: []*pb.PodState{{Name: "p1"}}}})
@@ -686,7 +686,7 @@ func TestDeletePolicy(t *testing.T) {
 	s.DeletePolicy(id)
 
 	// 3. Verify
-	if _, ok := s.GetPolicy(id); ok {
+	if s.GetPolicy(id) != nil {
 		t.Error("Policy still exists after deletion")
 	}
 
@@ -708,13 +708,13 @@ func TestMultiTenantIsolation(t *testing.T) {
 		Id:      &pb.PolicyId{ClusterName: "cluster-A", Namespace: ns, Name: name},
 		Metrics: []*pb.MetricDefinition{{Name: "m", Gauge: &pb.Gauge{Aggregation: "Avg"}}},
 	}
-	s.UpdatePolicy("cluster-A", polA)
+	s.UpdatePolicy("cluster-A", true, polA)
 
 	polB := &pb.Policy{
 		Id:      &pb.PolicyId{ClusterName: "cluster-B", Namespace: ns, Name: name},
 		Metrics: []*pb.MetricDefinition{{Name: "m", Gauge: &pb.Gauge{Aggregation: "Avg"}}},
 	}
-	s.UpdatePolicy("cluster-B", polB)
+	s.UpdatePolicy("cluster-B", true, polB)
 
 	// 2. Setup Workloads
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
@@ -888,7 +888,7 @@ func TestPodScopedDecayingHistogram(t *testing.T) {
 		},
 		Workload: &pb.WorkloadRef{Name: "app"},
 	}
-	s.UpdatePolicy("default", policy)
+	s.UpdatePolicy("default", true, policy)
 
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
 		Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol},
@@ -936,7 +936,7 @@ func TestContainerResourceRequestWeighting(t *testing.T) {
 		},
 		Workload: &pb.WorkloadRef{Name: "app"},
 	}
-	s.UpdatePolicy("default", policy)
+	s.UpdatePolicy("default", true, policy)
 
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
 		Id: id,
@@ -1036,7 +1036,7 @@ func TestVerticalResourceArbitration(t *testing.T) {
 		},
 		Workload: &pb.WorkloadRef{Name: "app"},
 	}
-	s.UpdatePolicy("default", policy)
+	s.UpdatePolicy("default", true, policy)
 
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
 		Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: pol},
@@ -1166,7 +1166,7 @@ func TestRecommenderOwnedMetrics(t *testing.T) {
 			}},
 		},
 	}
-	s.UpdatePolicy("default", pol)
+	s.UpdatePolicy("default", true, pol)
 	s.UpdateWorkload(&pb.UpdateWorkloadRequest{
 		Id:       id,
 		Workload: &pb.Workload{Pods: []*pb.PodState{{Name: "p1", IsReady: true}, {Name: "p2", IsReady: true}}},
@@ -1257,11 +1257,77 @@ func TestRecommenderOwnedMetricsCleanup(t *testing.T) {
 // returns the stored policy, which carries the new ETag.
 func mustUpdatePolicy(t *testing.T, s *MemoryStore, clusterName string, p *pb.Policy) *pb.Policy {
 	t.Helper()
-	stored, err := s.UpdatePolicy(clusterName, p)
+	stored, err := s.UpdatePolicy(clusterName, true, p)
 	if err != nil {
 		t.Fatalf("UpdatePolicy(%s) error = %v", p.GetId().GetName(), err)
 	}
 	return stored
+}
+
+func TestCreatePolicy(t *testing.T) {
+	id := &pb.PolicyId{ClusterName: "default", Namespace: "ns", Name: "pol"}
+	newPolicy := func(maxReplicas int32, etag string) *pb.Policy {
+		return &pb.Policy{Id: id, MinReplicas: 1, MaxReplicas: maxReplicas, Etag: etag}
+	}
+
+	tests := []struct {
+		name     string
+		existing bool
+		etag     string
+		wantErr  error
+	}{
+		{
+			name: "new policy, empty etag: created",
+		},
+		{
+			name:    "new policy, etag given: rejected",
+			etag:    "some-etag",
+			wantErr: ErrUnknownEtag,
+		},
+		{
+			name:     "existing policy: rejected",
+			existing: true,
+			wantErr:  ErrPolicyAlreadyExists,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewMemoryStore()
+			var before *pb.Policy
+			if tt.existing {
+				var err error
+				before, err = s.CreatePolicy("default", newPolicy(10, ""))
+				if err != nil {
+					t.Fatalf("setup CreatePolicy() error = %v", err)
+				}
+			}
+
+			got, err := s.CreatePolicy("default", newPolicy(20, tt.etag))
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("CreatePolicy() error = %v, want %v", err, tt.wantErr)
+				}
+				if got != nil {
+					t.Errorf("CreatePolicy() returned %v on error, want nil", got)
+				}
+				after := s.GetPolicy(id)
+				if (after != nil) != tt.existing || !proto.Equal(after, before) {
+					t.Errorf("store changed on rejection: got %v, want %v", after, before)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("CreatePolicy() error = %v", err)
+			}
+			if got.GetMaxReplicas() != 20 {
+				t.Errorf("stored MaxReplicas = %d, want 20", got.GetMaxReplicas())
+			}
+			if got.GetEtag() == "" {
+				t.Error("CreatePolicy() returned an empty ETag")
+			}
+		})
+	}
 }
 
 func TestUpdatePolicyEtag(t *testing.T) {
@@ -1271,20 +1337,29 @@ func TestUpdatePolicyEtag(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		existing bool // create the policy first
+		name         string
+		existing     bool // create the policy first
+		allowMissing bool
 		// etag returns the ETag to send, given the stored one ("" if none).
 		etag    func(stored string) string
 		wantErr error
 	}{
 		{
-			name: "new policy, empty etag: created",
-			etag: func(string) string { return "" },
+			name:         "new policy, allowMissing=false: rejected",
+			allowMissing: false,
+			etag:         func(string) string { return "" },
+			wantErr:      ErrUnknownPolicy,
 		},
 		{
-			name:    "new policy, etag given: rejected",
-			etag:    func(string) string { return "some-etag" },
-			wantErr: ErrUnknownEtag,
+			name:         "new policy, allowMissing=true, empty etag: created",
+			allowMissing: true,
+			etag:         func(string) string { return "" },
+		},
+		{
+			name:         "new policy, allowMissing=true, etag given: rejected",
+			allowMissing: true,
+			etag:         func(string) string { return "some-etag" },
+			wantErr:      ErrUnknownEtag,
 		},
 		{
 			name:     "existing policy, empty etag: overwritten",
@@ -1311,7 +1386,7 @@ func TestUpdatePolicyEtag(t *testing.T) {
 				before = mustUpdatePolicy(t, s, "default", newPolicy(10, ""))
 			}
 
-			got, err := s.UpdatePolicy("default", newPolicy(20, tt.etag(before.GetEtag())))
+			got, err := s.UpdatePolicy("default", tt.allowMissing, newPolicy(20, tt.etag(before.GetEtag())))
 
 			if tt.wantErr != nil {
 				if !errors.Is(err, tt.wantErr) {
@@ -1321,9 +1396,9 @@ func TestUpdatePolicyEtag(t *testing.T) {
 					t.Errorf("UpdatePolicy() returned %v on error, want nil", got)
 				}
 				// A rejected write must leave the store as it was.
-				after, ok := s.GetPolicy(id)
-				if ok != tt.existing || !proto.Equal(after, before) {
-					t.Errorf("store changed on rejection: got %v (ok=%v), want %v", after, ok, before)
+				after := s.GetPolicy(id)
+				if (after != nil) != tt.existing || !proto.Equal(after, before) {
+					t.Errorf("store changed on rejection: got %v, want %v", after, before)
 				}
 				return
 			}
@@ -1356,7 +1431,7 @@ func TestUpdatePolicyDoesNotAliasCaller(t *testing.T) {
 	}
 	// Changing the caller's object afterwards must not change the store.
 	p.MaxReplicas = 99
-	stored, _ := s.GetPolicy(id)
+	stored := s.GetPolicy(id)
 	if stored.GetMaxReplicas() != 10 {
 		t.Errorf("stored MaxReplicas = %d after caller mutation, want 10", stored.GetMaxReplicas())
 	}
@@ -1387,7 +1462,7 @@ func TestUpdatePolicyConcurrentSameEtag(t *testing.T) {
 	errs := make(chan error, writers)
 	for i := 0; i < writers; i++ {
 		go func(i int) {
-			_, err := s.UpdatePolicy("default", &pb.Policy{
+			_, err := s.UpdatePolicy("default", false, &pb.Policy{
 				Id:          id,
 				MaxReplicas: int32(100 + i),
 				Etag:        initial.GetEtag(),
@@ -1419,7 +1494,7 @@ func TestGetWorkload(t *testing.T) {
 	if _, ok := s.GetWorkload(id); ok {
 		t.Fatal("GetWorkload(unknown policy) found, want not found")
 	}
-	if _, err := s.UpdatePolicy("default", &pb.Policy{Id: id}); err != nil {
+	if _, err := s.UpdatePolicy("default", true, &pb.Policy{Id: id}); err != nil {
 		t.Fatalf("UpdatePolicy() error = %v", err)
 	}
 	if err := s.UpdateWorkload(&pb.UpdateWorkloadRequest{Id: id, Workload: &pb.Workload{Pods: []*pb.PodState{
@@ -1505,14 +1580,14 @@ func TestRemovedRecommenderOwnedMetricsGC(t *testing.T) {
 	if stored.Etag != want {
 		t.Errorf("returned etag = %q, want the etag of the stored policy %q", stored.Etag, want)
 	}
-	got, _ := s.GetPolicy(id)
+	got := s.GetPolicy(id)
 	if got.Etag != stored.Etag {
 		t.Errorf("stored etag = %q, want the returned one %q", got.Etag, stored.Etag)
 	}
 	// A follow-up update with the returned ETag succeeds.
 	next := proto.Clone(stored).(*pb.Policy)
 	next.MaxReplicas = 7
-	if _, err := s.UpdatePolicy("default", next); err != nil {
+	if _, err := s.UpdatePolicy("default", false, next); err != nil {
 		t.Errorf("UpdatePolicy() with the returned etag error = %v", err)
 	}
 }

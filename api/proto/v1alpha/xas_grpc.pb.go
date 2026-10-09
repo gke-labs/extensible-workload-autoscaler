@@ -20,6 +20,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	XASServer_GetPolicy_FullMethodName              = "/xas.v1alpha.XASServer/GetPolicy"
+	XASServer_CreatePolicy_FullMethodName           = "/xas.v1alpha.XASServer/CreatePolicy"
 	XASServer_UpdatePolicy_FullMethodName           = "/xas.v1alpha.XASServer/UpdatePolicy"
 	XASServer_DeletePolicy_FullMethodName           = "/xas.v1alpha.XASServer/DeletePolicy"
 	XASServer_ListPolicies_FullMethodName           = "/xas.v1alpha.XASServer/ListPolicies"
@@ -40,7 +42,11 @@ const (
 // metric ingestion, and decision making.
 type XASServerClient interface {
 	// --- Policy Management ---
-	// Create or Update a ScalingPolicy. This is an idempotent "Upsert".
+	// Get a ScalingPolicy.
+	GetPolicy(ctx context.Context, in *GetPolicyRequest, opts ...grpc.CallOption) (*Policy, error)
+	// Create a ScalingPolicy.
+	CreatePolicy(ctx context.Context, in *CreatePolicyRequest, opts ...grpc.CallOption) (*Policy, error)
+	// Updates an existing ScalingPolicy, or creates it if allow_missing is set.
 	UpdatePolicy(ctx context.Context, in *UpdatePolicyRequest, opts ...grpc.CallOption) (*Policy, error)
 	// Delete a ScalingPolicy.
 	DeletePolicy(ctx context.Context, in *DeletePolicyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -79,6 +85,26 @@ type xASServerClient struct {
 
 func NewXASServerClient(cc grpc.ClientConnInterface) XASServerClient {
 	return &xASServerClient{cc}
+}
+
+func (c *xASServerClient) GetPolicy(ctx context.Context, in *GetPolicyRequest, opts ...grpc.CallOption) (*Policy, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Policy)
+	err := c.cc.Invoke(ctx, XASServer_GetPolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *xASServerClient) CreatePolicy(ctx context.Context, in *CreatePolicyRequest, opts ...grpc.CallOption) (*Policy, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Policy)
+	err := c.cc.Invoke(ctx, XASServer_CreatePolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *xASServerClient) UpdatePolicy(ctx context.Context, in *UpdatePolicyRequest, opts ...grpc.CallOption) (*Policy, error) {
@@ -180,7 +206,11 @@ func (c *xASServerClient) IngestMetrics(ctx context.Context, in *IngestMetricsRe
 // metric ingestion, and decision making.
 type XASServerServer interface {
 	// --- Policy Management ---
-	// Create or Update a ScalingPolicy. This is an idempotent "Upsert".
+	// Get a ScalingPolicy.
+	GetPolicy(context.Context, *GetPolicyRequest) (*Policy, error)
+	// Create a ScalingPolicy.
+	CreatePolicy(context.Context, *CreatePolicyRequest) (*Policy, error)
+	// Updates an existing ScalingPolicy, or creates it if allow_missing is set.
 	UpdatePolicy(context.Context, *UpdatePolicyRequest) (*Policy, error)
 	// Delete a ScalingPolicy.
 	DeletePolicy(context.Context, *DeletePolicyRequest) (*emptypb.Empty, error)
@@ -221,6 +251,12 @@ type XASServerServer interface {
 // pointer dereference when methods are called.
 type UnimplementedXASServerServer struct{}
 
+func (UnimplementedXASServerServer) GetPolicy(context.Context, *GetPolicyRequest) (*Policy, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPolicy not implemented")
+}
+func (UnimplementedXASServerServer) CreatePolicy(context.Context, *CreatePolicyRequest) (*Policy, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreatePolicy not implemented")
+}
 func (UnimplementedXASServerServer) UpdatePolicy(context.Context, *UpdatePolicyRequest) (*Policy, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdatePolicy not implemented")
 }
@@ -267,6 +303,42 @@ func RegisterXASServerServer(s grpc.ServiceRegistrar, srv XASServerServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&XASServer_ServiceDesc, srv)
+}
+
+func _XASServer_GetPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPolicyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(XASServerServer).GetPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: XASServer_GetPolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(XASServerServer).GetPolicy(ctx, req.(*GetPolicyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _XASServer_CreatePolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePolicyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(XASServerServer).CreatePolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: XASServer_CreatePolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(XASServerServer).CreatePolicy(ctx, req.(*CreatePolicyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _XASServer_UpdatePolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -438,6 +510,14 @@ var XASServer_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "xas.v1alpha.XASServer",
 	HandlerType: (*XASServerServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetPolicy",
+			Handler:    _XASServer_GetPolicy_Handler,
+		},
+		{
+			MethodName: "CreatePolicy",
+			Handler:    _XASServer_CreatePolicy_Handler,
+		},
 		{
 			MethodName: "UpdatePolicy",
 			Handler:    _XASServer_UpdatePolicy_Handler,

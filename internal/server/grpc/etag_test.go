@@ -6,7 +6,6 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
@@ -21,28 +20,22 @@ var ignoreEtag = protocmp.IgnoreFields(&pb.Policy{}, "etag")
 // policy, whose etag must be echoed back on the next update.
 func mustUpdatePolicy(t *testing.T, client pb.XASServerClient, p *pb.Policy) *pb.Policy {
 	t.Helper()
-	stored, err := client.UpdatePolicy(context.Background(), &pb.UpdatePolicyRequest{Policy: p})
+	stored, err := client.UpdatePolicy(context.Background(), &pb.UpdatePolicyRequest{Policy: p, AllowMissing: true})
 	if err != nil {
 		t.Fatalf("UpdatePolicy(%s) failed: %v", p.GetId().GetName(), err)
 	}
 	return stored
 }
 
-// getPolicy reads a policy through ListPolicies, as a client would before a
+// getPolicy reads a policy through GetPolicy, as a client would before a
 // read-modify-write.
 func getPolicy(t *testing.T, client pb.XASServerClient, id *pb.PolicyId) *pb.Policy {
 	t.Helper()
-	resp, err := client.ListPolicies(context.Background(), &pb.ListPoliciesRequest{ClusterName: id.GetClusterName()})
+	p, err := client.GetPolicy(context.Background(), &pb.GetPolicyRequest{Id: id})
 	if err != nil {
-		t.Fatalf("ListPolicies() failed: %v", err)
+		t.Fatalf("GetPolicy(%v) failed: %v", id, err)
 	}
-	for _, p := range resp.GetPolicies() {
-		if proto.Equal(p.GetId(), id) {
-			return p
-		}
-	}
-	t.Fatalf("policy %v not found", id)
-	return nil
+	return p
 }
 
 // TestUpdatePolicyEtagCodesGRPC checks the gRPC code returned for each ETag
@@ -51,16 +44,18 @@ func TestUpdatePolicyEtagCodesGRPC(t *testing.T) {
 	id := &pb.PolicyId{ClusterName: "c1", Namespace: "ns", Name: "p1"}
 
 	tests := []struct {
-		name     string
-		existing bool
-		etag     func(stored string) string
-		wantCode codes.Code
+		name         string
+		existing     bool
+		allowMissing bool
+		etag         func(stored string) string
+		wantCode     codes.Code
 	}{
-		{"create with empty etag", false, func(string) string { return "" }, codes.OK},
-		{"create with an etag", false, func(string) string { return "some-etag" }, codes.NotFound},
-		{"update with empty etag (overwrite)", true, func(string) string { return "" }, codes.OK},
-		{"update with matching etag", true, func(s string) string { return s }, codes.OK},
-		{"update with stale etag", true, func(s string) string { return s + "-stale" }, codes.Aborted},
+		{"missing without allow_missing", false, false, func(string) string { return "" }, codes.NotFound},
+		{"create with empty etag and allow_missing", false, true, func(string) string { return "" }, codes.OK},
+		{"create with an etag and allow_missing", false, true, func(string) string { return "some-etag" }, codes.NotFound},
+		{"update with empty etag (overwrite)", true, false, func(string) string { return "" }, codes.OK},
+		{"update with matching etag", true, false, func(s string) string { return s }, codes.OK},
+		{"update with stale etag", true, false, func(s string) string { return s + "-stale" }, codes.Aborted},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -73,7 +68,8 @@ func TestUpdatePolicyEtagCodesGRPC(t *testing.T) {
 			}
 
 			resp, err := client.UpdatePolicy(context.Background(), &pb.UpdatePolicyRequest{
-				Policy: &pb.Policy{Id: id, MaxReplicas: 20, Etag: tt.etag(stored.GetEtag())},
+				Policy:       &pb.Policy{Id: id, MaxReplicas: 20, Etag: tt.etag(stored.GetEtag())},
+				AllowMissing: tt.allowMissing,
 			})
 			if got := status.Code(err); got != tt.wantCode {
 				t.Fatalf("UpdatePolicy() code = %v, want %v (err: %v)", got, tt.wantCode, err)

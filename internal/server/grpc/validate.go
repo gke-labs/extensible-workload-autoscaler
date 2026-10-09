@@ -6,18 +6,37 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+func validateGetPolicyRequest(req *pb.GetPolicyRequest) error {
+	if req == nil {
+		return status.Errorf(codes.InvalidArgument, "request is nil")
+	}
+	return validatePolicyId(req.Id)
+}
+
+func validateCreatePolicyRequest(req *pb.CreatePolicyRequest) error {
+	if req == nil {
+		return status.Errorf(codes.InvalidArgument, "request is nil")
+	}
+	return validateCreateUpdateRequest(req.Policy)
+}
+
 func validateUpdatePolicyRequest(req *pb.UpdatePolicyRequest) error {
 	if req == nil {
 		return status.Errorf(codes.InvalidArgument, "request is nil")
 	}
-	if req.Policy == nil {
+	return validateCreateUpdateRequest(req.Policy)
+}
+
+func validateCreateUpdateRequest(policy *pb.Policy) error {
+
+	if policy == nil {
 		return status.Errorf(codes.InvalidArgument, "policy is required")
 	}
-	if err := validatePolicyId(req.Policy.Id); err != nil {
+	if err := validatePolicyId(policy.Id); err != nil {
 		return err
 	}
 
-	for _, m := range req.Policy.Metrics {
+	for _, m := range policy.Metrics {
 		if m.GetRecommenderName() != "" {
 			return status.Errorf(codes.InvalidArgument, "metric %s: recommender_name must be empty for policy-wide metrics", m.GetName())
 		}
@@ -25,7 +44,7 @@ func validateUpdatePolicyRequest(req *pb.UpdatePolicyRequest) error {
 			return err
 		}
 	}
-	for owner, list := range req.Policy.RecommenderMetrics {
+	for owner, list := range policy.RecommenderMetrics {
 		if owner == "" {
 			return status.Errorf(codes.InvalidArgument, "recommender_metrics: recommender name is required")
 		}
