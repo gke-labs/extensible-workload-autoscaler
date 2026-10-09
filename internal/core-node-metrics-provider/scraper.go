@@ -16,6 +16,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/policy"
@@ -232,7 +233,7 @@ func (a *CoreNodeMetricsProvider) processGroupedPolicy(policy *groupedPolicy, ku
 
 	if len(podMetrics) > 0 {
 		req := &pb.IngestMetricsRequest{
-			Timestamp: time.Now().Unix(),
+			Timestamp: timestamppb.Now(),
 			Policies: []*pb.PolicyBatch{
 				{
 					Namespace: policy.Namespace,

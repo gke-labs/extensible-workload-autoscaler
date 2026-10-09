@@ -57,8 +57,8 @@ func validateMetricDefinition(m *pb.MetricDefinition) error {
 	}
 	if m.Rate != nil {
 		intents++
-		if m.Rate.Window == "" {
-			return status.Errorf(codes.InvalidArgument, "metric %s: window is required for rate intent", m.Name)
+		if m.Rate.GetWindow().AsDuration() <= 0 {
+			return status.Errorf(codes.InvalidArgument, "metric %s: a positive window is required for rate intent", m.Name)
 		}
 	}
 	if m.Distribution != nil {
@@ -69,8 +69,8 @@ func validateMetricDefinition(m *pb.MetricDefinition) error {
 	}
 	if m.DecayingDistribution != nil {
 		intents++
-		if m.DecayingDistribution.HalfLife == "" {
-			return status.Errorf(codes.InvalidArgument, "metric %s: half_life is required for decaying_distribution intent", m.Name)
+		if m.DecayingDistribution.GetHalfLife().AsDuration() <= 0 {
+			return status.Errorf(codes.InvalidArgument, "metric %s: a positive half_life is required for decaying_distribution intent", m.Name)
 		}
 		if m.DecayingDistribution.BucketSize == "" {
 			return status.Errorf(codes.InvalidArgument, "metric %s: bucket_size is required for decaying_distribution intent", m.Name)

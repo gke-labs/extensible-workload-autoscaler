@@ -8,7 +8,10 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
@@ -24,7 +27,7 @@ const (
 	// no metric.
 	defaultProvider  = "kubelet"
 	defaultScope     = "PodContainer"
-	defaultHalfLife  = "24h"
+	defaultHalfLife  = 24 * time.Hour
 	defaultCPUBucket = "0.05"     // 50m
 	defaultMemBucket = "10485760" // 10Mi
 )
@@ -155,9 +158,9 @@ func (r *VPARecommender) OwnedMetrics(def *pb.RecommenderDefinition, policyMetri
 				continue
 			}
 			tdd := template.GetDecayingDistribution()
-			if dd.HalfLife != tdd.HalfLife || dd.BucketSize != tdd.BucketSize {
-				return nil, fmt.Errorf("the %s metrics must have the same halfLife and bucketSize: %s %q has %q and %q, %s %q has %q and %q",
-					res.name, templateParam, template.Name, tdd.HalfLife, tdd.BucketSize, res.param(sl), ref.name, dd.HalfLife, dd.BucketSize)
+			if dd.GetHalfLife().AsDuration() != tdd.GetHalfLife().AsDuration() || dd.BucketSize != tdd.BucketSize {
+				return nil, fmt.Errorf("the %s metrics must have the same halfLife and bucketSize: %s %q has %v and %q, %s %q has %v and %q",
+					res.name, templateParam, template.Name, tdd.GetHalfLife().AsDuration(), tdd.BucketSize, res.param(sl), ref.name, dd.GetHalfLife().AsDuration(), dd.BucketSize)
 			}
 		}
 		if template == nil {
@@ -166,7 +169,7 @@ func (r *VPARecommender) OwnedMetrics(def *pb.RecommenderDefinition, policyMetri
 				Params:   map[string]string{"type": res.name},
 				Scope:    defaultScope,
 				DecayingDistribution: &pb.DecayingDistribution{
-					HalfLife:   defaultHalfLife,
+					HalfLife:   durationpb.New(defaultHalfLife),
 					BucketSize: res.defaultBucketSize,
 				},
 			}
@@ -185,9 +188,9 @@ func (r *VPARecommender) OwnedMetrics(def *pb.RecommenderDefinition, policyMetri
 				Filter:   maps.Clone(template.Filter),
 				Scope:    template.Scope,
 				DecayingDistribution: &pb.DecayingDistribution{
-					HalfLife:   tdd.HalfLife,
+					HalfLife:   proto.CloneOf(tdd.HalfLife),
 					BucketSize: tdd.BucketSize,
-					Rate:       tdd.Rate,
+					Rate:       proto.CloneOf(tdd.Rate),
 					Percentile: slots[sl].percentile,
 				},
 			})

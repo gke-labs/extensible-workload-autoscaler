@@ -3,14 +3,16 @@ package vpa
 import (
 	"strings"
 	"testing"
+	"time"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/testing/protocmp"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // decaying returns a decaying distribution metric definition.
-func decaying(name, typ, percentile, halfLife, bucketSize string) *pb.MetricDefinition {
+func decaying(name, typ, percentile string, halfLife time.Duration, bucketSize string) *pb.MetricDefinition {
 	return &pb.MetricDefinition{
 		Name:     name,
 		Provider: "kubelet",
@@ -18,7 +20,7 @@ func decaying(name, typ, percentile, halfLife, bucketSize string) *pb.MetricDefi
 		Scope:    "PodContainer",
 		DecayingDistribution: &pb.DecayingDistribution{
 			Percentile: percentile,
-			HalfLife:   halfLife,
+			HalfLife:   durationpb.New(halfLife),
 			BucketSize: bucketSize,
 		},
 	}
@@ -49,7 +51,7 @@ func TestOwnedMetrics(t *testing.T) {
 		Scope:    "PodContainer",
 		DecayingDistribution: &pb.DecayingDistribution{
 			Percentile: "p95",
-			HalfLife:   "12h",
+			HalfLife:   durationpb.New(12 * time.Hour),
 			BucketSize: "0.01",
 		},
 	}
@@ -62,19 +64,19 @@ func TestOwnedMetrics(t *testing.T) {
 			Scope:    "PodContainer",
 			DecayingDistribution: &pb.DecayingDistribution{
 				Percentile: percentile,
-				HalfLife:   "12h",
+				HalfLife:   durationpb.New(12 * time.Hour),
 				BucketSize: "0.01",
 			},
 		}
 	}
 
 	allPolicyMetrics := []*pb.MetricDefinition{
-		decaying("cpu_p50", "cpu", "p50", "24h", "0.05"),
-		decaying("cpu_p90", "cpu", "p90", "24h", "0.05"),
-		decaying("cpu_p99", "cpu", "p99", "24h", "0.05"),
-		decaying("mem_p50", "memory", "p50", "24h", "10485760"),
-		decaying("mem_p90", "memory", "p90", "24h", "10485760"),
-		decaying("mem_p99", "memory", "p99", "24h", "10485760"),
+		decaying("cpu_p50", "cpu", "p50", 24*time.Hour, "0.05"),
+		decaying("cpu_p90", "cpu", "p90", 24*time.Hour, "0.05"),
+		decaying("cpu_p99", "cpu", "p99", 24*time.Hour, "0.05"),
+		decaying("mem_p50", "memory", "p50", 24*time.Hour, "10485760"),
+		decaying("mem_p90", "memory", "p90", 24*time.Hour, "10485760"),
+		decaying("mem_p99", "memory", "p99", 24*time.Hour, "10485760"),
 	}
 
 	tests := []struct {
@@ -137,8 +139,8 @@ func TestOwnedMetrics(t *testing.T) {
 			name:   "user metrics of one resource with different half-lives",
 			params: map[string]string{"mem-metric": "mem_p90", "mem-upper-bound-metric": "mem_p99_short"},
 			policyMetrics: []*pb.MetricDefinition{
-				decaying("mem_p90", "memory", "p90", "24h", "10485760"),
-				decaying("mem_p99_short", "memory", "p99", "1h", "10485760"),
+				decaying("mem_p90", "memory", "p90", 24*time.Hour, "10485760"),
+				decaying("mem_p99_short", "memory", "p99", time.Hour, "10485760"),
 			},
 			wantErr: "the memory metrics must have the same halfLife and bucketSize",
 		},
@@ -146,8 +148,8 @@ func TestOwnedMetrics(t *testing.T) {
 			name:   "user metrics of one resource with different bucket sizes",
 			params: map[string]string{"cpu-lower-bound-metric": "cpu_p50", "cpu-upper-bound-metric": "cpu_p99_fine"},
 			policyMetrics: []*pb.MetricDefinition{
-				decaying("cpu_p50", "cpu", "p50", "24h", "0.05"),
-				decaying("cpu_p99_fine", "cpu", "p99", "24h", "0.01"),
+				decaying("cpu_p50", "cpu", "p50", 24*time.Hour, "0.05"),
+				decaying("cpu_p99_fine", "cpu", "p99", 24*time.Hour, "0.01"),
 			},
 			wantErr: "the cpu metrics must have the same halfLife and bucketSize",
 		},

@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
@@ -91,7 +92,7 @@ func TestServerEndToEndGRPC(t *testing.T) {
 		Policy: &pb.Policy{
 			Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "web-app", Namespace: ns},
-			Metrics:  []*pb.MetricDefinition{{Name: "cpu_avg", Provider: "kubelet", Params: map[string]string{"type": "cpu"}, Rate: &pb.Rate{Window: "1m", Aggregation: "Avg"}}},
+			Metrics:  []*pb.MetricDefinition{{Name: "cpu_avg", Provider: "kubelet", Params: map[string]string{"type": "cpu"}, Rate: &pb.Rate{Window: durationpb.New(time.Minute), Aggregation: "Avg"}}},
 
 			Scaling:     []*pb.RecommenderDefinition{{Recommender: "Linear", Name: "cpu", Mode: "Active", Type: "Linear", Params: map[string]string{"metric": "cpu_avg", "target": "0.5"}}},
 			MinReplicas: 2, MaxReplicas: 10,
@@ -102,13 +103,13 @@ func TestServerEndToEndGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{
 			{
 				Namespace: ns, Name: policyName,
 				Batches: []*pb.MetricBatch{
-					{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
-					{PodName: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
+					{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: timestamppb.New(time.Unix(ts, 0))}}},
+					{PodName: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: timestamppb.New(time.Unix(ts, 0))}}},
 				},
 			},
 		},
@@ -119,13 +120,13 @@ func TestServerEndToEndGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{
 			{
 				Namespace: ns, Name: policyName,
 				Batches: []*pb.MetricBatch{
-					{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 108, Timestamp: ts}}},
-					{PodName: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 108, Timestamp: ts}}},
+					{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 108, Timestamp: timestamppb.New(time.Unix(ts, 0))}}},
+					{PodName: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 108, Timestamp: timestamppb.New(time.Unix(ts, 0))}}},
 				},
 			},
 		},
@@ -144,7 +145,7 @@ func TestServerEndToEndGRPC(t *testing.T) {
 
 	wantCM := &pb.ControlMetrics{
 		Values:        map[string]float64{"cpu_avg": 0.8},
-		Timestamp:     1010,
+		Timestamp:     timestamppb.New(time.Unix(1010, 0)),
 		ReadyReplicas: 2,
 	}
 	if diff := cmp.Diff(wantCM, cm, protocmp.Transform()); diff != "" {
@@ -205,7 +206,7 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 		Policy: &pb.Policy{
 			Id:       &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName},
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "dist-app", Namespace: ns},
-			Metrics:  []*pb.MetricDefinition{{Name: "cpu_avg", Provider: "kubelet", Params: map[string]string{"type": "cpu"}, Rate: &pb.Rate{Window: "1m", Aggregation: "Avg"}}},
+			Metrics:  []*pb.MetricDefinition{{Name: "cpu_avg", Provider: "kubelet", Params: map[string]string{"type": "cpu"}, Rate: &pb.Rate{Window: durationpb.New(time.Minute), Aggregation: "Avg"}}},
 
 			Scaling:     []*pb.RecommenderDefinition{{Recommender: "Linear", Name: "cpu", Type: "Linear", Params: map[string]string{"metric": "cpu_avg", "target": "0.5"}}},
 			MinReplicas: 1, MaxReplicas: 20,
@@ -223,15 +224,15 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{
 			{
 				Namespace: ns, Name: policyName,
 				Batches: []*pb.MetricBatch{
-					{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
-					{PodName: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
-					{PodName: "p3", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
-					{PodName: "p4", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: ts}}},
+					{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: timestamppb.New(time.Unix(ts, 0))}}},
+					{PodName: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: timestamppb.New(time.Unix(ts, 0))}}},
+					{PodName: "p3", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: timestamppb.New(time.Unix(ts, 0))}}},
+					{PodName: "p4", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 100, Timestamp: timestamppb.New(time.Unix(ts, 0))}}},
 				},
 			},
 		},
@@ -242,13 +243,13 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{
 			{
 				Namespace: ns, Name: policyName,
 				Batches: []*pb.MetricBatch{
-					{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 120, Timestamp: ts}}},
-					{PodName: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 120, Timestamp: ts}}},
+					{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 120, Timestamp: timestamppb.New(time.Unix(ts, 0))}}},
+					{PodName: "p2", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 120, Timestamp: timestamppb.New(time.Unix(ts, 0))}}},
 				},
 			},
 		},
@@ -259,13 +260,13 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{
 			{
 				Namespace: ns, Name: policyName,
 				Batches: []*pb.MetricBatch{
-					{PodName: "p3", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 124, Timestamp: ts}}},
-					{PodName: "p4", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 124, Timestamp: ts}}},
+					{PodName: "p3", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 124, Timestamp: timestamppb.New(time.Unix(ts, 0))}}},
+					{PodName: "p4", Samples: []*pb.MetricSample{{Name: "cpu_avg", Value: 124, Timestamp: timestamppb.New(time.Unix(ts, 0))}}},
 				},
 			},
 		},
@@ -275,7 +276,7 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 
 	cm, _ := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	// Avg = 2.0
-	if diff := cmp.Diff(&pb.ControlMetrics{Values: map[string]float64{"cpu_avg": 2.0}, Timestamp: 1012, ReadyReplicas: 4}, cm, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(&pb.ControlMetrics{Values: map[string]float64{"cpu_avg": 2.0}, Timestamp: timestamppb.New(time.Unix(1012, 0)), ReadyReplicas: 4}, cm, protocmp.Transform()); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 
@@ -338,11 +339,11 @@ func TestExternalMetricGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{
 			{
 				Namespace: ns, Name: policyName,
-				Batches: []*pb.MetricBatch{{PodName: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 1000, Timestamp: ts}}}},
+				Batches: []*pb.MetricBatch{{PodName: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 1000, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}},
 			},
 		},
 	})
@@ -351,7 +352,7 @@ func TestExternalMetricGRPC(t *testing.T) {
 
 	cm, _ := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	// Avg = 1000/10 = 100.
-	if diff := cmp.Diff(&pb.ControlMetrics{Values: map[string]float64{"queue": 100.0}, Timestamp: 1000, ReadyReplicas: 10}, cm, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(&pb.ControlMetrics{Values: map[string]float64{"queue": 100.0}, Timestamp: timestamppb.New(time.Unix(1000, 0)), ReadyReplicas: 10}, cm, protocmp.Transform()); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 
@@ -411,13 +412,13 @@ func TestPerPodExternalMetricGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{
 			{
 				Namespace: ns, Name: policyName,
 				Batches: []*pb.MetricBatch{
-					{PodName: "pod-1", Samples: []*pb.MetricSample{{Name: "sidecar_latency", Value: 50, Timestamp: ts}}},
-					{PodName: "pod-2", Samples: []*pb.MetricSample{{Name: "sidecar_latency", Value: 150, Timestamp: ts}}},
+					{PodName: "pod-1", Samples: []*pb.MetricSample{{Name: "sidecar_latency", Value: 50, Timestamp: timestamppb.New(time.Unix(ts, 0))}}},
+					{PodName: "pod-2", Samples: []*pb.MetricSample{{Name: "sidecar_latency", Value: 150, Timestamp: timestamppb.New(time.Unix(ts, 0))}}},
 				},
 			},
 		},
@@ -427,7 +428,7 @@ func TestPerPodExternalMetricGRPC(t *testing.T) {
 
 	cm, _ := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	// Avg = (50+150)/2 = 100.
-	if diff := cmp.Diff(&pb.ControlMetrics{Values: map[string]float64{"sidecar_latency": 100.0}, Timestamp: 1000, ReadyReplicas: 2}, cm, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(&pb.ControlMetrics{Values: map[string]float64{"sidecar_latency": 100.0}, Timestamp: timestamppb.New(time.Unix(1000, 0)), ReadyReplicas: 2}, cm, protocmp.Transform()); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 
@@ -489,8 +490,8 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
-		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 50, Timestamp: ts}}}}}},
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
+		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 50, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
 	})
 
 	memStore.CalculateAll()
@@ -529,8 +530,8 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
-		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 0, Timestamp: ts}}}}}},
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
+		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 0, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
 	})
 
 	memStore.CalculateAll()
@@ -565,8 +566,8 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
-		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 0, Timestamp: ts}}}}}},
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
+		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "", Samples: []*pb.MetricSample{{Name: "queue", Value: 0, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
 	})
 	memStore.CalculateAll()
 	client.UpdateRecommenderState(ctx, &pb.UpdateRecommenderStateRequest{
@@ -631,8 +632,8 @@ func TestDryRunGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
-		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m1", Value: 100, Timestamp: ts}}}}}},
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
+		Policies:    []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m1", Value: 100, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
 	})
 
 	memStore.CalculateAll()
@@ -714,15 +715,15 @@ func TestHistogramWithFilterGRPC(t *testing.T) {
 	buckets0 := map[string]uint64{"0.1": 0, "0.5": 0, "+Inf": 0}
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: policyName,
 			Batches: []*pb.MetricBatch{{
 				PodName: "p1",
 				Samples: []*pb.MetricSample{
-					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "GET"}, Histogram: &pb.Histogram{Buckets: buckets0}, Timestamp: ts},
-					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "POST"}, Histogram: &pb.Histogram{Buckets: buckets0}, Timestamp: ts},
-					{Name: "api_latency", Labels: map[string]string{"path": "/health"}, Histogram: &pb.Histogram{Buckets: buckets0}, Timestamp: ts},
+					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "GET"}, Histogram: &pb.Histogram{Buckets: buckets0}, Timestamp: timestamppb.New(time.Unix(ts, 0))},
+					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "POST"}, Histogram: &pb.Histogram{Buckets: buckets0}, Timestamp: timestamppb.New(time.Unix(ts, 0))},
+					{Name: "api_latency", Labels: map[string]string{"path": "/health"}, Histogram: &pb.Histogram{Buckets: buckets0}, Timestamp: timestamppb.New(time.Unix(ts, 0))},
 				},
 			}},
 		}},
@@ -733,18 +734,18 @@ func TestHistogramWithFilterGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: policyName,
 			Batches: []*pb.MetricBatch{{
 				PodName: "p1",
 				Samples: []*pb.MetricSample{
 					// A: 50 fast
-					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "GET"}, Histogram: &pb.Histogram{Buckets: map[string]uint64{"0.1": 50, "0.5": 50, "+Inf": 50}}, Timestamp: ts},
+					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "GET"}, Histogram: &pb.Histogram{Buckets: map[string]uint64{"0.1": 50, "0.5": 50, "+Inf": 50}}, Timestamp: timestamppb.New(time.Unix(ts, 0))},
 					// B: 50 slow
-					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "POST"}, Histogram: &pb.Histogram{Buckets: map[string]uint64{"0.1": 0, "0.5": 50, "+Inf": 50}}, Timestamp: ts},
+					{Name: "api_latency", Labels: map[string]string{"path": "/api", "method": "POST"}, Histogram: &pb.Histogram{Buckets: map[string]uint64{"0.1": 0, "0.5": 50, "+Inf": 50}}, Timestamp: timestamppb.New(time.Unix(ts, 0))},
 					// C: 1000 very slow (Should be filtered out)
-					{Name: "api_latency", Labels: map[string]string{"path": "/health"}, Histogram: &pb.Histogram{Buckets: map[string]uint64{"0.1": 0, "0.5": 0, "+Inf": 1000}}, Timestamp: ts},
+					{Name: "api_latency", Labels: map[string]string{"path": "/health"}, Histogram: &pb.Histogram{Buckets: map[string]uint64{"0.1": 0, "0.5": 0, "+Inf": 1000}}, Timestamp: timestamppb.New(time.Unix(ts, 0))},
 				},
 			}},
 		}},
@@ -754,7 +755,7 @@ func TestHistogramWithFilterGRPC(t *testing.T) {
 
 	cm, _ := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	// Value 0.492
-	wantCM := &pb.ControlMetrics{Values: map[string]float64{"api_latency": 0.492}, Timestamp: 1010, ReadyReplicas: 1}
+	wantCM := &pb.ControlMetrics{Values: map[string]float64{"api_latency": 0.492}, Timestamp: timestamppb.New(time.Unix(1010, 0)), ReadyReplicas: 1}
 	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
@@ -799,13 +800,13 @@ func TestHistogramLatencyScalingGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: policyName,
 			Batches: []*pb.MetricBatch{{
 				PodName: "p1",
 				Samples: []*pb.MetricSample{{
-					Name: "latency", Timestamp: ts,
+					Name: "latency", Timestamp: timestamppb.New(time.Unix(ts, 0)),
 					Histogram: &pb.Histogram{Buckets: map[string]uint64{"0.05": 0, "0.2": 0, "+Inf": 0}},
 				}},
 			}},
@@ -817,13 +818,13 @@ func TestHistogramLatencyScalingGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: policyName,
 			Batches: []*pb.MetricBatch{{
 				PodName: "p1",
 				Samples: []*pb.MetricSample{{
-					Name: "latency", Timestamp: ts,
+					Name: "latency", Timestamp: timestamppb.New(time.Unix(ts, 0)),
 					Histogram: &pb.Histogram{Buckets: map[string]uint64{"0.05": 80, "0.2": 100, "+Inf": 100}},
 				}},
 			}},
@@ -874,7 +875,7 @@ func TestWindowedMetricsGRPC(t *testing.T) {
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app", Namespace: ns},
 			Metrics: []*pb.MetricDefinition{
 				{
-					Name: "cpu_hist", DecayingDistribution: &pb.DecayingDistribution{HalfLife: "24h", BucketSize: "0.1", Percentile: "p100"},
+					Name: "cpu_hist", DecayingDistribution: &pb.DecayingDistribution{HalfLife: durationpb.New(24 * time.Hour), BucketSize: "0.1", Percentile: "p100"},
 				},
 			},
 			Scaling:     []*pb.RecommenderDefinition{{Recommender: "Linear", Name: "cpu", Type: "Linear", Params: map[string]string{"metric": "cpu_hist", "target": "0.5"}}},
@@ -890,8 +891,8 @@ func TestWindowedMetricsGRPC(t *testing.T) {
 	// T0: Ingest 1.0 (High)
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
-		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu_hist", Value: 1.0, Timestamp: ts}}}}}},
+		ClusterName: "default", Timestamp: timestamppb.New(time.Unix(ts, 0)),
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu_hist", Value: 1.0, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
 	})
 
 	memStore.CalculateAll()
@@ -900,7 +901,7 @@ func TestWindowedMetricsGRPC(t *testing.T) {
 	cm, _ := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	wantCM := &pb.ControlMetrics{
 		Values:        map[string]float64{"cpu_hist": 1.1},
-		Timestamp:     1000,
+		Timestamp:     timestamppb.New(time.Unix(1000, 0)),
 		ReadyReplicas: 1,
 	}
 	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
@@ -1026,7 +1027,7 @@ func TestValidationGRPC(t *testing.T) {
 			name: "IngestMetrics: Missing ClusterName",
 			call: func() error {
 				_, err := client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
-					Timestamp: 1234,
+					Timestamp: timestamppb.New(time.Unix(1234, 0)),
 				})
 				return err
 			},
@@ -1100,10 +1101,10 @@ func TestMultiplePoliciesGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{
-			{Namespace: "default", Name: p1, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu", Value: 0.5, Timestamp: ts}}}}},
-			{Namespace: "default", Name: p2, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "mem", Value: 1024, Timestamp: ts}}}}},
+			{Namespace: "default", Name: p1, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "cpu", Value: 0.5, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}},
+			{Namespace: "default", Name: p2, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "mem", Value: 1024, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}},
 		},
 	})
 
@@ -1112,7 +1113,7 @@ func TestMultiplePoliciesGRPC(t *testing.T) {
 	cm1, _ := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: p1}})
 	wantCM1 := &pb.ControlMetrics{
 		Values:        map[string]float64{"cpu": 0.5},
-		Timestamp:     ts,
+		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: 1,
 	}
 	if diff := cmp.Diff(wantCM1, cm1, protocmp.Transform()); diff != "" {
@@ -1122,7 +1123,7 @@ func TestMultiplePoliciesGRPC(t *testing.T) {
 	cm2, _ := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: "default", Name: p2}})
 	wantCM2 := &pb.ControlMetrics{
 		Values:        map[string]float64{"mem": 1024},
-		Timestamp:     ts,
+		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: 1,
 	}
 	if diff := cmp.Diff(wantCM2, cm2, protocmp.Transform()); diff != "" {
@@ -1177,10 +1178,10 @@ func TestNamespaceIsolationGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{
-			{Namespace: "ns1", Name: name, Batches: []*pb.MetricBatch{{PodName: "p", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: ts}}}}},
-			{Namespace: "ns2", Name: name, Batches: []*pb.MetricBatch{{PodName: "p", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: ts}}}}},
+			{Namespace: "ns1", Name: name, Batches: []*pb.MetricBatch{{PodName: "p", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}},
+			{Namespace: "ns2", Name: name, Batches: []*pb.MetricBatch{{PodName: "p", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}},
 		},
 	})
 
@@ -1189,7 +1190,7 @@ func TestNamespaceIsolationGRPC(t *testing.T) {
 	cm1, _ := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: "ns1", Name: name}})
 	wantCM1 := &pb.ControlMetrics{
 		Values:        map[string]float64{"m": 10},
-		Timestamp:     ts,
+		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: 1,
 	}
 	if diff := cmp.Diff(wantCM1, cm1, protocmp.Transform()); diff != "" {
@@ -1199,7 +1200,7 @@ func TestNamespaceIsolationGRPC(t *testing.T) {
 	cm2, _ := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: "ns2", Name: name}})
 	wantCM2 := &pb.ControlMetrics{
 		Values:        map[string]float64{"m": 20},
-		Timestamp:     ts,
+		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: 1,
 	}
 	if diff := cmp.Diff(wantCM2, cm2, protocmp.Transform()); diff != "" {
@@ -1249,21 +1250,21 @@ func TestMetricAggregationGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   ts,
+		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		Policies: []*pb.PolicyBatch{{
 			Namespace: ns, Name: policyName,
 			Batches: []*pb.MetricBatch{
 				{PodName: "p1", Samples: []*pb.MetricSample{
-					{Name: "m_avg", Value: 10, Timestamp: ts},
-					{Name: "m_sum", Value: 10, Timestamp: ts},
-					{Name: "m_max", Value: 10, Timestamp: ts},
-					{Name: "m_min", Value: 10, Timestamp: ts},
+					{Name: "m_avg", Value: 10, Timestamp: timestamppb.New(time.Unix(ts, 0))},
+					{Name: "m_sum", Value: 10, Timestamp: timestamppb.New(time.Unix(ts, 0))},
+					{Name: "m_max", Value: 10, Timestamp: timestamppb.New(time.Unix(ts, 0))},
+					{Name: "m_min", Value: 10, Timestamp: timestamppb.New(time.Unix(ts, 0))},
 				}},
 				{PodName: "p2", Samples: []*pb.MetricSample{
-					{Name: "m_avg", Value: 30, Timestamp: ts},
-					{Name: "m_sum", Value: 30, Timestamp: ts},
-					{Name: "m_max", Value: 30, Timestamp: ts},
-					{Name: "m_min", Value: 30, Timestamp: ts},
+					{Name: "m_avg", Value: 30, Timestamp: timestamppb.New(time.Unix(ts, 0))},
+					{Name: "m_sum", Value: 30, Timestamp: timestamppb.New(time.Unix(ts, 0))},
+					{Name: "m_max", Value: 30, Timestamp: timestamppb.New(time.Unix(ts, 0))},
+					{Name: "m_min", Value: 30, Timestamp: timestamppb.New(time.Unix(ts, 0))},
 				}},
 			},
 		}},
@@ -1280,7 +1281,7 @@ func TestMetricAggregationGRPC(t *testing.T) {
 			"m_max": 30.0,
 			"m_min": 10.0,
 		},
-		Timestamp:     ts,
+		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: 2,
 	}
 
@@ -1378,7 +1379,7 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 			Workload: &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app", Namespace: ns},
 			Metrics: []*pb.MetricDefinition{
 				{
-					Name: "load", DecayingDistribution: &pb.DecayingDistribution{HalfLife: "10s", BucketSize: "1.0", Percentile: "p100"},
+					Name: "load", DecayingDistribution: &pb.DecayingDistribution{HalfLife: durationpb.New(10 * time.Second), BucketSize: "1.0", Percentile: "p100"},
 				},
 			},
 			MinReplicas: 1, MaxReplicas: 10,
@@ -1393,15 +1394,15 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 	// 2. T0: Ingest 100
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
-		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "load", Value: 100.0, Timestamp: ts}}}}}},
+		ClusterName: "default", Timestamp: timestamppb.New(time.Unix(ts, 0)),
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "load", Value: 100.0, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
 	})
 
 	memStore.CalculateAll()
 	cm, _ := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
 	wantCM0 := &pb.ControlMetrics{
 		Values:        map[string]float64{"load": 101.0}, // Bucket upper bound
-		Timestamp:     1000,
+		Timestamp:     timestamppb.New(time.Unix(1000, 0)),
 		ReadyReplicas: 1,
 	}
 	if diff := cmp.Diff(wantCM0, cm, protocmp.Transform(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
@@ -1416,7 +1417,7 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 	// Expectation: Histogram p100 sticks to the last maximum seen until new data arrives.
 	wantCM1 := &pb.ControlMetrics{
 		Values:        map[string]float64{"load": 101.0},
-		Timestamp:     1010,
+		Timestamp:     timestamppb.New(time.Unix(1010, 0)),
 		ReadyReplicas: 1,
 	}
 	if diff := cmp.Diff(wantCM1, cm, protocmp.Transform(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
@@ -1426,8 +1427,8 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 	// 4. T3: Ingest 200.
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
-		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "load", Value: 200.0, Timestamp: ts}}}}}},
+		ClusterName: "default", Timestamp: timestamppb.New(time.Unix(ts, 0)),
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "load", Value: 200.0, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
 	})
 
 	memStore.CalculateAll()
@@ -1435,7 +1436,7 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 
 	wantCM3 := &pb.ControlMetrics{
 		Values:        map[string]float64{"load": 201.0},
-		Timestamp:     1010,
+		Timestamp:     timestamppb.New(time.Unix(1010, 0)),
 		ReadyReplicas: 1,
 	}
 	if diff := cmp.Diff(wantCM3, cm, protocmp.Transform(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
@@ -1446,8 +1447,8 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 	clk.Advance(1 * time.Hour)
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
-		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "load", Value: 300.0, Timestamp: ts}}}}}},
+		ClusterName: "default", Timestamp: timestamppb.New(time.Unix(ts, 0)),
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "load", Value: 300.0, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
 	})
 
 	memStore.CalculateAll()
@@ -1455,7 +1456,7 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 
 	wantCM4 := &pb.ControlMetrics{
 		Values:        map[string]float64{"load": 301.0},
-		Timestamp:     4610,
+		Timestamp:     timestamppb.New(time.Unix(4610, 0)),
 		ReadyReplicas: 1,
 	}
 	if diff := cmp.Diff(wantCM4, cm, protocmp.Transform(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
@@ -1577,8 +1578,8 @@ func TestSlidingWindowGRPC(t *testing.T) {
 	// T0: Ingest 10
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
-		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: ts}}}}}},
+		ClusterName: "default", Timestamp: timestamppb.New(time.Unix(ts, 0)),
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
 	})
 	memStore.CalculateAll()
 	cm, _ := client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
@@ -1588,8 +1589,8 @@ func TestSlidingWindowGRPC(t *testing.T) {
 	clk.Advance(30 * time.Second)
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
-		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: ts}}}}}},
+		ClusterName: "default", Timestamp: timestamppb.New(time.Unix(ts, 0)),
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
 	})
 	memStore.CalculateAll()
 	cm, _ = client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
@@ -1599,8 +1600,8 @@ func TestSlidingWindowGRPC(t *testing.T) {
 	clk.Advance(60 * time.Second)
 	ts = clk.Now().Unix() // 1090
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
-		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: ts}}}}}},
+		ClusterName: "default", Timestamp: timestamppb.New(time.Unix(ts, 0)),
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
 	})
 	memStore.CalculateAll()
 	cm, _ = client.GetControlMetrics(ctx, &pb.GetControlMetricsRequest{Id: &pb.PolicyId{ClusterName: "default", Namespace: ns, Name: policyName}})
@@ -1635,8 +1636,8 @@ func TestMetricGCGRPC(t *testing.T) {
 	// T0: Ingest
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
-		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: ts}}}}}},
+		ClusterName: "default", Timestamp: timestamppb.New(time.Unix(ts, 0)),
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
 	})
 
 	// Verify exists
@@ -1728,8 +1729,8 @@ func TestPolicyMutationGRPC(t *testing.T) {
 
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
-		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: ts}}}}}},
+		ClusterName: "default", Timestamp: timestamppb.New(time.Unix(ts, 0)),
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 10, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
 	})
 	memStore.CalculateAll()
 
@@ -1742,7 +1743,7 @@ func TestPolicyMutationGRPC(t *testing.T) {
 	mustUpdatePolicy(t, client, &pb.Policy{
 		Id:          pid,
 		Workload:    &pb.WorkloadRef{Group: "apps", Version: "v1", Kind: "Deployment", Name: "app", Namespace: ns},
-		Metrics:     []*pb.MetricDefinition{{Name: "m", Provider: "kubelet", Rate: &pb.Rate{Window: "1m"}}}, // Changed to Rate
+		Metrics:     []*pb.MetricDefinition{{Name: "m", Provider: "kubelet", Rate: &pb.Rate{Window: durationpb.New(time.Minute)}}}, // Changed to Rate
 		MinReplicas: 1, MaxReplicas: 10,
 		Etag: stored.GetEtag(),
 	})
@@ -1752,8 +1753,8 @@ func TestPolicyMutationGRPC(t *testing.T) {
 	clk.Advance(10 * time.Second)
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
-		ClusterName: "default", Timestamp: ts,
-		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: ts}}}}}},
+		ClusterName: "default", Timestamp: timestamppb.New(time.Unix(ts, 0)),
+		Policies: []*pb.PolicyBatch{{Namespace: ns, Name: policyName, Batches: []*pb.MetricBatch{{PodName: "p1", Samples: []*pb.MetricSample{{Name: "m", Value: 20, Timestamp: timestamppb.New(time.Unix(ts, 0))}}}}}},
 	})
 
 	memStore.CalculateAll()
@@ -1767,8 +1768,8 @@ func TestPolicyMutationGRPC(t *testing.T) {
 
 func checkCM(t *testing.T, got *pb.ControlMetrics, wantVals map[string]float64, wantTS int64) {
 	t.Helper()
-	if got.Timestamp != wantTS {
-		t.Errorf("Timestamp mismatch: want %d, got %d", wantTS, got.Timestamp)
+	if got.GetTimestamp().AsTime().Unix() != wantTS {
+		t.Errorf("Timestamp mismatch: want %d, got %d", wantTS, got.GetTimestamp().AsTime().Unix())
 	}
 	for k, v := range wantVals {
 		if got.Values[k] != v {
@@ -1825,20 +1826,20 @@ func TestRecommenderOwnedMetricsGRPC(t *testing.T) {
 
 	_, err = client.IngestMetrics(ctx, &pb.IngestMetricsRequest{
 		ClusterName: "default",
-		Timestamp:   start.Unix(),
+		Timestamp:   timestamppb.New(time.Unix(start.Unix(), 0)),
 		Policies: []*pb.PolicyBatch{{
 			Namespace: "prod", Name: "web",
 			Batches: []*pb.MetricBatch{{
 				PodName: "p1",
 				Samples: []*pb.MetricSample{
-					{Name: "cpu", Value: 2, Timestamp: start.Unix()},
-					{Name: "cpu", RecommenderName: "vpa", Value: 20, Timestamp: start.Unix()},
+					{Name: "cpu", Value: 2, Timestamp: timestamppb.New(time.Unix(start.Unix(), 0))},
+					{Name: "cpu", RecommenderName: "vpa", Value: 20, Timestamp: timestamppb.New(time.Unix(start.Unix(), 0))},
 				},
 			}, {
 				PodName: "p2",
 				Samples: []*pb.MetricSample{
-					{Name: "cpu", Value: 4, Timestamp: start.Unix()},
-					{Name: "cpu", RecommenderName: "vpa", Value: 40, Timestamp: start.Unix()},
+					{Name: "cpu", Value: 4, Timestamp: timestamppb.New(time.Unix(start.Unix(), 0))},
+					{Name: "cpu", RecommenderName: "vpa", Value: 40, Timestamp: timestamppb.New(time.Unix(start.Unix(), 0))},
 				},
 			}},
 		}},

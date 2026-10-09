@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/testing/protocmp"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -108,7 +109,7 @@ func TestProcessCustomMetric(t *testing.T) {
 					{
 						Name:      "pod_http_requests",
 						Value:     85,
-						Timestamp: 1720000000,
+						Timestamp: timestamppb.New(time.Unix(1720000000, 0)),
 					},
 				},
 			},
@@ -154,7 +155,7 @@ func TestProcessCustomMetric(t *testing.T) {
 					{
 						Name:      "service_http_requests",
 						Value:     450,
-						Timestamp: 1720000000,
+						Timestamp: timestamppb.New(time.Unix(1720000000, 0)),
 					},
 				},
 			},

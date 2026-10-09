@@ -364,7 +364,7 @@ const pageTemplate = `
             } else if (def.rate) {
                 d.intent = 'Rate';
                 d.agg = def.rate.aggregation || 'Sum';
-                d.config = 'Window: ' + def.rate.window;
+                d.config = 'Window: ' + formatDuration(def.rate.window);
             } else if (def.distribution) {
                 d.intent = 'Distribution';
                 d.agg = def.distribution.percentile;
@@ -372,7 +372,7 @@ const pageTemplate = `
             } else if (def.decaying_distribution) {
                 d.intent = 'DecayingDist';
                 d.agg = def.decaying_distribution.percentile;
-                d.config = 'HL: ' + def.decaying_distribution.half_life;
+                d.config = 'HL: ' + formatDuration(def.decaying_distribution.half_life);
             }
 
             if (def.params) {
@@ -694,10 +694,32 @@ const pageTemplate = `
                 '</div>';
         }
 
+        // ts is an RFC 3339 string, as protojson renders google.protobuf.Timestamp.
         function formatTime(ts) {
             if (!ts) return '-';
-            const date = new Date(ts * 1000);
+            const date = new Date(ts);
             return date.toLocaleTimeString();
+        }
+
+        // formatDuration renders a google.protobuf.Duration, which protojson
+        // encodes as seconds (e.g. "86400s"), the way Go does (e.g. "24h",
+        // "1m30s", "500ms").
+        function formatDuration(d) {
+            if (!d) return '-';
+            const secs = parseFloat(d);
+            if (isNaN(secs)) return d;
+            if (secs === 0) return '0s';
+            if (Math.abs(secs) < 1) return parseFloat((secs * 1000).toFixed(3)) + 'ms';
+            let rest = Math.abs(secs);
+            const h = Math.floor(rest / 3600);
+            rest -= h * 3600;
+            const m = Math.floor(rest / 60);
+            rest = parseFloat((rest - m * 60).toFixed(9));
+            let out = secs < 0 ? '-' : '';
+            if (h) out += h + 'h';
+            if (m) out += m + 'm';
+            if (rest) out += rest + 's';
+            return out;
         }
 
         function formatFloat(val) {

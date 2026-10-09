@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package xas.v1alpha;
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
@@ -182,8 +183,8 @@ message Gauge {
 }
 
 message Rate {
-  // The temporal period for rate calculation (e.g. "1m").
-  string window = 1;
+  // The temporal period for rate calculation.
+  google.protobuf.Duration window = 1;
   // Aggregation method: "Avg", "Sum", "Max", "Min".
   string aggregation = 2;
 }
@@ -196,14 +197,14 @@ message Distribution {
 }
 
 message DecayingDistribution {
-  // Half-life duration string (e.g. "24h").
-  string half_life = 1;
+  // Half-life of the samples weight.
+  google.protobuf.Duration half_life = 1;
   // Bucket size string (e.g. "0.1").
   string bucket_size = 2;
   // The percentile to extract (e.g. "p100").
   string percentile = 3;
   // If set, treat input as Counter and calculate rate over this window before sampling.
-  string rate = 4;
+  google.protobuf.Duration rate = 4;
 }
 
 // RecommenderDefinition configures a specific scaling algorithm.
@@ -293,8 +294,8 @@ message ContainerMetrics {
 
 // ControlMetrics contains the aggregated values calculated by the Server.
 message ControlMetrics {
-  // Timestamp of the calculation (Unix seconds).
-  int64 timestamp = 2;
+  // Timestamp of the calculation.
+  google.protobuf.Timestamp timestamp = 2;
   // The number of ready replicas.
   int32 ready_replicas = 3;
   // Global metric values, keyed by metric name.
@@ -424,8 +425,8 @@ message MetricStatus {
   string name = 1;
   // The aggregated value.
   double value = 2;
-  // Timestamp of the value (Unix seconds).
-  int64 timestamp = 3;
+  // Timestamp of the value.
+  google.protobuf.Timestamp timestamp = 3;
   // Error message if data is missing or invalid.
   string error = 4;
 }
@@ -437,8 +438,8 @@ message MetricStatus {
 message IngestMetricsRequest {
   // The cluster name where metrics originated.
   string cluster_name = 1;
-  // Timestamp of the ingestion (Unix seconds).
-  int64 timestamp = 2;
+  // Timestamp of the ingestion.
+  google.protobuf.Timestamp timestamp = 2;
   // Group metrics by policy.
   repeated PolicyBatch policies = 3;
 }
@@ -478,8 +479,8 @@ message MetricSample {
   string resource_name = 8;
   // The scalar value of the sample.
   double value = 3;
-  // Timestamp of the sample (Unix seconds).
-  int64 timestamp = 4;
+  // Timestamp of the sample.
+  google.protobuf.Timestamp timestamp = 4;
   // The histogram value of the sample (if its a distribution).
   Histogram histogram = 5;
 }
