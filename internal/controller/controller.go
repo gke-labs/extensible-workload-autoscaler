@@ -23,8 +23,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	"github.com/gke-labs/extensible-workload-autoscaler/internal/podutil"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
 	clientset "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/clientset/versioned"
 	informers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/informers/externalversions/xas/v1"
@@ -612,20 +614,8 @@ func (c *Controller) syncWorkload(policy *xasv1.ScalingPolicy, deployment *appsv
 
 	// 2. Build PodStates
 	var replicas []*pb.PodState
-	for _, pod := range pods.Items {
-		isReady := false
-		for _, cond := range pod.Status.Conditions {
-			if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
-				isReady = true
-				break
-			}
-		}
-		replicas = append(replicas, &pb.PodState{
-			Name:       pod.Name,
-			NodeName:   pod.Spec.NodeName,
-			IsReady:    isReady,
-			Containers: buildContainerStates(&pod),
-		})
+	for i := range pods.Items {
+		replicas = append(replicas, buildPodState(&pods.Items[i]))
 	}
 
 	// 3. Send
@@ -641,6 +631,25 @@ func (c *Controller) syncWorkload(policy *xasv1.ScalingPolicy, deployment *appsv
 
 	_, err = c.grpcClient.UpdateWorkload(ctx, req)
 	return err
+}
+
+// buildPodState reports the state of a pod, including the lifecycle facts the
+// Server needs to decide whether the pod's metrics should be considered.
+func buildPodState(pod *corev1.Pod) *pb.PodState {
+	state := &pb.PodState{
+		Name:       pod.Name,
+		NodeName:   pod.Spec.NodeName,
+		Phase:      string(pod.Status.Phase),
+		Containers: buildContainerStates(pod),
+	}
+	if pod.Status.StartTime != nil {
+		state.StartTime = timestamppb.New(pod.Status.StartTime.Time)
+	}
+	if cond := podutil.ReadyCondition(pod); cond != nil {
+		state.IsReady = cond.Status == corev1.ConditionTrue
+		state.ReadyLastTransitionTime = timestamppb.New(cond.LastTransitionTime.Time)
+	}
+	return state
 }
 
 // buildContainerStates reports the resource requests currently declared for each

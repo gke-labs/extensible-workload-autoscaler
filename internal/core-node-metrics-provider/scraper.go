@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
@@ -18,6 +17,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	"github.com/gke-labs/extensible-workload-autoscaler/internal/podutil"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/policy"
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 )
@@ -201,7 +201,9 @@ func (a *CoreNodeMetricsProvider) processGroupedPolicy(policy *groupedPolicy, ku
 	var podMetrics []*pb.MetricBatch
 
 	for _, pod := range pods.Items {
-		if pod.Status.Phase != "Running" || !isPodReady(&pod) {
+		// Pods that became unready later in their life (e.g. their readiness
+		// probe fails under load) are still scraped.
+		if !podutil.IsEligible(podutil.FromPod(&pod)) {
 			continue
 		}
 
@@ -258,13 +260,4 @@ func (a *CoreNodeMetricsProvider) sendBatch(pbReq *pb.IngestMetricsRequest) {
 		return
 	}
 	slog.Info("Batch sent", "success", resp.Success)
-}
-
-func isPodReady(pod *corev1.Pod) bool {
-	for _, cond := range pod.Status.Conditions {
-		if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
-			return true
-		}
-	}
-	return false
 }

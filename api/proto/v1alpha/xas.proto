@@ -249,10 +249,17 @@ message PodState {
   string name = 1;
   // The node where the pod is running.
   string node_name = 2;
-  // Whether the pod is ready to serve traffic.
+  // Whether the pod's Ready condition is currently true.
   bool is_ready = 3;
   // State of all the pod containers.
   repeated ContainerState containers = 4;
+  // The pod phase (e.g. "Pending", "Running", "Succeeded", "Failed").
+  string phase = 5;
+  // When the pod was acknowledged by the kubelet. Unset until then.
+  google.protobuf.Timestamp start_time = 6;
+  // When the pod's Ready condition last changed. Unset if the pod has no
+  // Ready condition yet.
+  google.protobuf.Timestamp ready_last_transition_time = 7;
 }
 
 // ContainerState represents the state of a given container instance.
