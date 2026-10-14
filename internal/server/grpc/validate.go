@@ -189,6 +189,11 @@ func validateIngestMetricsRequest(req *pb.IngestMetricsRequest) error {
 	if req == nil {
 		return status.Errorf(codes.InvalidArgument, "request is nil")
 	}
+	// The request timestamp is the default timestamp of the samples and the
+	// freshness timestamp of the series, so it cannot be omitted.
+	if !req.HasTimestamp() {
+		return status.Errorf(codes.InvalidArgument, "timestamp is required")
+	}
 	return validateClusterName(req.GetClusterName())
 }
 

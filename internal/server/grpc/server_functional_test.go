@@ -2006,7 +2006,21 @@ func TestIngestMetrics_InvalidCluster(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	_, err := client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{ClusterName: proto.String("")}.Build())
+	_, err := client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{ClusterName: proto.String(""), Timestamp: timestamppb.Now()}.Build())
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("Expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestIngestMetrics_MissingTimestamp(t *testing.T) {
+	_, client, cleanup := setupFunctionalGRPCServer(t, clock.RealClock{})
+	defer cleanup()
+	ctx := context.Background()
+
+	_, err := client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
+		ClusterName: proto.String("c1"),
+		Policies:    []*pb.PolicyBatch{pb.PolicyBatch_builder{Namespace: proto.String("ns"), Name: proto.String("p1")}.Build()},
+	}.Build())
 	if status.Code(err) != codes.InvalidArgument {
 		t.Errorf("Expected InvalidArgument, got %v", err)
 	}
@@ -2019,6 +2033,7 @@ func TestIngestMetrics_NotFound(t *testing.T) {
 
 	_, err := client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("c1"),
+		Timestamp:   timestamppb.Now(),
 		Policies:    []*pb.PolicyBatch{pb.PolicyBatch_builder{Namespace: proto.String("ns"), Name: proto.String("missing")}.Build()},
 	}.Build())
 	if status.Code(err) != codes.NotFound {
@@ -2036,6 +2051,7 @@ func TestIngestMetrics_NotDefinedMetric(t *testing.T) {
 
 	_, err := client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("c1"),
+		Timestamp:   timestamppb.Now(),
 		Policies: []*pb.PolicyBatch{pb.PolicyBatch_builder{
 			Namespace: proto.String("ns"), Name: proto.String("p1"),
 			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("undefined")}.Build()}}.Build()},

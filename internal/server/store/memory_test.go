@@ -488,7 +488,8 @@ func TestDump(t *testing.T) {
                 "Distribution": null,
                 "DecayingHistogram": null
               },
-              "LastRawWindow": 0
+              "LastRawWindow": 0,
+              "LastIngested": "1970-01-01T00:16:40Z"
             }
           },
           "ResourceName": ""
