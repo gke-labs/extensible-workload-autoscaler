@@ -129,10 +129,10 @@ func (ms *MetricStore) seriesIngestSample(ser *model.Series, m *pb.MetricSample,
 	if m.Timestamp != nil {
 		ts = m.Timestamp.AsTime()
 	}
-	if ts.Before(time.Unix(ser.LastRaw.Timestamp, 0)) {
+	if ts.Before(ser.LastRaw.Timestamp) {
 		return // Drop out of order samples
 	}
-	sample := model.Sample{Timestamp: ts.Unix(), Value: m.Value, Distribution: model.NewDistributionFromHistogram(m.GetHistogram())}
+	sample := model.Sample{Timestamp: ts, Value: m.Value, Distribution: model.NewDistributionFromHistogram(m.GetHistogram())}
 	ser.AddSample(sample, ingestTime)
 }
 
@@ -154,10 +154,10 @@ const seriesRetention = 10 * time.Minute
 // seriesRetention (e.g. the series of pods that disappeared), and the metrics
 // left without any series.
 func (ms *MetricStore) gcSeries(now time.Time) {
-	cutoff := now.Add(-seriesRetention).Unix()
+	cutoff := now.Add(-seriesRetention)
 	for id, metric := range ms.Series {
 		for sid, ser := range metric.Series {
-			if ser.LastRaw.Timestamp < cutoff {
+			if ser.LastRaw.Timestamp.Before(cutoff) {
 				delete(metric.Series, sid)
 			}
 		}
@@ -188,14 +188,14 @@ func definedMetrics(policy *pb.Policy) map[metricID]*pb.MetricDefinition {
 // Calculate aggregates the given metric definitions into a single ControlMetrics
 // snapshot at timestamp now. All the definitions are expected to share the same
 // owner.
-func (ms *MetricStore) Calculate(policy *pb.Policy, defs []*pb.MetricDefinition, workload map[string]*pb.PodState, now int64) *pb.ControlMetrics {
-	ms.gcSeries(time.Unix(now, 0))
+func (ms *MetricStore) Calculate(policy *pb.Policy, defs []*pb.MetricDefinition, workload map[string]*pb.PodState, now time.Time) *pb.ControlMetrics {
+	ms.gcSeries(now)
 
 	eligiblePods := filterEligiblePods(workload)
 	readyReplicas := len(eligiblePods)
 	cm := &pb.ControlMetrics{
 		ReadyReplicas:       int32(max(1, readyReplicas)),
-		Timestamp:           timestamppb.New(time.Unix(now, 0)),
+		Timestamp:           timestamppb.New(now),
 		Values:              make(map[string]float64),
 		PodMetrics:          make(map[string]*pb.MetricValues),
 		PodContainerMetrics: make(map[string]*pb.ContainerMetrics),

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"sync"
+	"time"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
@@ -57,7 +58,7 @@ type PolicyState struct {
 	Metrics             *MetricStore
 	Recommendation      *pb.Recommendation
 	Explanation         []*pb.RecommenderStatus
-	LastActive          int64
+	LastActive          time.Time
 	RecommenderStatuses map[string]*pb.RecommenderStatus
 	ControlMetrics      *pb.ControlMetrics
 	// RecommenderControlMetrics holds the values of the metrics owned by each
@@ -427,7 +428,7 @@ func (s *MemoryStore) CalculateAll() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	now := s.clock.Now().Unix()
+	now := s.clock.Now()
 
 	for _, ps := range s.state {
 		policy := ps.Policy
@@ -487,7 +488,7 @@ func recommenderNames(p *pb.Policy) map[string]bool {
 	return names
 }
 
-func (s *MemoryStore) processRecommendations(ps *PolicyState, now int64) {
+func (s *MemoryStore) processRecommendations(ps *PolicyState, now time.Time) {
 	policy := ps.Policy
 	isActive := false
 	var activationStatuses []*pb.RecommenderStatus
@@ -512,18 +513,18 @@ func (s *MemoryStore) processRecommendations(ps *PolicyState, now int64) {
 		ps.LastActive = now
 	}
 
-	window := int64(300)
+	window := 5 * time.Minute
 	for _, recDef := range policy.Activation {
 		if val, ok := recDef.Params["window"]; ok {
 			if w, err := strconv.ParseInt(val, 10, 64); err == nil {
-				window = w
+				window = time.Duration(w) * time.Second
 			}
 		}
 	}
 
 	if !isActive {
 		last := ps.LastActive
-		if now-last <= window {
+		if now.Sub(last) <= window {
 			isActive = true
 		}
 	}

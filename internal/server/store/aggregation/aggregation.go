@@ -365,12 +365,12 @@ func (r *RateAggregation) Apply() (model.Sample, bool) {
 		return model.Sample{}, false
 	}
 	oldest, newest := r.oldest(), r.newest()
-	deltaTime := newest.Timestamp - oldest.Timestamp
+	deltaTime := newest.Timestamp.Sub(oldest.Timestamp).Seconds()
 	if deltaTime == 0 {
 		return model.Sample{}, false
 	}
 	deltaValue := newest.Value - oldest.Value
-	v := deltaValue / float64(deltaTime)
+	v := deltaValue / deltaTime
 	return model.Sample{Value: v}, true
 }
 
@@ -406,11 +406,11 @@ func (d *DistributionAggregation) Apply() (model.Sample, bool) {
 		return model.Sample{}, false
 	}
 	oldest, newest := d.oldest(), d.newest()
-	deltaTime := newest.Timestamp - oldest.Timestamp
+	deltaTime := newest.Timestamp.Sub(oldest.Timestamp).Seconds()
 	if deltaTime == 0 {
 		return model.Sample{}, false
 	}
-	return model.Sample{Distribution: model.RateDistribution(oldest.Distribution, newest.Distribution, float64(deltaTime))}, true
+	return model.Sample{Distribution: model.RateDistribution(oldest.Distribution, newest.Distribution, deltaTime)}, true
 }
 
 type MaxTimeWindow struct {
@@ -519,7 +519,7 @@ func (d *DecayingDistributionAggregation) AddSample(sample model.Sample, now tim
 		}
 		sample.Value = rate.Value
 	}
-	t := time.Unix(sample.Timestamp, 0)
+	t := sample.Timestamp
 	if d.histogram.ReferenceTime.IsZero() {
 		d.histogram.ReferenceTime = t
 	}
@@ -550,11 +550,11 @@ func newSamplesWindow(duration time.Duration) sampleWindow {
 
 // AddSample appends sample to the window, after dropping the samples that
 // have fallen out of the window relative to now. A sample carrying the same
-// timestamp as the newest one supersedes it (e.g. a re-scrape within the same
-// second).
+// timestamp as the newest one supersedes it (e.g. a re-scrape of a source
+// that has not produced a new value).
 func (m *sampleWindow) AddSample(sample model.Sample, now time.Time) {
 	m.prune(now)
-	if m.Len() > 0 && m.newest().Timestamp == sample.Timestamp {
+	if m.Len() > 0 && m.newest().Timestamp.Equal(sample.Timestamp) {
 		m.samples[(m.end+len(m.samples)-1)%len(m.samples)] = sample
 		return
 	}
@@ -569,8 +569,8 @@ func (m *sampleWindow) AddSample(sample model.Sample, now time.Time) {
 
 // prune drops the samples that have fallen out of the window relative to now.
 func (m *sampleWindow) prune(now time.Time) {
-	cutoff := now.Add(-m.duration).Unix()
-	for m.start != m.end && m.samples[m.start].Timestamp < cutoff {
+	cutoff := now.Add(-m.duration)
+	for m.start != m.end && m.samples[m.start].Timestamp.Before(cutoff) {
 		m.start = (m.start + 1) % len(m.samples)
 	}
 }

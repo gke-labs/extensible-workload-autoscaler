@@ -476,7 +476,7 @@ func TestDump(t *testing.T) {
               "ResourceName": "",
               "Labels": null,
               "LastRaw": {
-                "Timestamp": 1000,
+                "Timestamp": "1970-01-01T00:16:40Z",
                 "Value": 1,
                 "Distribution": null,
                 "DecayingHistogram": null
@@ -500,7 +500,7 @@ func TestDump(t *testing.T) {
         "replicas": 2
       }
     ],
-    "LastActive": 1000,
+    "LastActive": "1970-01-01T00:16:40Z",
     "RecommenderStatuses": {
       "cpu-rec": {
         "is_active": true,

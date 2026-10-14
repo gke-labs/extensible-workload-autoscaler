@@ -27,7 +27,7 @@ const (
 // Sample represents the raw data from the source
 type Sample struct {
 	// Source Timestamp.
-	Timestamp int64
+	Timestamp time.Time
 	// If the sample is a scalar, its value.
 	Value float64
 	// If the sample is a distribution, its cumulative buckets: the counts

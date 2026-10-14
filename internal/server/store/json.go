@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -58,7 +59,7 @@ func (ps PolicyState) MarshalJSON() ([]byte, error) {
 		Metrics                   *MetricStore
 		Recommendation            protoJSON
 		Explanation               []protoJSON
-		LastActive                int64
+		LastActive                time.Time
 		RecommenderStatuses       map[string]protoJSON
 		ControlMetrics            protoJSON
 		RecommenderControlMetrics map[string]protoJSON
@@ -68,7 +69,7 @@ func (ps PolicyState) MarshalJSON() ([]byte, error) {
 		Metrics:                   ps.Metrics,
 		Recommendation:            protoJSON{ps.Recommendation},
 		Explanation:               protoJSONSlice(ps.Explanation),
-		LastActive:                ps.LastActive,
+		LastActive:                ps.LastActive.UTC(),
 		RecommenderStatuses:       protoJSONMap(ps.RecommenderStatuses),
 		ControlMetrics:            protoJSON{ps.ControlMetrics},
 		RecommenderControlMetrics: protoJSONMap(ps.RecommenderControlMetrics),
