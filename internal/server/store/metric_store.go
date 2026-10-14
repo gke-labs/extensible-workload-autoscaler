@@ -125,16 +125,38 @@ func (ms *MetricStore) ingestSample(policy *pb.Policy, podName, containerName st
 	return nil
 }
 
+// seriesIngestSample records sample m, reported at ingestTime, into ser.
+//
+// Two timestamps are involved:
+//   - the sample timestamp (see sampleTimestamp), the time at which the sample
+//     was measured, is used for everything that relates to the data itself:
+//     rate computation, time windows and decaying histograms.
+//   - ingestTime, the time at which the sample was collected, tracks whether
+//     the series is still being reported (see gcSeries).
 func (ms *MetricStore) seriesIngestSample(ser *model.Series, m *pb.MetricSample, ingestTime time.Time) {
-	ts := ingestTime
-	if m.HasTimestamp() {
-		ts = m.GetTimestamp().AsTime()
-	}
+	ts := sampleTimestamp(m, ingestTime)
 	if ts.Before(ser.LastRaw.Timestamp) {
 		return // Drop out of order samples
 	}
 	sample := model.Sample{Timestamp: ts, Value: m.GetValue(), Distribution: model.NewDistributionFromHistogram(m.GetHistogram())}
 	ser.AddSample(sample, ingestTime)
+}
+
+// sampleTimestamp returns the time at which the sample was measured. Samples
+// without their own timestamp default to ingestTime, the time at which they
+// were collected. Samples timestamped after their collection (e.g. because of
+// clock skew between the source and the collector) are clamped to ingestTime,
+// so that they do not cause the following samples to be dropped as out of
+// order.
+func sampleTimestamp(m *pb.MetricSample, ingestTime time.Time) time.Time {
+	if !m.HasTimestamp() {
+		return ingestTime
+	}
+	ts := m.GetTimestamp().AsTime()
+	if ts.After(ingestTime) {
+		return ingestTime
+	}
+	return ts
 }
 
 // CleanupOrphaned removes the state of the metrics that are no longer defined
@@ -148,17 +170,18 @@ func (ms *MetricStore) CleanupOrphaned(policy *pb.Policy) {
 	}
 }
 
-// seriesRetention is how long a series is kept without receiving any sample.
+// seriesRetention is how long a series is kept without being reported.
 const seriesRetention = 10 * time.Minute
 
-// gcSeries drops the series that have not received a sample for
-// seriesRetention (e.g. the series of pods that disappeared), and the metrics
-// left without any series.
+// gcSeries drops the series that have not been reported for seriesRetention
+// (e.g. the series of pods that disappeared), and the metrics left without any
+// series. Series are kept based on when they were last reported rather than on
+// their samples' timestamps, so that sources lagging behind are not dropped.
 func (ms *MetricStore) gcSeries(now time.Time) {
 	cutoff := now.Add(-seriesRetention)
 	for id, metric := range ms.Series {
 		for sid, ser := range metric.Series {
-			if ser.LastRaw.Timestamp.Before(cutoff) {
+			if ser.LastIngested.Before(cutoff) {
 				delete(metric.Series, sid)
 			}
 		}

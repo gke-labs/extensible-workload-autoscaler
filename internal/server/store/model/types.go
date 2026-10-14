@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"hash/fnv"
+	"reflect"
 	"sort"
 	"time"
 )
@@ -57,8 +58,13 @@ type Series struct {
 	Labels       map[string]string
 
 	// LastRaw is the most recent sample ingested for the series. Its timestamp
-	// is used to garbage collect series that stopped reporting.
+	// is the time at which the sample was measured by its source.
 	LastRaw Sample
+	// LastIngested is the time at which the series was last reported (i.e. the
+	// IngestMetricsRequest timestamp). It is used to garbage collect series
+	// that stopped reporting: a series whose source lags behind stays live as
+	// long as it keeps being reported.
+	LastIngested time.Time
 	// TimeWindow is the temportal aggregation for the series.
 	TimeWindow TimeWindow `json:"-"`
 }
@@ -75,11 +81,33 @@ func NewSeries(podName, containerName, resourceName string, labels map[string]st
 	}
 }
 
-// AddSample feeds sample, ingested at time now, to the time window of
-// the series and records it as the latest raw sample.
-func (s *Series) AddSample(sample Sample, now time.Time) {
-	s.TimeWindow.AddSample(sample, now)
+// AddSample feeds sample, reported at ingestTime, to the time window of the
+// series and records it as the latest raw sample.
+//
+// The time window is advanced on the clock of the series' source (the sample
+// timestamp) rather than on ingestTime, so that a source lagging behind by
+// more than the window duration still fills its window.
+//
+// A sample identical to the last one (e.g. a source re-reporting its last
+// value) only shows that the series is still being reported: it is not fed to
+// the time window again, as some windows (e.g. decaying histograms) would
+// count it twice.
+func (s *Series) AddSample(sample Sample, ingestTime time.Time) {
+	s.LastIngested = ingestTime
+	if s.isRepeat(sample) {
+		return
+	}
+	s.TimeWindow.AddSample(sample, sample.Timestamp)
 	s.LastRaw = sample
+}
+
+// isRepeat reports whether sample is identical to the last sample of the
+// series.
+func (s *Series) isRepeat(sample Sample) bool {
+	return !s.LastRaw.Timestamp.IsZero() &&
+		sample.Timestamp.Equal(s.LastRaw.Timestamp) &&
+		sample.Value == s.LastRaw.Value &&
+		reflect.DeepEqual(sample.Distribution, s.LastRaw.Distribution)
 }
 
 // SeriesID identifies a timeseries within a metric. It's composed of the pod,
