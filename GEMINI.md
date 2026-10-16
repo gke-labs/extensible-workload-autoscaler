@@ -54,7 +54,7 @@ The system architecture follows a Hub-and-Spoke model:
     ```bash
     make verify
     ```
-    Runs formatting, vet, and build checks.
+    Runs formatting, vet, build, test, and codegen checks.
 
 ### Local Deployment
 
