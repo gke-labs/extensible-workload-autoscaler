@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -114,6 +115,45 @@ func (s *Server) GetControlMetrics(ctx context.Context, req *pb.GetControlMetric
 		return nil, status.Errorf(codes.NotFound, "policy not found")
 	}
 	return metrics, nil
+}
+
+// WatchControlMetrics streams the control metrics of every policy in the
+// requested cluster. The stream stays open until the client cancels it, or
+// until the client falls too far behind, in which case it is terminated with
+// ResourceExhausted and must be reopened.
+func (s *Server) WatchControlMetrics(req *pb.WatchControlMetricsRequest, stream grpc.ServerStreamingServer[pb.WatchControlMetricsResponse]) error {
+	if err := validateWatchControlMetricsRequest(req); err != nil {
+		return err
+	}
+	slog.Debug("WatchControlMetrics: Started", "cluster", req.GetClusterName())
+	defer slog.Debug("WatchControlMetrics: Stopped", "cluster", req.GetClusterName())
+
+	events, unwatch := s.store.Watch(req.GetClusterName())
+	defer unwatch()
+
+	if err := stream.SendHeader(nil); err != nil {
+		return err
+	}
+
+	ctx := stream.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case evt, ok := <-events:
+			if !ok {
+				return status.Errorf(codes.ResourceExhausted, "watcher too slow, events were dropped: reopen the stream")
+			}
+			res := pb.WatchControlMetricsResponse_builder{
+				Id:                        evt.PolicyID(),
+				ControlMetrics:            evt.ControlMetrics(),
+				RecommenderControlMetrics: evt.RecommenderControlMetrics(),
+			}.Build()
+			if err := stream.Send(res); err != nil {
+				return err
+			}
+		}
+	}
 }
 
 func (s *Server) GetWorkload(ctx context.Context, req *pb.GetWorkloadRequest) (*pb.Workload, error) {

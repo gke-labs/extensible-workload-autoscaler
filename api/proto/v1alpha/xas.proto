@@ -40,6 +40,9 @@ service XASServer {
   // Recommenders use this to compute their recommendations.
   rpc GetControlMetrics(GetControlMetricsRequest) returns (ControlMetrics);
 
+  // Stream changes to control metrics.
+  rpc WatchControlMetrics(WatchControlMetricsRequest) returns (stream WatchControlMetricsResponse);
+
   // --- Workload (Recommender -> Server) ---
   // Read the Server's view of the workload (Pods and their requests) for a
   // policy, as last reported by the Controller with UpdateWorkload.
@@ -350,6 +353,22 @@ message ControlMetrics {
   ContainerMetrics container_metrics = 6;
 }
 
+// WatchControlMetricsRequest retrieves the control metrics of all policies in the
+// requested cluster.
+message WatchControlMetricsRequest {
+  string cluster_name = 1;
+}
+
+// WatchControlMetricsResponse is the response sent on the WatchControlMetrics
+// streaming RPC. Unless throttled, such an object is sent every time a metric
+// changes its value.
+message WatchControlMetricsResponse {
+  PolicyId id = 1;
+  // Global metrics.
+  ControlMetrics control_metrics = 2;
+  // Per-recommender metrics.
+  map<string, ControlMetrics> recommender_control_metrics = 3;
+}
 
 // --- Recommender State ---
 

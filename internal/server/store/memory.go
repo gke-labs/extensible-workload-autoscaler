@@ -49,6 +49,10 @@ type ServerStore interface {
 	// with UpdateWorkload, sorted by name.
 	GetWorkload(id *pb.PolicyId) (*pb.Workload, bool)
 	CalculateAll()
+	// Watch returns a channel delivering the control metrics of the
+	// policies of a cluster each time they change. The returned function
+	// unwatches.
+	Watch(clusterName string) (<-chan ControlMetricEvent, func())
 	Dump() interface{}
 }
 
@@ -73,6 +77,9 @@ type MemoryStore struct {
 
 	// Storage: PolicyID -> PolicyState
 	state map[policyID]*PolicyState
+
+	// watchers holds the control metric watchers of each cluster.
+	watchers map[string]*Watchers
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -81,9 +88,22 @@ func NewMemoryStore() *MemoryStore {
 
 func NewMemoryStoreWithClock(c clock.Clock) *MemoryStore {
 	return &MemoryStore{
-		clock: c,
-		state: make(map[policyID]*PolicyState),
+		clock:    c,
+		state:    make(map[policyID]*PolicyState),
+		watchers: make(map[string]*Watchers),
 	}
+}
+
+// Watch implements ServerStore.
+func (s *MemoryStore) Watch(clusterName string) (<-chan ControlMetricEvent, func()) {
+	s.mu.Lock()
+	watchers, ok := s.watchers[clusterName]
+	if !ok {
+		watchers = NewWatchers(clusterName)
+		s.watchers[clusterName] = watchers
+	}
+	s.mu.Unlock()
+	return watchers.Watch()
 }
 
 func (s *MemoryStore) CreatePolicy(clusterName string, p *pb.Policy) (*pb.Policy, error) {
@@ -166,6 +186,9 @@ func (s *MemoryStore) DeletePolicy(id *pb.PolicyId) error {
 	defer s.mu.Unlock()
 	key := newPolicyID(id)
 	delete(s.state, key)
+	if watchers, ok := s.watchers[key.cluster]; ok {
+		watchers.Forget(key)
+	}
 	return nil
 }
 
@@ -241,6 +264,11 @@ func (s *MemoryStore) AddBatch(req *pb.IngestMetricsRequest) error {
 
 		if err := ps.Metrics.IngestMetrics(ps.Policy, ps.Workload, pBatch.GetBatches(), req.GetTimestamp().AsTime()); err != nil {
 			return err
+		}
+		watchers, watchersOk := s.watchers[key.cluster]
+		if watchersOk && !watchers.Throttled(key) {
+			cm, rcm := calculatePolicy(ps, s.clock.Now())
+			watchers.Notify(key, cm, rcm)
 		}
 	}
 	return nil
@@ -430,29 +458,33 @@ func (s *MemoryStore) CalculateAll() {
 	defer s.mu.Unlock()
 
 	now := s.clock.Now()
-
 	for _, ps := range s.state {
-		policy := ps.Policy
-		if policy == nil {
+		if ps.Policy == nil {
 			continue
 		}
-
-		workload := ps.Workload
-		ps.ControlMetrics = ps.Metrics.Calculate(policy, policy.GetMetrics(), workload, now)
-
-		// Metrics owned by a recommender are aggregated the same way, but kept
-		// in a snapshot of their own so that they are only reported to their
-		// owner.
-		ps.RecommenderControlMetrics = nil
-		if len(policy.GetRecommenderMetrics()) > 0 {
-			ps.RecommenderControlMetrics = make(map[string]*pb.ControlMetrics, len(policy.GetRecommenderMetrics()))
-			for name, defs := range policy.GetRecommenderMetrics() {
-				ps.RecommenderControlMetrics[name] = ps.Metrics.Calculate(policy, defs.GetDefinitions(), workload, now)
-			}
-		}
-
+		ps.ControlMetrics, ps.RecommenderControlMetrics = calculatePolicy(ps, now)
 		s.processRecommendations(ps, now)
 	}
+}
+
+// calculatePolicy aggregates the metrics of a policy as of now. It returns the
+// policy-wide control metrics and, keyed by recommender name, the control
+// metrics owned by each recommender (nil if the policy defines none). The
+// policy state is not modified. The caller must hold mu.
+func calculatePolicy(ps *PolicyState, now time.Time) (*pb.ControlMetrics, map[string]*pb.ControlMetrics) {
+	policy := ps.Policy
+	workload := ps.Workload
+	cm := ps.Metrics.calculate(policy.GetMetrics(), workload, now)
+
+	// Process metrics owned by a recommender the same way.
+	var rcm map[string]*pb.ControlMetrics
+	if len(policy.GetRecommenderMetrics()) > 0 {
+		rcm = make(map[string]*pb.ControlMetrics, len(policy.GetRecommenderMetrics()))
+		for name, defs := range policy.GetRecommenderMetrics() {
+			rcm[name] = ps.Metrics.calculate(defs.GetDefinitions(), workload, now)
+		}
+	}
+	return cm, rcm
 }
 
 func (s *MemoryStore) cleanupOrphanedRecommenderStatuses(ps *PolicyState) {
@@ -530,11 +562,10 @@ func (s *MemoryStore) processRecommendations(ps *PolicyState, now time.Time) {
 		}
 	}
 
-	// Returns the arbitrated number of replicas and vertical recommendations status.
-	// hasRecommendation is true if activators and recommenders have decided on a
-	// number of replicas: workload is inactive (0 replicas), or active and a
-	// recommender has decided on a positive number of replicas.
-	replicas, scalingStatuses := s.calculateTargetReplicas(ps, isActive)
+	// Arbitrate the horizontal and vertical recommendations. replicas is nil
+	// if no recommender has decided on a number of replicas yet.
+	scalingStatuses := s.scalingRecommenderStatuses(ps, isActive)
+	replicas := s.calculateArbitratedReplicas(ps, isActive, scalingStatuses)
 	workloadRes, podRes := s.calculateArbitratedResources(ps, isActive)
 
 	if replicas == nil && len(workloadRes) == 0 && len(podRes) == 0 && len(scalingStatuses) == 0 {
@@ -689,38 +720,55 @@ func arbitrateResourceMap(dest map[string]string, src map[string]string) {
 	}
 }
 
-func (s *MemoryStore) calculateTargetReplicas(ps *PolicyState, isActive bool) (*int32, []*pb.RecommenderStatus) {
+// scalingRecommenderStatuses returns the status of every scaling recommender
+// of the policy that has reported one, in policy order. Nothing is reported
+// for an inactive workload: its replicas are decided by the activators alone.
+func (s *MemoryStore) scalingRecommenderStatuses(ps *PolicyState, isActive bool) []*pb.RecommenderStatus {
 	if !isActive {
-		return new(int32), nil
+		return nil
+	}
+	var statuses []*pb.RecommenderStatus
+	for _, recDef := range ps.Policy.GetScaling() {
+		if d, ok := ps.RecommenderStatuses[recDef.GetName()]; ok {
+			statuses = append(statuses, d)
+		}
+	}
+	return statuses
+}
+
+// calculateArbitratedReplicas returns the number of replicas arbitrated from
+// the given scaling recommender statuses: 0 for an inactive workload,
+// otherwise the highest active non-dry-run recommendation clamped to the
+// policy's [min, max] range, or nil if no recommender has decided yet.
+func (s *MemoryStore) calculateArbitratedReplicas(ps *PolicyState, isActive bool, statuses []*pb.RecommenderStatus) *int32 {
+	if !isActive {
+		return new(int32)
+	}
+
+	// Modes are defined on the policy, not on the status: index them by name.
+	modes := make(map[string]string, len(ps.Policy.GetScaling()))
+	for _, recDef := range ps.Policy.GetScaling() {
+		modes[recDef.GetName()] = recDef.GetMode()
 	}
 
 	var targetReplicas *int32
-	var recommenderStatuses []*pb.RecommenderStatus
-
-	for _, recDef := range ps.Policy.GetScaling() {
-		d, ok := ps.RecommenderStatuses[recDef.GetName()]
-		if !ok {
-			continue
-		}
-
+	for _, d := range statuses {
 		// If multiple (non-dry-run) recommendations exist, take the highest.
-		if recDef.GetMode() != "DryRun" && d.GetIsActive() && d.HasReplicas() && (targetReplicas == nil || d.GetReplicas() >= *targetReplicas) {
+		if modes[d.GetName()] != "DryRun" && d.GetIsActive() && d.HasReplicas() && (targetReplicas == nil || d.GetReplicas() >= *targetReplicas) {
 			r := d.GetReplicas()
 			targetReplicas = &r
 		}
-
-		recommenderStatuses = append(recommenderStatuses, d)
 	}
 
 	if targetReplicas == nil {
-		return nil, recommenderStatuses
+		return nil
 	}
 
 	if ps.Policy.GetMaxReplicas() > 0 {
 		*targetReplicas = min(*targetReplicas, ps.Policy.GetMaxReplicas())
 	}
 	*targetReplicas = max(*targetReplicas, ps.Policy.GetMinReplicas())
-	return targetReplicas, recommenderStatuses
+	return targetReplicas
 }
 
 func (s *MemoryStore) Dump() interface{} {

@@ -201,10 +201,10 @@ func definedMetrics(policy *pb.Policy) map[metricID]*pb.MetricDefinition {
 	return defs
 }
 
-// Calculate aggregates the given metric definitions into a single ControlMetrics
+// calculate aggregates the given metric definitions into a single ControlMetrics
 // snapshot at timestamp now. All the definitions are expected to share the same
-// owner.
-func (ms *MetricStore) Calculate(policy *pb.Policy, defs []*pb.MetricDefinition, workload map[string]*pb.PodState, now time.Time) *pb.ControlMetrics {
+// owner. The caller must hold mu.
+func (ms *MetricStore) calculate(defs []*pb.MetricDefinition, workload map[string]*pb.PodState, now time.Time) *pb.ControlMetrics {
 	ms.gcSeries(now)
 
 	eligiblePods := filterEligiblePods(workload)

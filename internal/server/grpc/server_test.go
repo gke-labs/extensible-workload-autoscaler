@@ -2011,3 +2011,122 @@ func TestGetWorkloadGRPC(t *testing.T) {
 		t.Errorf("GetWorkload() mismatch (-want +got):\n%s", diff)
 	}
 }
+
+// TestWatchControlMetricsGRPC validates the WatchControlMetrics stream.
+// Steps:
+//  1. Create a policy with a policy-wide gauge and a recommender-owned gauge.
+//  2. Register the workload, ingest metrics and calculate.
+//  3. Open a watch and recalculate without changes: nothing must be streamed.
+//  4. Ingest a new value: the change must be streamed, including the
+//     recommender-owned metrics.
+//  5. Validation: a request without cluster must be rejected.
+func TestWatchControlMetricsGRPC(t *testing.T) {
+	clk := &clock.FakeClock{CurrentTime: time.Unix(1000, 0)}
+	memStore, client, cleanup := setupGRPCServer(t, clk)
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	ns, policyName := "default", "watch-policy"
+	id := pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()
+
+	// 1. Policy
+	if _, err := client.CreatePolicy(ctx, pb.CreatePolicyRequest_builder{
+		Policy: pb.Policy_builder{
+			Id:       id,
+			Workload: pb.WorkloadRef_builder{Group: proto.String("apps"), Version: proto.String("v1"), Kind: proto.String("Deployment"), Name: proto.String("web-app"), Namespace: proto.String(ns)}.Build(),
+			Metrics: []*pb.MetricDefinition{
+				pb.MetricDefinition_builder{Name: proto.String("qps"), Provider: proto.String("prometheus"), Gauge: pb.Gauge_builder{Aggregation: proto.String("Sum")}.Build()}.Build(),
+			},
+			RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+				"lin": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{
+					pb.MetricDefinition_builder{Name: proto.String("owned"), RecommenderName: proto.String("lin"), Provider: proto.String("prometheus"), Gauge: pb.Gauge_builder{Aggregation: proto.String("Sum")}.Build()}.Build(),
+				}}.Build(),
+			},
+			Scaling:     []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Recommender: proto.String("Linear"), Name: proto.String("lin"), Mode: proto.String("Active"), Type: proto.String("Linear"), Params: map[string]string{"metric": "qps", "target": "10"}}.Build()},
+			MinReplicas: proto.Int32(1), MaxReplicas: proto.Int32(10),
+		}.Build(),
+	}.Build()); err != nil {
+		t.Fatalf("CreatePolicy: %v", err)
+	}
+
+	ingest := func(qps, owned float64) {
+		t.Helper()
+		ts := timestamppb.New(clk.Now())
+		if _, err := client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
+			ClusterName: proto.String("default"), Timestamp: ts,
+			Policies: []*pb.PolicyBatch{pb.PolicyBatch_builder{
+				Namespace: proto.String(ns), Name: proto.String(policyName),
+				Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{
+					pb.MetricSample_builder{Name: proto.String("qps"), Value: proto.Float64(qps), Timestamp: ts}.Build(),
+					pb.MetricSample_builder{Name: proto.String("owned"), RecommenderName: proto.String("lin"), Value: proto.Float64(owned), Timestamp: ts}.Build(),
+				}}.Build()},
+			}.Build()},
+		}.Build()); err != nil {
+			t.Fatalf("IngestMetrics: %v", err)
+		}
+	}
+
+	// 2. Workload, ingest, calculate. The pod must be reported before its
+	// samples are ingested, otherwise they are dropped.
+	if _, err := client.UpdateWorkload(ctx, pb.UpdateWorkloadRequest_builder{
+		Id:       id,
+		Workload: pb.Workload_builder{Pods: []*pb.PodState{pb.PodState_builder{Name: proto.String("p1"), IsReady: proto.Bool(true)}.Build()}}.Build(),
+	}.Build()); err != nil {
+		t.Fatalf("UpdateWorkload: %v", err)
+	}
+	ingest(5, 50)
+	memStore.CalculateAll()
+
+	// 3. Watch, then recalculate. Nothing is streamed: nothing was published
+	// for the cluster before the watch, and recalculating does not publish by
+	// itself.
+	stream, err := client.WatchControlMetrics(ctx, pb.WatchControlMetricsRequest_builder{
+		ClusterName: proto.String("default"),
+	}.Build())
+	if err != nil {
+		t.Fatalf("WatchControlMetrics: %v", err)
+	}
+	// The headers are sent once the watch is registered: wait for them so
+	// that the samples ingested below cannot race with the registration.
+	if _, err := stream.Header(); err != nil {
+		t.Fatalf("Header: %v", err)
+	}
+	memStore.CalculateAll()
+
+	// 4. Ingesting new samples publishes the recomputed policy right away, so
+	// the first message received must be the changed one.
+	recv := func() *pb.WatchControlMetricsResponse {
+		t.Helper()
+		res, err := stream.Recv()
+		if err != nil {
+			t.Fatalf("Recv: %v", err)
+		}
+		return res
+	}
+	wantResponse := func(qps, owned float64) *pb.WatchControlMetricsResponse {
+		return pb.WatchControlMetricsResponse_builder{
+			Id:             id,
+			ControlMetrics: pb.ControlMetrics_builder{Values: map[string]float64{"qps": qps}, ReadyReplicas: proto.Int32(1), Timestamp: timestamppb.New(clk.Now())}.Build(),
+			RecommenderControlMetrics: map[string]*pb.ControlMetrics{
+				"lin": pb.ControlMetrics_builder{Values: map[string]float64{"owned": owned}, ReadyReplicas: proto.Int32(1), Timestamp: timestamppb.New(clk.Now())}.Build(),
+			},
+		}.Build()
+	}
+	opts := []cmp.Option{protocmp.Transform(), protocmp.IgnoreDefaultScalars(), protocmp.IgnoreEmptyMessages()}
+	clk.Advance(10 * time.Second)
+	ingest(7, 70)
+	if diff := cmp.Diff(wantResponse(7, 70), recv(), opts...); diff != "" {
+		t.Errorf("change mismatch (-want +got):\n%s", diff)
+	}
+
+	// 5. Validation.
+	bad, err := client.WatchControlMetrics(ctx, pb.WatchControlMetricsRequest_builder{}.Build())
+	if err != nil {
+		t.Fatalf("WatchControlMetrics: %v", err)
+	}
+	if _, err := bad.Recv(); status.Code(err) != codes.InvalidArgument {
+		t.Errorf("Recv() on invalid request: got %v, want %v", err, codes.InvalidArgument)
+	}
+}

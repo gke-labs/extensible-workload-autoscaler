@@ -148,6 +148,13 @@ func validateGetControlMetricsRequest(req *pb.GetControlMetricsRequest) error {
 	return validatePolicyId(req.GetId())
 }
 
+func validateWatchControlMetricsRequest(req *pb.WatchControlMetricsRequest) error {
+	if req == nil {
+		return status.Errorf(codes.InvalidArgument, "request is nil")
+	}
+	return validateClusterName(req.GetClusterName())
+}
+
 func validateGetWorkloadRequest(req *pb.GetWorkloadRequest) error {
 	if req == nil {
 		return status.Errorf(codes.InvalidArgument, "request is nil")
