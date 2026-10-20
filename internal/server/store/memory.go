@@ -420,7 +420,8 @@ func (s *MemoryStore) GetControlMetrics(id *pb.PolicyId, recommenderName string)
 		Values:              make(map[string]float64),
 		PodMetrics:          make(map[string]*pb.MetricValues),
 		PodContainerMetrics: make(map[string]*pb.ContainerMetrics),
-		ReadyReplicas:       proto.Int32(ps.ControlMetrics.GetReadyReplicas()),
+		EligiblePods:        proto.Int32(ps.ControlMetrics.GetEligiblePods()),
+		IneligiblePods:      proto.Int32(ps.ControlMetrics.GetIneligiblePods()),
 		Timestamp:           ps.ControlMetrics.GetTimestamp(),
 	}.Build(), true
 }

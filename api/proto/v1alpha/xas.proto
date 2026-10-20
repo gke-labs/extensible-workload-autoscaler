@@ -318,7 +318,7 @@ message GetControlMetricsRequest {
   // Returns only the metrics owned by the specified recommender, as defined in
   // Policy.recommender_metrics. If omitted, returns only the policy-wide
   // metrics, i.e. those not owned by a specific recommender.
-  // Workload-level information (ready replicas, timestamp) is always reported.
+  // Workload-level information (pod counts, timestamp) is always reported.
   string recommender_name = 2;
 }
 
@@ -336,10 +336,22 @@ message ContainerMetrics {
 
 // ControlMetrics contains the aggregated values calculated by the Server.
 message ControlMetrics {
+  reserved 3;
+  reserved ready_replicas;
+
   // Timestamp of the calculation.
   google.protobuf.Timestamp timestamp = 2;
-  // The number of ready replicas.
-  int32 ready_replicas = 3;
+  // The number of pods of the workload whose metrics are considered: the pods
+  // that have been ready and are not being deleted. May be 0.
+  int32 eligible_pods = 7;
+  // The number of pods of the workload whose metrics are not considered, e.g.
+  // because they are still starting up or are terminating.
+  int32 ineligible_pods = 8;
+  // Per metric reported by the pods, the number of eligible pods without a
+  // usable sample (e.g. not scraped yet, or in the CPU initialization period),
+  // keyed by metric name. Metrics without missing pods, and metrics not
+  // reported by any pod, are left out.
+  map<string, int32> missing_pods = 9;
   // Global metric values, keyed by metric name.
   map<string, double> values = 1;
   // Per pod metric values, keyed by pod name.

@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	"github.com/gke-labs/extensible-workload-autoscaler/internal/podutil"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store/model"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -26,17 +27,18 @@ func weightable(workload map[string]*pb.PodState, agg *SeriesAggregate, resource
 }
 
 // ReplicaAverageTransform reports a policy-wide aggregate (one not bound to a
-// pod, e.g. an external metric such as a queue length) per ready replica, like
+// pod, e.g. an external metric such as a queue length) per eligible pod, like
 // the average of per-pod aggregates. Aggregates bound to a pod are left untouched.
 func ReplicaAverageTransform(workload map[string]*pb.PodState, agg *SeriesAggregate, _ string) {
-	agg.sample.Value /= float64(max(1, readyReplicas(workload)))
+	agg.sample.Value /= float64(max(1, eligiblePods(workload)))
 }
 
-// readyReplicas returns the number of ready pods of the workload.
-func readyReplicas(workload map[string]*pb.PodState) int {
+// eligiblePods returns the number of eligible pods of the workload. See
+// podutil.IsEligible.
+func eligiblePods(workload map[string]*pb.PodState) int {
 	n := 0
 	for _, p := range workload {
-		if p.GetIsReady() {
+		if podutil.IsEligible(podutil.FromPodState(p)) {
 			n++
 		}
 	}

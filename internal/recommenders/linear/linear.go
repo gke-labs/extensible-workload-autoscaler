@@ -33,7 +33,10 @@ func (r *LinearRecommender) Recommend(def *pb.RecommenderDefinition, state, _ *p
 	}
 
 	ratio := val / cfg.target
-	desired := int32(math.Ceil(float64(state.GetReadyReplicas()) * ratio))
+	// A workload without any eligible pod (e.g. all its pods are still
+	// starting up) is scaled as if it had one, so that the recommendation
+	// never collapses to 0 because of the pods' readiness alone.
+	desired := int32(math.Ceil(float64(max(state.GetEligiblePods(), 1)) * ratio))
 
 	return pb.Recommendation_builder{
 		Replicas: &desired,

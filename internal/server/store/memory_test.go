@@ -518,7 +518,8 @@ func TestDump(t *testing.T) {
     },
     "ControlMetrics": {
       "timestamp": "1970-01-01T00:16:40Z",
-      "ready_replicas": 1,
+      "eligible_pods": 1,
+      "ineligible_pods": 0,
       "values": {
         "cpu": 1
       }
@@ -1217,8 +1218,8 @@ func TestRecommenderOwnedMetrics(t *testing.T) {
 		if diff := cmp.Diff(tc.want, cm.GetValues(), cmpopts.EquateEmpty()); diff != "" {
 			t.Errorf("GetControlMetrics(%q) values mismatch (-want +got):\n%s", tc.recommender, diff)
 		}
-		if cm.GetReadyReplicas() != 2 {
-			t.Errorf("GetControlMetrics(%q) ready replicas = %d, want 2", tc.recommender, cm.GetReadyReplicas())
+		if cm.GetEligiblePods() != 2 {
+			t.Errorf("GetControlMetrics(%q) eligible pods = %d, want 2", tc.recommender, cm.GetEligiblePods())
 		}
 	}
 }

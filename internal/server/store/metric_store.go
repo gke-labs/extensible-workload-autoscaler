@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"iter"
 	"maps"
+	"slices"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -40,6 +41,17 @@ func newMetricSeries(def *pb.MetricDefinition, podName, containerName string, sa
 
 func (ms *MetricSeries) isEmpty() bool {
 	return ms == nil || len(ms.Series) == 0
+}
+
+// isPerPod reports whether the metric is reported by the pods, as opposed to
+// e.g. an external metric such as a queue length.
+func (ms *MetricSeries) isPerPod() bool {
+	for _, ser := range ms.Series {
+		if ser.PodName != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func (ms *MetricSeries) getSeries(sid model.SeriesID) (*model.Series, bool) {
@@ -208,9 +220,10 @@ func (ms *MetricStore) Calculate(policy *pb.Policy, defs []*pb.MetricDefinition,
 	ms.gcSeries(now)
 
 	eligiblePods := filterEligiblePods(workload)
-	readyReplicas := len(eligiblePods)
 	cm := pb.ControlMetrics_builder{
-		ReadyReplicas:       proto.Int32(int32(max(1, readyReplicas))),
+		EligiblePods:        proto.Int32(int32(len(eligiblePods))),
+		IneligiblePods:      proto.Int32(int32(len(workload) - len(eligiblePods))),
+		MissingPods:         make(map[string]int32),
 		Timestamp:           timestamppb.New(now),
 		Values:              make(map[string]float64),
 		PodMetrics:          make(map[string]*pb.MetricValues),
@@ -229,7 +242,13 @@ func (ms *MetricStore) Calculate(policy *pb.Policy, defs []*pb.MetricDefinition,
 		if !def.GetEligibility().GetStartupSamples() {
 			series = filterInitializingCPU(series, workload, now)
 		}
-		aggregation.AddControlMetric(cm, def.GetName(), metricSeries.Aggregation.Reduce(series, workload))
+		usable := slices.Collect(series)
+		if metricSeries.isPerPod() {
+			if missing := missingPods(usable, eligiblePods); missing > 0 {
+				cm.GetMissingPods()[def.GetName()] = int32(missing)
+			}
+		}
+		aggregation.AddControlMetric(cm, def.GetName(), metricSeries.Aggregation.Reduce(slices.Values(usable), workload))
 	}
 
 	// Skip empty ContainerMetrics as, unlike empty maps, an empty proto message
@@ -251,6 +270,22 @@ func isPodIngestible(def *pb.MetricDefinition, workload map[string]*pb.PodState,
 		return ok
 	}
 	return podutil.IsPodEligible(workload, podName)
+}
+
+// missingPods returns the number of eligible pods without a series among the
+// given ones, i.e. without a usable sample.
+func missingPods(series []*model.Series, eligiblePods map[string]*pb.PodState) int {
+	reporting := make(map[string]bool)
+	for _, ser := range series {
+		reporting[ser.PodName] = true
+	}
+	missing := 0
+	for name := range eligiblePods {
+		if !reporting[name] {
+			missing++
+		}
+	}
+	return missing
 }
 
 // filterInitializingCPU drops the CPU usage series of the pods still in their

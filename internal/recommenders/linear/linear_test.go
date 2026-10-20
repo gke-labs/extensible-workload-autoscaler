@@ -16,7 +16,7 @@ func TestLinearRecommend(t *testing.T) {
 		name           string
 		def            *pb.RecommenderDefinition
 		controlMetrics map[string]float64
-		readyReplicas  int32
+		eligiblePods   int32
 		want           *pb.Recommendation
 	}{
 		{
@@ -27,7 +27,7 @@ func TestLinearRecommend(t *testing.T) {
 				Params:      map[string]string{"metric": "cpu", "target": "0.5"},
 			}.Build(),
 			controlMetrics: map[string]float64{"cpu": 0.8},
-			readyReplicas:  2,
+			eligiblePods:   2,
 			// Desired = 2 * (0.8 / 0.5) = 2 * 1.6 = 3.2 -> ceil(3.2) = 4
 			want: pb.Recommendation_builder{
 				Replicas: proto.Int32(4),
@@ -42,8 +42,23 @@ func TestLinearRecommend(t *testing.T) {
 				Params:      map[string]string{"metric": "cpu", "target": "0.5"},
 			}.Build(),
 			controlMetrics: map[string]float64{"cpu": 0.2},
-			readyReplicas:  4,
+			eligiblePods:   4,
 			// Desired = 4 * (0.2 / 0.5) = 4 * 0.4 = 1.6 -> ceil(1.6) = 2
+			want: pb.Recommendation_builder{
+				Replicas: proto.Int32(2),
+				IsActive: proto.Bool(true),
+			}.Build(),
+		},
+		{
+			name: "No eligible pod scales as if there were one",
+			def: pb.RecommenderDefinition_builder{
+				Name:        proto.String("cpu"),
+				Recommender: proto.String("Linear"),
+				Params:      map[string]string{"metric": "cpu", "target": "0.5"},
+			}.Build(),
+			controlMetrics: map[string]float64{"cpu": 0.8},
+			eligiblePods:   0,
+			// Desired = max(0, 1) * (0.8 / 0.5) = 1.6 -> ceil(1.6) = 2
 			want: pb.Recommendation_builder{
 				Replicas: proto.Int32(2),
 				IsActive: proto.Bool(true),
@@ -57,7 +72,7 @@ func TestLinearRecommend(t *testing.T) {
 				Params:      map[string]string{"metric": "unknown", "target": "0.5"},
 			}.Build(),
 			controlMetrics: map[string]float64{"cpu": 0.8},
-			readyReplicas:  2,
+			eligiblePods:   2,
 			want: pb.Recommendation_builder{
 				Message: proto.String("metric 'unknown' not found"),
 			}.Build(),
@@ -70,7 +85,7 @@ func TestLinearRecommend(t *testing.T) {
 				Params:      map[string]string{"metric": "cpu"},
 			}.Build(),
 			controlMetrics: map[string]float64{"cpu": 0.8},
-			readyReplicas:  2,
+			eligiblePods:   2,
 			want: pb.Recommendation_builder{
 				Message: proto.String("missing target param"),
 			}.Build(),
@@ -82,8 +97,8 @@ func TestLinearRecommend(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			state := pb.ControlMetrics_builder{
-				Values:        tc.controlMetrics,
-				ReadyReplicas: proto.Int32(tc.readyReplicas),
+				Values:       tc.controlMetrics,
+				EligiblePods: proto.Int32(tc.eligiblePods),
 			}.Build()
 			got := rec.Recommend(tc.def, state, nil, nil)
 			if diff := cmp.Diff(tc.want, got, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
