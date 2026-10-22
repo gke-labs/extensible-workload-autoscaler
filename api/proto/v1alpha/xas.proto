@@ -519,10 +519,12 @@ message MetricSample {
   double value = 3;
   // Time at which the sample was measured by its source. Optional.
   //
-  // Defaults to IngestMetricsRequest.timestamp when unset. Timestamps later
-  // than IngestMetricsRequest.timestamp are clamped to it. Samples that are
-  // not newer than the last sample of the same series are treated as
-  // duplicates (or out of order) and do not contribute new data.
+  // Defaults to IngestMetricsRequest.timestamp when unset. Samples older than
+  // the last sample of their series are dropped as out of order, and samples
+  // timestamped more than 5 minutes after IngestMetricsRequest.timestamp are
+  // dropped as invalid. A sample carrying the same timestamp as the last one
+  // supersedes it, except in decaying distributions, which cannot replace an
+  // observation and ignore it.
   google.protobuf.Timestamp timestamp = 4;
   // The histogram value of the sample (if its a distribution).
   Histogram histogram = 5;

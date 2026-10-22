@@ -147,29 +147,36 @@ func (ms *MetricStore) ingestSample(policy *pb.Policy, workload map[string]*pb.P
 //   - ingestTime, the time at which the sample was collected, tracks whether
 //     the series is still being reported (see gcSeries).
 func (ms *MetricStore) seriesIngestSample(ser *model.Series, m *pb.MetricSample, ingestTime time.Time) {
-	ts := sampleTimestamp(m, ingestTime)
-	if ts.Before(ser.LastRaw.Timestamp) {
-		return // Drop out of order samples
+	ts, ok := sampleTimestamp(m, ingestTime)
+	if !ok || ts.Before(ser.LastRaw.Timestamp) {
+		return // Drop invalid and out of order samples.
 	}
 	sample := model.Sample{Timestamp: ts, Value: m.GetValue(), Distribution: model.NewDistributionFromHistogram(m.GetHistogram())}
 	ser.AddSample(sample, ingestTime)
 }
 
-// sampleTimestamp returns the time at which the sample was measured. Samples
-// without their own timestamp default to ingestTime, the time at which they
-// were collected. Samples timestamped after their collection (e.g. because of
-// clock skew between the source and the collector) are clamped to ingestTime,
-// so that they do not cause the following samples to be dropped as out of
-// order.
-func sampleTimestamp(m *pb.MetricSample, ingestTime time.Time) time.Time {
+// maxSampleLead is how far ahead of its collection a sample may be timestamped.
+//
+// The clock of a source may legitimately run slightly ahead of the collector's
+// (clock skew), and this is harmless: the samples of a series are processed
+// on the clock of their source. A sample timestamped further ahead than this
+// is invalid, and it is dropped rather than recorded, as it would cause the
+// following samples of its series to be dropped as out of order until the
+// source's clock catches up.
+const maxSampleLead = 5 * time.Minute
+
+// sampleTimestamp returns the time at which the sample was measured, reporting
+// false when the sample is invalid. Samples without their own timestamp default
+// to ingestTime, the time at which they were collected.
+func sampleTimestamp(m *pb.MetricSample, ingestTime time.Time) (time.Time, bool) {
 	if !m.HasTimestamp() {
-		return ingestTime
+		return ingestTime, true
 	}
 	ts := m.GetTimestamp().AsTime()
-	if ts.After(ingestTime) {
-		return ingestTime
+	if ts.After(ingestTime.Add(maxSampleLead)) {
+		return time.Time{}, false
 	}
-	return ts
+	return ts, true
 }
 
 // CleanupOrphaned removes the state of the metrics that are no longer defined
