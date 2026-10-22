@@ -138,16 +138,45 @@ func (ms *MetricStore) ingestSample(policy *pb.Policy, workload map[string]*pb.P
 	return nil
 }
 
+// seriesIngestSample records sample m, reported at ingestTime, into ser.
+//
+// Two timestamps are involved:
+//   - the sample timestamp (see sampleTimestamp), the time at which the sample
+//     was measured, is used for everything that relates to the data itself:
+//     rate computation, time windows and decaying histograms.
+//   - ingestTime, the time at which the sample was collected, tracks whether
+//     the series is still being reported (see gcSeries).
 func (ms *MetricStore) seriesIngestSample(ser *model.Series, m *pb.MetricSample, ingestTime time.Time) {
-	ts := ingestTime
-	if m.HasTimestamp() {
-		ts = m.GetTimestamp().AsTime()
-	}
-	if ts.Before(ser.LastRaw.Timestamp) {
-		return // Drop out of order samples
+	ts, ok := sampleTimestamp(m, ingestTime)
+	if !ok || ts.Before(ser.LastRaw.Timestamp) {
+		return // Drop invalid and out of order samples.
 	}
 	sample := model.Sample{Timestamp: ts, Value: m.GetValue(), Distribution: model.NewDistributionFromHistogram(m.GetHistogram())}
 	ser.AddSample(sample, ingestTime)
+}
+
+// maxSampleLead is how far ahead of its collection a sample may be timestamped.
+//
+// The clock of a source may legitimately run slightly ahead of the collector's
+// (clock skew), and this is harmless: the samples of a series are processed
+// on the clock of their source. A sample timestamped further ahead than this
+// is invalid, and it is dropped rather than recorded, as it would cause the
+// following samples of its series to be dropped as out of order until the
+// source's clock catches up.
+const maxSampleLead = 5 * time.Minute
+
+// sampleTimestamp returns the time at which the sample was measured, reporting
+// false when the sample is invalid. Samples without their own timestamp default
+// to ingestTime, the time at which they were collected.
+func sampleTimestamp(m *pb.MetricSample, ingestTime time.Time) (time.Time, bool) {
+	if !m.HasTimestamp() {
+		return ingestTime, true
+	}
+	ts := m.GetTimestamp().AsTime()
+	if ts.After(ingestTime.Add(maxSampleLead)) {
+		return time.Time{}, false
+	}
+	return ts, true
 }
 
 // CleanupOrphaned removes the state of the metrics that are no longer defined
@@ -161,17 +190,18 @@ func (ms *MetricStore) CleanupOrphaned(policy *pb.Policy) {
 	}
 }
 
-// seriesRetention is how long a series is kept without receiving any sample.
+// seriesRetention is how long a series is kept without being reported.
 const seriesRetention = 10 * time.Minute
 
-// gcSeries drops the series that have not received a sample for
-// seriesRetention (e.g. the series of pods that disappeared), and the metrics
-// left without any series.
+// gcSeries drops the series that have not been reported for seriesRetention
+// (e.g. the series of pods that disappeared), and the metrics left without any
+// series. Series are kept based on when they were last reported rather than on
+// their samples' timestamps, so that sources lagging behind are not dropped.
 func (ms *MetricStore) gcSeries(now time.Time) {
 	cutoff := now.Add(-seriesRetention)
 	for id, metric := range ms.Series {
 		for sid, ser := range metric.Series {
-			if ser.LastRaw.Timestamp.Before(cutoff) {
+			if ser.LastIngested.Before(cutoff) {
 				delete(metric.Series, sid)
 			}
 		}

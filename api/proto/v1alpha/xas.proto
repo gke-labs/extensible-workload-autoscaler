@@ -468,7 +468,15 @@ message MetricStatus {
 message IngestMetricsRequest {
   // The cluster name where metrics originated.
   string cluster_name = 1;
-  // Timestamp of the ingestion.
+  // Time at which the metrics were collected (i.e. the scrape time). Required.
+  //
+  // This is the default timestamp of every MetricSample that does not set its
+  // own. The Server also uses it to track the freshness of each metric series:
+  // a series is considered live as long as it keeps being reported, even if
+  // its samples' own timestamps lag behind.
+  //
+  // A growing gap between this timestamp and the samples' timestamps indicates
+  // that the metric sources (or the scraping) are falling behind.
   google.protobuf.Timestamp timestamp = 2;
   // Group metrics by policy.
   repeated PolicyBatch policies = 3;
@@ -509,7 +517,14 @@ message MetricSample {
   string resource_name = 8;
   // The scalar value of the sample.
   double value = 3;
-  // Timestamp of the sample.
+  // Time at which the sample was measured by its source. Optional.
+  //
+  // Defaults to IngestMetricsRequest.timestamp when unset. Samples older than
+  // the last sample of their series are dropped as out of order, and samples
+  // timestamped more than 5 minutes after IngestMetricsRequest.timestamp are
+  // dropped as invalid. A sample carrying the same timestamp as the last one
+  // supersedes it, except in decaying distributions, which cannot replace an
+  // observation and ignore it.
   google.protobuf.Timestamp timestamp = 4;
   // The histogram value of the sample (if its a distribution).
   Histogram histogram = 5;

@@ -4627,7 +4627,15 @@ type IngestMetricsRequest_builder struct {
 
 	// The cluster name where metrics originated.
 	ClusterName *string
-	// Timestamp of the ingestion.
+	// Time at which the metrics were collected (i.e. the scrape time). Required.
+	//
+	// This is the default timestamp of every MetricSample that does not set its
+	// own. The Server also uses it to track the freshness of each metric series:
+	// a series is considered live as long as it keeps being reported, even if
+	// its samples' own timestamps lag behind.
+	//
+	// A growing gap between this timestamp and the samples' timestamps indicates
+	// that the metric sources (or the scraping) are falling behind.
 	Timestamp *timestamppb.Timestamp
 	// Group metrics by policy.
 	Policies []*PolicyBatch
@@ -5124,7 +5132,14 @@ type MetricSample_builder struct {
 	ResourceName *string
 	// The scalar value of the sample.
 	Value *float64
-	// Timestamp of the sample.
+	// Time at which the sample was measured by its source. Optional.
+	//
+	// Defaults to IngestMetricsRequest.timestamp when unset. Samples older than
+	// the last sample of their series are dropped as out of order, and samples
+	// timestamped more than 5 minutes after IngestMetricsRequest.timestamp are
+	// dropped as invalid. A sample carrying the same timestamp as the last one
+	// supersedes it, except in decaying distributions, which cannot replace an
+	// observation and ignore it.
 	Timestamp *timestamppb.Timestamp
 	// The histogram value of the sample (if its a distribution).
 	Histogram *Histogram
