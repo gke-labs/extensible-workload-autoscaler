@@ -506,6 +506,10 @@ type DecayingDistributionAggregation struct {
 
 var _ model.TimeWindow = (*DecayingDistributionAggregation)(nil)
 
+// Supersedes implements model.TimeWindow. A histogram cannot replace an
+// observation once it is added.
+func (d *DecayingDistributionAggregation) Supersedes() bool { return false }
+
 func NewDecayingDistributionAggregation(def *pb.DecayingDistribution) *DecayingDistributionAggregation {
 	halfLife := def.GetHalfLife().AsDuration()
 	// The reference time is set by the first sample.
@@ -573,6 +577,9 @@ func (m *sampleWindow) AddSample(sample model.Sample, now time.Time) {
 	m.samples[m.end] = sample
 	m.end = (m.end + 1) % len(m.samples)
 }
+
+// Supersedes implements model.TimeWindow: see AddSample.
+func (m *sampleWindow) Supersedes() bool { return true }
 
 // prune drops the samples that have fallen out of the window relative to now.
 func (m *sampleWindow) prune(now time.Time) {
