@@ -16,13 +16,17 @@ import (
 // recommendations it pushes. Other methods panic.
 type recommendClient struct {
 	pb.XASServerClient
+	metrics     *pb.GetControlMetricsResponse
 	workload    *pb.Workload
 	workloadErr error
 	pushed      []*pb.UpdateRecommenderStateRequest
 }
 
-func (c *recommendClient) GetControlMetrics(context.Context, *pb.GetControlMetricsRequest, ...grpc.CallOption) (*pb.ControlMetrics, error) {
-	return &pb.ControlMetrics{}, nil
+func (c *recommendClient) GetControlMetrics(context.Context, *pb.GetControlMetricsRequest, ...grpc.CallOption) (*pb.GetControlMetricsResponse, error) {
+	if c.metrics == nil {
+		return &pb.GetControlMetricsResponse{}, nil
+	}
+	return c.metrics, nil
 }
 
 func (c *recommendClient) GetWorkload(context.Context, *pb.GetWorkloadRequest, ...grpc.CallOption) (*pb.Workload, error) {
@@ -42,6 +46,57 @@ type workloadRecommender struct {
 func (r *workloadRecommender) Recommend(_ *pb.RecommenderDefinition, _, _ *pb.ControlMetrics, workload *pb.Workload) *pb.Recommendation {
 	r.got = append(r.got, workload)
 	return pb.Recommendation_builder{IsActive: proto.Bool(true)}.Build()
+}
+
+// recommenderInput is what a recommender instance was given to recommend.
+type recommenderInput struct {
+	metrics, ownedMetrics *pb.ControlMetrics
+}
+
+// metricsRecommender records the metrics given to each recommender instance,
+// keyed by instance name.
+type metricsRecommender struct {
+	got map[string]recommenderInput
+}
+
+func (r *metricsRecommender) Recommend(def *pb.RecommenderDefinition, metrics, ownedMetrics *pb.ControlMetrics, _ *pb.Workload) *pb.Recommendation {
+	if r.got == nil {
+		r.got = make(map[string]recommenderInput)
+	}
+	r.got[def.GetName()] = recommenderInput{metrics: metrics, ownedMetrics: ownedMetrics}
+	return nil
+}
+
+// TestProcessPolicyPassesMetrics checks that a single GetControlMetrics call
+// feeds every recommender: all get the policy-wide metrics, and each gets the
+// metrics it owns, or nil if it owns none.
+func TestProcessPolicyPassesMetrics(t *testing.T) {
+	policyWide := pb.ControlMetrics_builder{Values: map[string]float64{"cpu": 2}, ReadyReplicas: proto.Int32(2)}.Build()
+	vpaOwned := pb.ControlMetrics_builder{Values: map[string]float64{"cpu": 30}, ReadyReplicas: proto.Int32(2)}.Build()
+	client := &recommendClient{
+		metrics: pb.GetControlMetricsResponse_builder{
+			ControlMetrics:            policyWide,
+			RecommenderControlMetrics: map[string]*pb.ControlMetrics{"vpa": vpaOwned},
+		}.Build(),
+		workload: &pb.Workload{},
+	}
+	policy := pb.Policy_builder{
+		Id:         pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("web")}.Build(),
+		Activation: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("act"), Recommender: proto.String("rec-class")}.Build()},
+		Scaling:    []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("vpa"), Recommender: proto.String("rec-class")}.Build()},
+	}.Build()
+	rec := &metricsRecommender{}
+	e := newTestEngine(t, client, map[string]string{"rec-class": "Rec"}, map[string]Recommender{"Rec": rec})
+
+	e.processPolicy(policy)
+
+	want := map[string]recommenderInput{
+		"act": {metrics: policyWide, ownedMetrics: nil},
+		"vpa": {metrics: policyWide, ownedMetrics: vpaOwned},
+	}
+	if diff := cmp.Diff(want, rec.got, cmp.AllowUnexported(recommenderInput{}), protocmp.Transform()); diff != "" {
+		t.Errorf("metrics given to Recommend mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func TestProcessPolicyPassesWorkload(t *testing.T) {

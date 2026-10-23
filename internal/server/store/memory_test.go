@@ -241,7 +241,7 @@ func TestMetricCalculations(t *testing.T) {
 
 			s.CalculateAll()
 
-			cm, _ := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build(), "")
+			cm, _, _ := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
 			got := make(map[string]float64)
 			if cm != nil {
 				got = cm.GetValues()
@@ -581,7 +581,7 @@ func TestWindowedMetrics(t *testing.T) {
 	ingest(s, clk.Now().Unix(), ns, pol, "p1", "cpu_slide", 0.1)
 
 	s.CalculateAll()
-	cm, _ := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build(), "")
+	cm, _, _ := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build())
 
 	// Histogram should remember the 1.0 spike (approx 1.0 bucket upper bound -> 1.1)
 	// Sliding Window (Max) should see 1.0.
@@ -606,7 +606,7 @@ func TestWindowedMetrics(t *testing.T) {
 	ingest(s, clk.Now().Unix(), ns, pol, "p1", "cpu_slide", 0.2)
 
 	s.CalculateAll()
-	cm, _ = s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build(), "")
+	cm, _, _ = s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build())
 
 	// Gauge should see 0.2.
 	if cm.GetValues()["cpu_slide"] != 0.2 {
@@ -656,7 +656,7 @@ func TestAggregatedDecayingHistogram(t *testing.T) {
 	ingest(s, clk.Now().Unix(), ns, pol, "p2", "cpu", 1.5)
 
 	s.CalculateAll()
-	cm, _ := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build(), "")
+	cm, _, _ := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build())
 	val := cm.GetValues()["cpu"]
 
 	// If it's 1.1, it's per-pod aggregation (Avg of p95s).
@@ -741,12 +741,12 @@ func TestMultiTenantIsolation(t *testing.T) {
 	s.CalculateAll()
 
 	// 4. Verify Isolation
-	cmA, okA := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("cluster-A"), Namespace: proto.String(ns), Name: proto.String(name)}.Build(), "")
+	cmA, _, okA := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("cluster-A"), Namespace: proto.String(ns), Name: proto.String(name)}.Build())
 	if !okA || cmA.GetValues()["m"] != 100 {
 		t.Errorf("Cluster A: Want 100, Got %v", cmA)
 	}
 
-	cmB, okB := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("cluster-B"), Namespace: proto.String(ns), Name: proto.String(name)}.Build(), "")
+	cmB, _, okB := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("cluster-B"), Namespace: proto.String(ns), Name: proto.String(name)}.Build())
 	if !okB || cmB.GetValues()["m"] != 200 {
 		t.Errorf("Cluster B: Want 200, Got %v", cmB)
 	}
@@ -899,7 +899,7 @@ func TestPodScopedDecayingHistogram(t *testing.T) {
 	ingest(s, clk.Now().Unix(), ns, pol, "p2", "cpu", 1.5)
 
 	s.CalculateAll()
-	cm, _ := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build(), "")
+	cm, _, _ := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build())
 
 	if cm.GetValues()["cpu"] != 0 {
 		t.Errorf("Pod scoped metric should not have a global value, got %f", cm.GetValues()["cpu"])
@@ -996,7 +996,7 @@ func TestContainerResourceRequestWeighting(t *testing.T) {
 	}
 
 	s.CalculateAll()
-	cm, ok := s.GetControlMetrics(id, "")
+	cm, _, ok := s.GetControlMetrics(id)
 	if !ok {
 		t.Fatalf("No control metrics")
 	}
@@ -1157,9 +1157,9 @@ func ingestOwned(s *MemoryStore, ts int64, ns, pol, pod, owner, metric string, v
 }
 
 // TestRecommenderOwnedMetrics checks that metrics owned by a recommender are
-// aggregated like policy-wide ones, but only reported to their owner. A metric
-// is identified by the <name, recommender> pair, so the same name can be used
-// by several owners without them colliding.
+// aggregated like policy-wide ones, but reported apart, keyed by their owner.
+// A metric is identified by the <name, recommender> pair, so the same name can
+// be used by several owners without them colliding.
 func TestRecommenderOwnedMetrics(t *testing.T) {
 	s := NewMemoryStore()
 	ns, name := "default", "pol"
@@ -1170,7 +1170,8 @@ func TestRecommenderOwnedMetrics(t *testing.T) {
 		Metrics: []*pb.MetricDefinition{
 			pb.MetricDefinition_builder{Name: proto.String("cpu"), Gauge: pb.Gauge_builder{Aggregation: proto.String("Avg")}.Build()}.Build(),
 		},
-		Scaling: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("vpa")}.Build(), pb.RecommenderDefinition_builder{Name: proto.String("hpa")}.Build()},
+		// "other" owns no metric.
+		Scaling: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("vpa")}.Build(), pb.RecommenderDefinition_builder{Name: proto.String("hpa")}.Build(), pb.RecommenderDefinition_builder{Name: proto.String("other")}.Build()},
 		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 			"vpa": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{
 				pb.MetricDefinition_builder{Name: proto.String("cpu"), RecommenderName: proto.String("vpa"), Gauge: pb.Gauge_builder{Aggregation: proto.String("Max")}.Build()}.Build(),
@@ -1197,29 +1198,35 @@ func TestRecommenderOwnedMetrics(t *testing.T) {
 
 	s.CalculateAll()
 
-	tests := []struct {
-		recommender string
-		want        map[string]float64
-	}{
-		// Policy-wide metrics are unaffected by the owned ones: Avg(1, 3).
-		{recommender: "", want: map[string]float64{"cpu": 2}},
-		// Max(10, 30) with the owner's own aggregation, plus its own metric.
-		{recommender: "vpa", want: map[string]float64{"cpu": 30, "memory": 100}},
-		{recommender: "hpa", want: map[string]float64{"cpu": 7}},
-		// A recommender owning no metric still observes the workload.
-		{recommender: "other", want: map[string]float64{}},
+	cm, rcm, ok := s.GetControlMetrics(id)
+	if !ok {
+		t.Fatal("GetControlMetrics() not found")
 	}
-	for _, tc := range tests {
-		cm, ok := s.GetControlMetrics(id, tc.recommender)
-		if !ok {
-			t.Fatalf("GetControlMetrics(%q) not found", tc.recommender)
+	// Policy-wide metrics are unaffected by the owned ones: Avg(1, 3).
+	if diff := cmp.Diff(map[string]float64{"cpu": 2}, cm.GetValues()); diff != "" {
+		t.Errorf("GetControlMetrics() policy-wide values mismatch (-want +got):\n%s", diff)
+	}
+	if cm.GetReadyReplicas() != 2 {
+		t.Errorf("GetControlMetrics() policy-wide ready replicas = %d, want 2", cm.GetReadyReplicas())
+	}
+
+	// Each owner gets its metrics, aggregated its own way. A recommender
+	// owning no metric has no entry: the workload state is in the policy-wide
+	// metrics.
+	wantOwned := map[string]map[string]float64{
+		// Max(10, 30), plus its own metric.
+		"vpa": {"cpu": 30, "memory": 100},
+		"hpa": {"cpu": 7},
+	}
+	gotOwned := make(map[string]map[string]float64, len(rcm))
+	for owner, ocm := range rcm {
+		gotOwned[owner] = ocm.GetValues()
+		if ocm.GetReadyReplicas() != 2 {
+			t.Errorf("GetControlMetrics() %q ready replicas = %d, want 2", owner, ocm.GetReadyReplicas())
 		}
-		if diff := cmp.Diff(tc.want, cm.GetValues(), cmpopts.EquateEmpty()); diff != "" {
-			t.Errorf("GetControlMetrics(%q) values mismatch (-want +got):\n%s", tc.recommender, diff)
-		}
-		if cm.GetReadyReplicas() != 2 {
-			t.Errorf("GetControlMetrics(%q) ready replicas = %d, want 2", tc.recommender, cm.GetReadyReplicas())
-		}
+	}
+	if diff := cmp.Diff(wantOwned, gotOwned); diff != "" {
+		t.Errorf("GetControlMetrics() owned values mismatch (-want +got):\n%s", diff)
 	}
 }
 

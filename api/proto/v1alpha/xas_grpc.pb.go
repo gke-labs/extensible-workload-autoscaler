@@ -59,9 +59,9 @@ type XASServerClient interface {
 	// TODO(): This method should probably just return an empty response (google.protobuf.Empty).
 	UpdateWorkload(ctx context.Context, in *UpdateWorkloadRequest, opts ...grpc.CallOption) (*Workload, error)
 	// --- Control Metrics (Recommender -> Server) ---
-	// Read the current aggregated metric values ("Control Metrics") for a policy.
-	// Recommenders use this to compute their recommendations.
-	GetControlMetrics(ctx context.Context, in *GetControlMetricsRequest, opts ...grpc.CallOption) (*ControlMetrics, error)
+	// Read the current control metric values for a policy. Recommenders use
+	// these to compute their recommendations.
+	GetControlMetrics(ctx context.Context, in *GetControlMetricsRequest, opts ...grpc.CallOption) (*GetControlMetricsResponse, error)
 	// Stream changes to control metrics.
 	WatchControlMetrics(ctx context.Context, in *WatchControlMetricsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WatchControlMetricsResponse], error)
 	// --- Workload (Recommender -> Server) ---
@@ -150,9 +150,9 @@ func (c *xASServerClient) UpdateWorkload(ctx context.Context, in *UpdateWorkload
 	return out, nil
 }
 
-func (c *xASServerClient) GetControlMetrics(ctx context.Context, in *GetControlMetricsRequest, opts ...grpc.CallOption) (*ControlMetrics, error) {
+func (c *xASServerClient) GetControlMetrics(ctx context.Context, in *GetControlMetricsRequest, opts ...grpc.CallOption) (*GetControlMetricsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ControlMetrics)
+	out := new(GetControlMetricsResponse)
 	err := c.cc.Invoke(ctx, XASServer_GetControlMetrics_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -244,9 +244,9 @@ type XASServerServer interface {
 	// TODO(): This method should probably just return an empty response (google.protobuf.Empty).
 	UpdateWorkload(context.Context, *UpdateWorkloadRequest) (*Workload, error)
 	// --- Control Metrics (Recommender -> Server) ---
-	// Read the current aggregated metric values ("Control Metrics") for a policy.
-	// Recommenders use this to compute their recommendations.
-	GetControlMetrics(context.Context, *GetControlMetricsRequest) (*ControlMetrics, error)
+	// Read the current control metric values for a policy. Recommenders use
+	// these to compute their recommendations.
+	GetControlMetrics(context.Context, *GetControlMetricsRequest) (*GetControlMetricsResponse, error)
 	// Stream changes to control metrics.
 	WatchControlMetrics(*WatchControlMetricsRequest, grpc.ServerStreamingServer[WatchControlMetricsResponse]) error
 	// --- Workload (Recommender -> Server) ---
@@ -293,7 +293,7 @@ func (UnimplementedXASServerServer) ListPolicies(context.Context, *ListPoliciesR
 func (UnimplementedXASServerServer) UpdateWorkload(context.Context, *UpdateWorkloadRequest) (*Workload, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateWorkload not implemented")
 }
-func (UnimplementedXASServerServer) GetControlMetrics(context.Context, *GetControlMetricsRequest) (*ControlMetrics, error) {
+func (UnimplementedXASServerServer) GetControlMetrics(context.Context, *GetControlMetricsRequest) (*GetControlMetricsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetControlMetrics not implemented")
 }
 func (UnimplementedXASServerServer) WatchControlMetrics(*WatchControlMetricsRequest, grpc.ServerStreamingServer[WatchControlMetricsResponse]) error {

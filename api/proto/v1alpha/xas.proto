@@ -36,9 +36,9 @@ service XASServer {
   rpc UpdateWorkload(UpdateWorkloadRequest) returns (Workload);
 
   // --- Control Metrics (Recommender -> Server) ---
-  // Read the current aggregated metric values ("Control Metrics") for a policy.
-  // Recommenders use this to compute their recommendations.
-  rpc GetControlMetrics(GetControlMetricsRequest) returns (ControlMetrics);
+  // Read the current control metric values for a policy. Recommenders use
+  // these to compute their recommendations.
+  rpc GetControlMetrics(GetControlMetricsRequest) returns (GetControlMetricsResponse);
 
   // Stream changes to control metrics.
   rpc WatchControlMetrics(WatchControlMetricsRequest) returns (stream WatchControlMetricsResponse);
@@ -313,16 +313,17 @@ message ContainerState {
 
 // --- Control Metrics ---
 
-// GetControlMetricsRequest retrieves aggregated metrics for a policy.
+// GetControlMetricsRequest retrieves control metrics for a policy.
 message GetControlMetricsRequest { 
   // The policy to fetch metrics for.
   PolicyId id = 1; 
+}
 
-  // Returns only the metrics owned by the specified recommender, as defined in
-  // Policy.recommender_metrics. If omitted, returns only the policy-wide
-  // metrics, i.e. those not owned by a specific recommender.
-  // Workload-level information (ready replicas, timestamp) is always reported.
-  string recommender_name = 2;
+// GetControlMetricsResponse contains ControlMetrics (both global and
+// recommender-owned).
+message GetControlMetricsResponse {
+  ControlMetrics control_metrics = 1; 
+  map<string, ControlMetrics> recommender_control_metrics = 2; 
 }
 
 // A set of control metric values.

@@ -41,10 +41,11 @@ type ServerStore interface {
 	ListPolicies(clusterName string) []*pb.Policy
 	UpdateWorkload(req *pb.UpdateWorkloadRequest) error
 	GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationResponse, bool)
-	// GetControlMetrics returns the aggregated metrics of a policy. An empty
-	// recommenderName returns the policy-wide metrics, otherwise only the
-	// metrics owned by that recommender are reported.
-	GetControlMetrics(id *pb.PolicyId, recommenderName string) (*pb.ControlMetrics, bool)
+	// GetControlMetrics returns the aggregated metrics of a policy: the
+	// policy-wide ones and, keyed by recommender name, those owned by each
+	// recommender (see calculatePolicy). false is returned if the policy is
+	// unknown or has not been calculated yet.
+	GetControlMetrics(id *pb.PolicyId) (*pb.ControlMetrics, map[string]*pb.ControlMetrics, bool)
 	// GetWorkload returns the pods of a policy's workload, as last reported
 	// with UpdateWorkload, sorted by name.
 	GetWorkload(id *pb.PolicyId) (*pb.Workload, bool)
@@ -423,34 +424,19 @@ func metricStatus(name, owner string, cm *pb.ControlMetrics) *pb.MetricStatus {
 	return status
 }
 
-// GetControlMetrics returns the aggregated metrics of a policy. An empty
-// recommenderName reports the policy-wide metrics, otherwise only the metrics
-// owned by that recommender are reported. Workload-level information (ready
-// replicas, timestamp) is reported in both cases, so a recommender that owns no
-// metric still observes the state of the workload.
-func (s *MemoryStore) GetControlMetrics(id *pb.PolicyId, recommenderName string) (*pb.ControlMetrics, bool) {
+// GetControlMetrics implements ServerStore. The returned map only has entries
+// for the recommenders that own metrics: a recommender that owns none reads
+// the state of the workload (ready replicas, timestamp) from the policy-wide
+// metrics, which are always reported.
+func (s *MemoryStore) GetControlMetrics(id *pb.PolicyId) (*pb.ControlMetrics, map[string]*pb.ControlMetrics, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	key := newPolicyID(id)
 	ps, ok := s.state[key]
 	if !ok || ps.ControlMetrics == nil {
-		return nil, false
+		return nil, nil, false
 	}
-	if recommenderName == "" {
-		return ps.ControlMetrics, true
-	}
-	if cm, ok := ps.RecommenderControlMetrics[recommenderName]; ok {
-		return cm, true
-	}
-	// The recommender owns no metric: report the workload state only.
-	// ContainerMetrics is left unset, matching Calculate.
-	return pb.ControlMetrics_builder{
-		Values:              make(map[string]float64),
-		PodMetrics:          make(map[string]*pb.MetricValues),
-		PodContainerMetrics: make(map[string]*pb.ContainerMetrics),
-		ReadyReplicas:       proto.Int32(ps.ControlMetrics.GetReadyReplicas()),
-		Timestamp:           ps.ControlMetrics.GetTimestamp(),
-	}.Build(), true
+	return ps.ControlMetrics, ps.RecommenderControlMetrics, true
 }
 
 func (s *MemoryStore) CalculateAll() {

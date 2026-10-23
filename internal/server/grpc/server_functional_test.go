@@ -463,7 +463,7 @@ func TestGetControlMetrics_Aggregation(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values: map[string]float64{
@@ -524,7 +524,7 @@ func TestGetControlMetrics_PodScope(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values: map[string]float64{
@@ -584,7 +584,7 @@ func TestGetControlMetrics_PodContainerScope(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values: map[string]float64{},
@@ -653,7 +653,7 @@ func TestGetControlMetrics_ContainerScope(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values: map[string]float64{},
@@ -716,7 +716,7 @@ func TestGetControlMetrics_ContainerScopeAveragesOverReportingPodsOnly(t *testin
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values: map[string]float64{},
@@ -775,7 +775,7 @@ func TestGetControlMetrics_PodScopeOmitsContainerBreakdown(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values: map[string]float64{},
@@ -843,7 +843,7 @@ func TestGetControlMetrics_PodEligibility(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values:        map[string]float64{"m1": 30},
@@ -895,7 +895,7 @@ func TestGetControlMetrics_TerminatingPod(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values:        map[string]float64{"m1": 10},
@@ -957,7 +957,7 @@ func TestIngestMetrics_GlobalDecayingDistributionIgnoresNonEligiblePods(t *testi
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	// The p100 is the upper bound of the bucket of the largest eligible
 	// sample (20, in a bucket of size 1).
@@ -997,7 +997,7 @@ func TestIngestMetrics_IgnoresSamplesOfPodsNotReportedYet(t *testing.T) {
 	// Before the workload reports the pod: dropped.
 	ingest(10)
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 	if _, ok := cm.GetValues()["m1"]; ok {
 		t.Errorf("m1 = %v, want no value before the workload reports the pod", cm.GetValues()["m1"])
 	}
@@ -1009,7 +1009,7 @@ func TestIngestMetrics_IgnoresSamplesOfPodsNotReportedYet(t *testing.T) {
 	}.Build())
 	ingest(20)
 	memStore.CalculateAll()
-	cm, _ = client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm = getControlMetrics(t, ctx, client, id)
 	if got := cm.GetValues()["m1"]; got != 20 {
 		t.Errorf("m1 = %v, want 20", got)
 	}
@@ -1075,7 +1075,7 @@ func TestGetControlMetrics_StartupSamples(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantValues := map[string]float64{
 		"m_exclude":     1,
@@ -1179,10 +1179,7 @@ func TestGetControlMetrics_CPUInitializationPeriod(t *testing.T) {
 			}
 
 			memStore.CalculateAll()
-			cm, err := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
-			if err != nil {
-				t.Fatalf("GetControlMetrics() = %v", err)
-			}
+			cm := getControlMetrics(t, ctx, client, id)
 
 			wantValues := map[string]float64{"cpu_include": 2, "mem": 512}
 			if tc.wantCPUReport {
@@ -1218,7 +1215,7 @@ func TestGetControlMetrics_PolicyUpdate(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 	wantCM1 := pb.ControlMetrics_builder{
 		Values:        map[string]float64{"m1": 10},
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
@@ -1241,7 +1238,7 @@ func TestGetControlMetrics_PolicyUpdate(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ = client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm = getControlMetrics(t, ctx, client, id)
 
 	wantCM2 := pb.ControlMetrics_builder{
 		Values:        map[string]float64{"m2": 20},
@@ -1297,7 +1294,7 @@ func TestGetControlMetrics_SlidingWindow(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 	wantCM1 := pb.ControlMetrics_builder{
 		Values: map[string]float64{
 			"m_instant": 20.0,
@@ -1314,7 +1311,7 @@ func TestGetControlMetrics_SlidingWindow(t *testing.T) {
 	clk.Advance(60 * time.Second)
 	ts = clk.Now().Unix()
 	memStore.CalculateAll()
-	cm, _ = client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm = getControlMetrics(t, ctx, client, id)
 	wantCM2 := pb.ControlMetrics_builder{
 		Values: map[string]float64{
 			"m_instant": 20.0,
@@ -1371,7 +1368,7 @@ func TestGetControlMetrics_DecayingHistogramWindow(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values: map[string]float64{
@@ -1960,7 +1957,7 @@ func TestIngestMetrics_Global(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values: map[string]float64{
@@ -2020,7 +2017,7 @@ func TestGetControlMetrics_AggregatedDecayingHistogram(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	// Aggregate samples: [10, 20]. Weight total = 2.0. Target p50 Rank = 1.0.
 	// Bucket 10 has weight 1.0. It reaches target.
@@ -2056,7 +2053,7 @@ func TestGetControlMetrics_AggregatedDecayingHistogram(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ = client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm = getControlMetrics(t, ctx, client, id)
 
 	// Target p95 Rank = 2.0 * 0.95 = 1.9.
 	// Bucket 10 reaches 1.0.
@@ -2084,7 +2081,7 @@ func TestGetControlMetrics_AggregatedDecayingHistogram(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ = client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm = getControlMetrics(t, ctx, client, id)
 
 	// Weights: bucket 1 = 2.0, bucket 10 = 1/32, bucket 20 = 1/32.
 	// Total = 2.0625. Target p95 Rank = 1.959. Bucket 1 reaches 2.0: target
@@ -2134,7 +2131,7 @@ func TestGetControlMetrics_DecayingHistogramPodChurn(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm1, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm1 := getControlMetrics(t, ctx, client, id)
 
 	wantCM1 := pb.ControlMetrics_builder{
 		Values:        map[string]float64{"cpu": 1.1}, // p100 of bucket 1.0 (size 0.1)
@@ -2165,7 +2162,7 @@ func TestGetControlMetrics_DecayingHistogramPodChurn(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm2, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm2 := getControlMetrics(t, ctx, client, id)
 
 	wantCM2 := pb.ControlMetrics_builder{
 		Values:        map[string]float64{"cpu": 1.1}, // Persistent from pod-1
@@ -2189,7 +2186,7 @@ func TestGetControlMetrics_DecayingHistogramPodChurn(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm3, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm3 := getControlMetrics(t, ctx, client, id)
 
 	wantCM3 := pb.ControlMetrics_builder{
 		Values:        map[string]float64{"cpu": 0.2}, // Now pod-1 has decayed, pod-2 is max
@@ -2252,7 +2249,7 @@ func TestIntent_GaugeAggregation(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values: map[string]float64{
@@ -2312,7 +2309,7 @@ func TestIntent_RateCalculation(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	// Rate = (110 - 100) / 10s = 1.0
 	wantCM := pb.ControlMetrics_builder{
@@ -2368,7 +2365,7 @@ func TestIntent_DistributionPercentile(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values:        map[string]float64{"latency": 1.0},
@@ -2414,7 +2411,7 @@ func TestIntent_DecayingDistributionPersistence(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm1, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm1 := getControlMetrics(t, ctx, client, id)
 	if val := cm1.GetValues()["peak_cpu"]; val < 1.5 || val > 1.6 {
 		t.Errorf("Expected peak_cpu around 1.6 (upper bound), got %f", val)
 	}
@@ -2438,7 +2435,7 @@ func TestIntent_DecayingDistributionPersistence(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm2, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm2 := getControlMetrics(t, ctx, client, id)
 	if val := cm2.GetValues()["peak_cpu"]; val < 1.5 || val > 1.6 {
 		t.Errorf("Expected peak_cpu to persist around 1.6, got %f", val)
 	}
@@ -2527,7 +2524,7 @@ func TestIntent_PodScope_Gauge(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values: map[string]float64{},
@@ -2577,7 +2574,7 @@ func TestIntent_PodScope_Rate(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values: map[string]float64{},
@@ -2626,7 +2623,7 @@ func TestIntent_PodScope_Distribution(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values: map[string]float64{},
@@ -2671,7 +2668,7 @@ func TestIntent_PodScope_DecayingDistribution(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm, _ := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
+	cm := getControlMetrics(t, ctx, client, id)
 
 	wantCM := pb.ControlMetrics_builder{
 		Values: map[string]float64{},
