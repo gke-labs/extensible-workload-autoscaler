@@ -351,7 +351,7 @@ func TestRecommend(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &VPARecommender{}
-			got := r.Recommend(tt.def, tt.state, nil, workload)
+			got := r.Recommend(tt.def, tt.state, nil, 0, workload)
 
 			if tt.wantMsgContains != "" {
 				if !strings.Contains(got.GetMessage(), tt.wantMsgContains) {

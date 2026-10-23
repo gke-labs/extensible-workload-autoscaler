@@ -109,7 +109,7 @@ func TestRecommendBounds(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &VPARecommender{}
-			got := r.Recommend(pb.RecommenderDefinition_builder{Params: tt.params}.Build(), boundsState, nil, workload)
+			got := r.Recommend(pb.RecommenderDefinition_builder{Params: tt.params}.Build(), boundsState, nil, 0, workload)
 			if !got.GetIsActive() {
 				t.Fatalf("Recommend() inactive: %s", got.GetMessage())
 			}
@@ -241,7 +241,7 @@ func TestRecommendWorkload(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &VPARecommender{}
-			got := r.Recommend(pb.RecommenderDefinition_builder{Params: tt.params}.Build(), boundsState, nil, pb.Workload_builder{Pods: tt.pods}.Build())
+			got := r.Recommend(pb.RecommenderDefinition_builder{Params: tt.params}.Build(), boundsState, nil, 0, pb.Workload_builder{Pods: tt.pods}.Build())
 			if got.GetIsActive() != tt.wantActive {
 				t.Fatalf("Recommend() IsActive = %v, want %v (message %q)", got.GetIsActive(), tt.wantActive, got.GetMessage())
 			}
@@ -342,7 +342,7 @@ func TestRecommendLimits(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &VPARecommender{}
-			got := r.Recommend(pb.RecommenderDefinition_builder{Params: tt.params}.Build(), boundsState, nil, pb.Workload_builder{Pods: tt.pods}.Build())
+			got := r.Recommend(pb.RecommenderDefinition_builder{Params: tt.params}.Build(), boundsState, nil, 0, pb.Workload_builder{Pods: tt.pods}.Build())
 			if !got.GetIsActive() {
 				t.Fatalf("Recommend() inactive: %s", got.GetMessage())
 			}

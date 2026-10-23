@@ -107,20 +107,18 @@ func (s *Server) UpdateWorkload(ctx context.Context, req *pb.UpdateWorkloadReque
 }
 
 // GetControlMetrics returns the policy-wide control metrics of a policy
-// together with those owned by each of its recommenders, so a recommender
-// reads everything it needs in a single call.
+// together with those owned by each of its recommenders, and the state of the
+// workload they were calculated against, so a recommender reads everything it
+// needs in a single call.
 func (s *Server) GetControlMetrics(ctx context.Context, req *pb.GetControlMetricsRequest) (*pb.GetControlMetricsResponse, error) {
 	if err := validateGetControlMetricsRequest(req); err != nil {
 		return nil, err
 	}
-	cm, rcm, ok := s.store.GetControlMetrics(req.GetId())
+	res, ok := s.store.GetControlMetrics(req.GetId())
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "policy not found")
 	}
-	return pb.GetControlMetricsResponse_builder{
-		ControlMetrics:            cm,
-		RecommenderControlMetrics: rcm,
-	}.Build(), nil
+	return res, nil
 }
 
 // WatchControlMetrics streams the control metrics of every policy in the

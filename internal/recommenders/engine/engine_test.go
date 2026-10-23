@@ -43,7 +43,7 @@ type workloadRecommender struct {
 	got []*pb.Workload
 }
 
-func (r *workloadRecommender) Recommend(_ *pb.RecommenderDefinition, _, _ *pb.ControlMetrics, workload *pb.Workload) *pb.Recommendation {
+func (r *workloadRecommender) Recommend(_ *pb.RecommenderDefinition, _, _ *pb.ControlMetrics, _ int32, workload *pb.Workload) *pb.Recommendation {
 	r.got = append(r.got, workload)
 	return pb.Recommendation_builder{IsActive: proto.Bool(true)}.Build()
 }
@@ -51,6 +51,7 @@ func (r *workloadRecommender) Recommend(_ *pb.RecommenderDefinition, _, _ *pb.Co
 // recommenderInput is what a recommender instance was given to recommend.
 type recommenderInput struct {
 	metrics, ownedMetrics *pb.ControlMetrics
+	readyReplicas         int32
 }
 
 // metricsRecommender records the metrics given to each recommender instance,
@@ -59,22 +60,23 @@ type metricsRecommender struct {
 	got map[string]recommenderInput
 }
 
-func (r *metricsRecommender) Recommend(def *pb.RecommenderDefinition, metrics, ownedMetrics *pb.ControlMetrics, _ *pb.Workload) *pb.Recommendation {
+func (r *metricsRecommender) Recommend(def *pb.RecommenderDefinition, metrics, ownedMetrics *pb.ControlMetrics, readyReplicas int32, _ *pb.Workload) *pb.Recommendation {
 	if r.got == nil {
 		r.got = make(map[string]recommenderInput)
 	}
-	r.got[def.GetName()] = recommenderInput{metrics: metrics, ownedMetrics: ownedMetrics}
+	r.got[def.GetName()] = recommenderInput{metrics: metrics, ownedMetrics: ownedMetrics, readyReplicas: readyReplicas}
 	return nil
 }
 
 // TestProcessPolicyPassesMetrics checks that a single GetControlMetrics call
-// feeds every recommender: all get the policy-wide metrics, and each gets the
-// metrics it owns, or nil if it owns none.
+// feeds every recommender: all get the policy-wide metrics and the ready
+// replicas, and each gets the metrics it owns, or nil if it owns none.
 func TestProcessPolicyPassesMetrics(t *testing.T) {
-	policyWide := pb.ControlMetrics_builder{Values: map[string]float64{"cpu": 2}, ReadyReplicas: proto.Int32(2)}.Build()
-	vpaOwned := pb.ControlMetrics_builder{Values: map[string]float64{"cpu": 30}, ReadyReplicas: proto.Int32(2)}.Build()
+	policyWide := pb.ControlMetrics_builder{Values: map[string]float64{"cpu": 2}}.Build()
+	vpaOwned := pb.ControlMetrics_builder{Values: map[string]float64{"cpu": 30}}.Build()
 	client := &recommendClient{
 		metrics: pb.GetControlMetricsResponse_builder{
+			ReadyReplicas:             proto.Int32(2),
 			ControlMetrics:            policyWide,
 			RecommenderControlMetrics: map[string]*pb.ControlMetrics{"vpa": vpaOwned},
 		}.Build(),
@@ -91,8 +93,8 @@ func TestProcessPolicyPassesMetrics(t *testing.T) {
 	e.processPolicy(policy)
 
 	want := map[string]recommenderInput{
-		"act": {metrics: policyWide, ownedMetrics: nil},
-		"vpa": {metrics: policyWide, ownedMetrics: vpaOwned},
+		"act": {metrics: policyWide, ownedMetrics: nil, readyReplicas: 2},
+		"vpa": {metrics: policyWide, ownedMetrics: vpaOwned, readyReplicas: 2},
 	}
 	if diff := cmp.Diff(want, rec.got, cmp.AllowUnexported(recommenderInput{}), protocmp.Transform()); diff != "" {
 		t.Errorf("metrics given to Recommend mismatch (-want +got):\n%s", diff)

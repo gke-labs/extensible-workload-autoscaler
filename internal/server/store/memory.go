@@ -43,9 +43,10 @@ type ServerStore interface {
 	GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationResponse, bool)
 	// GetControlMetrics returns the aggregated metrics of a policy: the
 	// policy-wide ones and, keyed by recommender name, those owned by each
-	// recommender (see calculatePolicy). false is returned if the policy is
+	// recommender, along with the state of the workload they were calculated
+	// against (see calculatePolicy). false is returned if the policy is
 	// unknown or has not been calculated yet.
-	GetControlMetrics(id *pb.PolicyId) (*pb.ControlMetrics, map[string]*pb.ControlMetrics, bool)
+	GetControlMetrics(id *pb.PolicyId) (*pb.GetControlMetricsResponse, bool)
 	// GetWorkload returns the pods of a policy's workload, as last reported
 	// with UpdateWorkload, sorted by name.
 	GetWorkload(id *pb.PolicyId) (*pb.Workload, bool)
@@ -66,10 +67,9 @@ type PolicyState struct {
 	Explanation         []*pb.RecommenderStatus
 	LastActive          time.Time
 	RecommenderStatuses map[string]*pb.RecommenderStatus
-	ControlMetrics      *pb.ControlMetrics
-	// RecommenderControlMetrics holds the values of the metrics owned by each
-	// recommender, keyed by recommender name.
-	RecommenderControlMetrics map[string]*pb.ControlMetrics
+	// ControlMetrics holds the control metrics of the policy as of its last
+	// calculation (see calculatePolicy), nil until then.
+	ControlMetrics *pb.GetControlMetricsResponse
 }
 
 type MemoryStore struct {
@@ -152,7 +152,6 @@ func (s *MemoryStore) savePolicy(p *pb.Policy, ps *PolicyState, key policyID) (*
 	ps.Recommendation = nil
 	ps.Explanation = nil
 	ps.ControlMetrics = nil
-	ps.RecommenderControlMetrics = nil
 
 	ps.Metrics.CleanupOrphaned(ps.Policy)
 	s.cleanupOrphanedRecommenderStatuses(ps)
@@ -268,8 +267,8 @@ func (s *MemoryStore) AddBatch(req *pb.IngestMetricsRequest) error {
 		}
 		watchers, watchersOk := s.watchers[key.cluster]
 		if watchersOk && !watchers.Throttled(key) {
-			cm, rcm := calculatePolicy(ps, s.clock.Now())
-			watchers.Notify(key, cm, rcm)
+			res := calculatePolicy(ps, s.clock.Now())
+			watchers.Notify(key, res.GetControlMetrics(), res.GetRecommenderControlMetrics())
 		}
 	}
 	return nil
@@ -359,19 +358,19 @@ func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationR
 	}
 
 	var metricStatuses []*pb.MetricStatus
-	if ps.ControlMetrics != nil {
+	if res := ps.ControlMetrics; res != nil {
 		for _, def := range ps.Policy.GetMetrics() {
-			metricStatuses = append(metricStatuses, metricStatus(def.GetName(), "", ps.ControlMetrics))
+			metricStatuses = append(metricStatuses, metricStatus(def.GetName(), "", res.GetControlMetrics(), res.GetTimestamp()))
 		}
-	}
-	// Metrics owned by recommenders are listed as <recommender>/<metric>.
-	for _, owner := range slices.Sorted(maps.Keys(ps.Policy.GetRecommenderMetrics())) {
-		cm, ok := ps.RecommenderControlMetrics[owner]
-		if !ok || cm == nil {
-			continue
-		}
-		for _, def := range ps.Policy.GetRecommenderMetrics()[owner].GetDefinitions() {
-			metricStatuses = append(metricStatuses, metricStatus(def.GetName(), owner, cm))
+		// Metrics owned by recommenders are listed as <recommender>/<metric>.
+		for _, owner := range slices.Sorted(maps.Keys(ps.Policy.GetRecommenderMetrics())) {
+			cm, ok := res.GetRecommenderControlMetrics()[owner]
+			if !ok || cm == nil {
+				continue
+			}
+			for _, def := range ps.Policy.GetRecommenderMetrics()[owner].GetDefinitions() {
+				metricStatuses = append(metricStatuses, metricStatus(def.GetName(), owner, cm, res.GetTimestamp()))
+			}
 		}
 	}
 
@@ -383,16 +382,16 @@ func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationR
 }
 
 // metricStatus returns the status of the metric name in cm, owned by owner
-// (empty for policy-wide metrics). Owned metrics are displayed as
-// "<owner>/<name>". Per-pod and per-container values are averaged.
-func metricStatus(name, owner string, cm *pb.ControlMetrics) *pb.MetricStatus {
+// (empty for policy-wide metrics) and calculated at ts. Owned metrics are
+// displayed as "<owner>/<name>". Per-pod and per-container values are averaged.
+func metricStatus(name, owner string, cm *pb.ControlMetrics, ts *timestamppb.Timestamp) *pb.MetricStatus {
 	displayName := name
 	if owner != "" {
 		displayName = owner + "/" + name
 	}
 	status := pb.MetricStatus_builder{
 		Name:      proto.String(displayName),
-		Timestamp: cm.GetTimestamp(),
+		Timestamp: ts,
 	}.Build()
 	if val, ok := cm.GetValues()[name]; ok {
 		status.SetValue(val)
@@ -424,19 +423,17 @@ func metricStatus(name, owner string, cm *pb.ControlMetrics) *pb.MetricStatus {
 	return status
 }
 
-// GetControlMetrics implements ServerStore. The returned map only has entries
-// for the recommenders that own metrics: a recommender that owns none reads
-// the state of the workload (ready replicas, timestamp) from the policy-wide
-// metrics, which are always reported.
-func (s *MemoryStore) GetControlMetrics(id *pb.PolicyId) (*pb.ControlMetrics, map[string]*pb.ControlMetrics, bool) {
+// GetControlMetrics implements ServerStore. The recommender control metrics
+// only have entries for the recommenders that own metrics.
+func (s *MemoryStore) GetControlMetrics(id *pb.PolicyId) (*pb.GetControlMetricsResponse, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	key := newPolicyID(id)
 	ps, ok := s.state[key]
 	if !ok || ps.ControlMetrics == nil {
-		return nil, nil, false
+		return nil, false
 	}
-	return ps.ControlMetrics, ps.RecommenderControlMetrics, true
+	return ps.ControlMetrics, true
 }
 
 func (s *MemoryStore) CalculateAll() {
@@ -448,16 +445,18 @@ func (s *MemoryStore) CalculateAll() {
 		if ps.Policy == nil {
 			continue
 		}
-		ps.ControlMetrics, ps.RecommenderControlMetrics = calculatePolicy(ps, now)
+		ps.ControlMetrics = calculatePolicy(ps, now)
 		s.processRecommendations(ps, now)
 	}
 }
 
 // calculatePolicy aggregates the metrics of a policy as of now. It returns the
 // policy-wide control metrics and, keyed by recommender name, the control
-// metrics owned by each recommender (nil if the policy defines none). The
-// policy state is not modified. The caller must hold mu.
-func calculatePolicy(ps *PolicyState, now time.Time) (*pb.ControlMetrics, map[string]*pb.ControlMetrics) {
+// metrics owned by each recommender (none if the policy defines none), along
+// with the state of the workload they were calculated against: the
+// calculation time and the number of ready replicas. The policy state is not
+// modified. The caller must hold mu.
+func calculatePolicy(ps *PolicyState, now time.Time) *pb.GetControlMetricsResponse {
 	policy := ps.Policy
 	workload := ps.Workload
 	cm := ps.Metrics.calculate(policy.GetMetrics(), workload, now)
@@ -470,7 +469,12 @@ func calculatePolicy(ps *PolicyState, now time.Time) (*pb.ControlMetrics, map[st
 			rcm[name] = ps.Metrics.calculate(defs.GetDefinitions(), workload, now)
 		}
 	}
-	return cm, rcm
+	return pb.GetControlMetricsResponse_builder{
+		Timestamp:                 timestamppb.New(now),
+		ReadyReplicas:             proto.Int32(readyReplicas(workload)),
+		ControlMetrics:            cm,
+		RecommenderControlMetrics: rcm,
+	}.Build()
 }
 
 func (s *MemoryStore) cleanupOrphanedRecommenderStatuses(ps *PolicyState) {

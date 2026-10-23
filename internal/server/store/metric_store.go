@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/podutil"
@@ -202,16 +201,12 @@ func definedMetrics(policy *pb.Policy) map[metricID]*pb.MetricDefinition {
 }
 
 // calculate aggregates the given metric definitions into a single ControlMetrics
-// snapshot at timestamp now. All the definitions are expected to share the same
+// snapshot as of now. All the definitions are expected to share the same
 // owner. The caller must hold mu.
 func (ms *MetricStore) calculate(defs []*pb.MetricDefinition, workload map[string]*pb.PodState, now time.Time) *pb.ControlMetrics {
 	ms.gcSeries(now)
 
-	eligiblePods := filterEligiblePods(workload)
-	readyReplicas := len(eligiblePods)
 	cm := pb.ControlMetrics_builder{
-		ReadyReplicas:       proto.Int32(int32(max(1, readyReplicas))),
-		Timestamp:           timestamppb.New(now),
 		Values:              make(map[string]float64),
 		PodMetrics:          make(map[string]*pb.MetricValues),
 		PodContainerMetrics: make(map[string]*pb.ContainerMetrics),
@@ -273,14 +268,16 @@ func filterInitializingCPU(series iter.Seq[*model.Series], workload map[string]*
 	}
 }
 
-// filterEligiblePods returns the pods of the workload whose metrics should be
-// considered, keyed by name. See podutil.IsEligible.
-func filterEligiblePods(workload map[string]*pb.PodState) map[string]*pb.PodState {
-	eligible := make(map[string]*pb.PodState, len(workload))
-	for name, p := range workload {
+// readyReplicas returns the number of pods of the workload whose metrics are
+// considered (see podutil.IsEligible), as reported to the recommenders. At
+// least 1 is reported, so that a recommender scaling the current replicas
+// proportionally (e.g. Linear) does not get stuck at 0.
+func readyReplicas(workload map[string]*pb.PodState) int32 {
+	n := 0
+	for _, p := range workload {
 		if podutil.IsEligible(podutil.FromPodState(p)) {
-			eligible[name] = p
+			n++
 		}
 	}
-	return eligible
+	return int32(max(1, n))
 }

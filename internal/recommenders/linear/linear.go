@@ -17,7 +17,7 @@ type config struct {
 	target float64
 }
 
-func (r *LinearRecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.ControlMetrics, _ *pb.Workload) *pb.Recommendation {
+func (r *LinearRecommender) Recommend(def *pb.RecommenderDefinition, state, _ *pb.ControlMetrics, readyReplicas int32, _ *pb.Workload) *pb.Recommendation {
 	cfg, err := parseConfig(def)
 	if err != nil {
 		return pb.Recommendation_builder{
@@ -33,7 +33,7 @@ func (r *LinearRecommender) Recommend(def *pb.RecommenderDefinition, state, _ *p
 	}
 
 	ratio := val / cfg.target
-	desired := int32(math.Ceil(float64(state.GetReadyReplicas()) * ratio))
+	desired := int32(math.Ceil(float64(readyReplicas) * ratio))
 
 	return pb.Recommendation_builder{
 		Replicas: &desired,

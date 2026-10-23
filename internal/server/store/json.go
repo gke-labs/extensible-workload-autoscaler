@@ -54,24 +54,22 @@ func protoJSONSlice[M proto.Message](in []M) []protoJSON {
 
 func (ps PolicyState) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Policy                    protoJSON
-		Workload                  map[string]protoJSON
-		Metrics                   *MetricStore
-		Recommendation            protoJSON
-		Explanation               []protoJSON
-		LastActive                time.Time
-		RecommenderStatuses       map[string]protoJSON
-		ControlMetrics            protoJSON
-		RecommenderControlMetrics map[string]protoJSON
+		Policy              protoJSON
+		Workload            map[string]protoJSON
+		Metrics             *MetricStore
+		Recommendation      protoJSON
+		Explanation         []protoJSON
+		LastActive          time.Time
+		RecommenderStatuses map[string]protoJSON
+		ControlMetrics      protoJSON
 	}{
-		Policy:                    protoJSON{ps.Policy},
-		Workload:                  protoJSONMap(ps.Workload),
-		Metrics:                   ps.Metrics,
-		Recommendation:            protoJSON{ps.Recommendation},
-		Explanation:               protoJSONSlice(ps.Explanation),
-		LastActive:                ps.LastActive.UTC(),
-		RecommenderStatuses:       protoJSONMap(ps.RecommenderStatuses),
-		ControlMetrics:            protoJSON{ps.ControlMetrics},
-		RecommenderControlMetrics: protoJSONMap(ps.RecommenderControlMetrics),
+		Policy:              protoJSON{ps.Policy},
+		Workload:            protoJSONMap(ps.Workload),
+		Metrics:             ps.Metrics,
+		Recommendation:      protoJSON{ps.Recommendation},
+		Explanation:         protoJSONSlice(ps.Explanation),
+		LastActive:          ps.LastActive.UTC(),
+		RecommenderStatuses: protoJSONMap(ps.RecommenderStatuses),
+		ControlMetrics:      protoJSON{ps.ControlMetrics},
 	})
 }

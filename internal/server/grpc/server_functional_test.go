@@ -463,18 +463,20 @@ func TestGetControlMetrics_Aggregation(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values: map[string]float64{
-			"g_avg": 20.0, // (10+30)/2
-			"c_sum": 3.0,  // (1.0+2.0)
-			"h_p99": 1.0,  // P99 in [0, 1.0]
-		},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(2),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{
+				"g_avg": 20.0, // (10+30)/2
+				"c_sum": 3.0,  // (1.0+2.0)
+				"h_p99": 1.0,  // P99 in [0, 1.0]
+			},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -524,22 +526,24 @@ func TestGetControlMetrics_PodScope(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values: map[string]float64{
-			"cpu_global": 20.0, // Aggregated: (10 + 30) / 2
-			// cpu_pod should NOT be in Values
-		},
-		PodMetrics: map[string]*pb.MetricValues{
-			"pod1": pb.MetricValues_builder{Values: map[string]float64{"cpu_pod": 10.0}}.Build(),
-			"pod2": pb.MetricValues_builder{Values: map[string]float64{"cpu_pod": 30.0}}.Build(),
-		},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(2),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{
+				"cpu_global": 20.0, // Aggregated: (10 + 30) / 2
+				// cpu_pod should NOT be in Values
+			},
+			PodMetrics: map[string]*pb.MetricValues{
+				"pod1": pb.MetricValues_builder{Values: map[string]float64{"cpu_pod": 10.0}}.Build(),
+				"pod2": pb.MetricValues_builder{Values: map[string]float64{"cpu_pod": 30.0}}.Build(),
+			},
+		}.Build(),
 	}.Build()
 
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics with Pod scope mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -584,28 +588,30 @@ func TestGetControlMetrics_PodContainerScope(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values: map[string]float64{},
-		PodMetrics: map[string]*pb.MetricValues{
-			// pod1's container samples are only reported per container, not per-pod.
-			// pod2's sample has no container, so it stays pod-level.
-			"pod2": pb.MetricValues_builder{Values: map[string]float64{"cpu": 30.0}}.Build(),
-		},
-		PodContainerMetrics: map[string]*pb.ContainerMetrics{
-			"pod1": pb.ContainerMetrics_builder{
-				ContainerMetrics: map[string]*pb.MetricValues{
-					"app":     pb.MetricValues_builder{Values: map[string]float64{"cpu": 10.0}}.Build(),
-					"sidecar": pb.MetricValues_builder{Values: map[string]float64{"cpu": 2.0}}.Build(),
-				},
-			}.Build(),
-		},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(2),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{},
+			PodMetrics: map[string]*pb.MetricValues{
+				// pod1's container samples are only reported per container, not per-pod.
+				// pod2's sample has no container, so it stays pod-level.
+				"pod2": pb.MetricValues_builder{Values: map[string]float64{"cpu": 30.0}}.Build(),
+			},
+			PodContainerMetrics: map[string]*pb.ContainerMetrics{
+				"pod1": pb.ContainerMetrics_builder{
+					ContainerMetrics: map[string]*pb.MetricValues{
+						"app":     pb.MetricValues_builder{Values: map[string]float64{"cpu": 10.0}}.Build(),
+						"sidecar": pb.MetricValues_builder{Values: map[string]float64{"cpu": 2.0}}.Build(),
+					},
+				}.Build(),
+			},
+		}.Build(),
 	}.Build()
 
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics with PodContainer scope mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -653,22 +659,24 @@ func TestGetControlMetrics_ContainerScope(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values: map[string]float64{},
-		ContainerMetrics: pb.ContainerMetrics_builder{
-			ContainerMetrics: map[string]*pb.MetricValues{
-				// Averaged across both pods: app (10+30)/2, sidecar (2+6)/2.
-				"app":     pb.MetricValues_builder{Values: map[string]float64{"cpu": 20.0}}.Build(),
-				"sidecar": pb.MetricValues_builder{Values: map[string]float64{"cpu": 4.0}}.Build(),
-			},
-		}.Build(),
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(2),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{},
+			ContainerMetrics: pb.ContainerMetrics_builder{
+				ContainerMetrics: map[string]*pb.MetricValues{
+					// Averaged across both pods: app (10+30)/2, sidecar (2+6)/2.
+					"app":     pb.MetricValues_builder{Values: map[string]float64{"cpu": 20.0}}.Build(),
+					"sidecar": pb.MetricValues_builder{Values: map[string]float64{"cpu": 4.0}}.Build(),
+				},
+			}.Build(),
+		}.Build(),
 	}.Build()
 
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics with Container scope mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -716,22 +724,24 @@ func TestGetControlMetrics_ContainerScopeAveragesOverReportingPodsOnly(t *testin
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values: map[string]float64{},
-		ContainerMetrics: pb.ContainerMetrics_builder{
-			ContainerMetrics: map[string]*pb.MetricValues{
-				"app": pb.MetricValues_builder{Values: map[string]float64{"cpu": 20.0}}.Build(),
-				// Averaged over pod1 only, not halved by pod2.
-				"sidecar": pb.MetricValues_builder{Values: map[string]float64{"cpu": 7.0}}.Build(),
-			},
-		}.Build(),
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(2),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{},
+			ContainerMetrics: pb.ContainerMetrics_builder{
+				ContainerMetrics: map[string]*pb.MetricValues{
+					"app": pb.MetricValues_builder{Values: map[string]float64{"cpu": 20.0}}.Build(),
+					// Averaged over pod1 only, not halved by pod2.
+					"sidecar": pb.MetricValues_builder{Values: map[string]float64{"cpu": 7.0}}.Build(),
+				},
+			}.Build(),
+		}.Build(),
 	}.Build()
 
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics with Container scope mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -775,19 +785,21 @@ func TestGetControlMetrics_PodScopeOmitsContainerBreakdown(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values: map[string]float64{},
-		PodMetrics: map[string]*pb.MetricValues{
-			// Container samples are summed, but not broken out individually.
-			"pod1": pb.MetricValues_builder{Values: map[string]float64{"cpu": 12.0}}.Build(),
-		},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{},
+			PodMetrics: map[string]*pb.MetricValues{
+				// Container samples are summed, but not broken out individually.
+				"pod1": pb.MetricValues_builder{Values: map[string]float64{"cpu": 12.0}}.Build(),
+			},
+		}.Build(),
 	}.Build()
 
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics with Pod scope mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -843,14 +855,16 @@ func TestGetControlMetrics_PodEligibility(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"m1": 30},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(2),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"m1": 30},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -895,14 +909,16 @@ func TestGetControlMetrics_TerminatingPod(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"m1": 10},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"m1": 10},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -957,11 +973,11 @@ func TestIngestMetrics_GlobalDecayingDistributionIgnoresNonEligiblePods(t *testi
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
 	// The p100 is the upper bound of the bucket of the largest eligible
 	// sample (20, in a bucket of size 1).
-	if got := cm.GetValues()["m_max"]; math.Abs(got-21) > 1e-9 {
+	if got := res.GetControlMetrics().GetValues()["m_max"]; math.Abs(got-21) > 1e-9 {
 		t.Errorf("m_max = %v, want 21 (the never-ready and unknown pods' samples must be ignored)", got)
 	}
 }
@@ -997,9 +1013,9 @@ func TestIngestMetrics_IgnoresSamplesOfPodsNotReportedYet(t *testing.T) {
 	// Before the workload reports the pod: dropped.
 	ingest(10)
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
-	if _, ok := cm.GetValues()["m1"]; ok {
-		t.Errorf("m1 = %v, want no value before the workload reports the pod", cm.GetValues()["m1"])
+	res := getControlMetrics(t, ctx, client, id)
+	if _, ok := res.GetControlMetrics().GetValues()["m1"]; ok {
+		t.Errorf("m1 = %v, want no value before the workload reports the pod", res.GetControlMetrics().GetValues()["m1"])
 	}
 
 	// Once reported: the next samples count.
@@ -1009,8 +1025,8 @@ func TestIngestMetrics_IgnoresSamplesOfPodsNotReportedYet(t *testing.T) {
 	}.Build())
 	ingest(20)
 	memStore.CalculateAll()
-	cm = getControlMetrics(t, ctx, client, id)
-	if got := cm.GetValues()["m1"]; got != 20 {
+	res = getControlMetrics(t, ctx, client, id)
+	if got := res.GetControlMetrics().GetValues()["m1"]; got != 20 {
 		t.Errorf("m1 = %v, want 20", got)
 	}
 }
@@ -1075,19 +1091,19 @@ func TestGetControlMetrics_StartupSamples(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
 	wantValues := map[string]float64{
 		"m_exclude":     1,
 		"m_include":     111,
 		"m_include_max": 101, // The upper bound of the bucket of 100.
 	}
-	if diff := cmp.Diff(wantValues, cm.GetValues()); diff != "" {
+	if diff := cmp.Diff(wantValues, res.GetControlMetrics().GetValues()); diff != "" {
 		t.Errorf("ControlMetrics.Values mismatch (-want +got):\n%s", diff)
 	}
 	// The replica count isn't affected: it is a property of the workload.
-	if cm.GetReadyReplicas() != 1 {
-		t.Errorf("ReadyReplicas = %d, want 1", cm.GetReadyReplicas())
+	if res.GetReadyReplicas() != 1 {
+		t.Errorf("ReadyReplicas = %d, want 1", res.GetReadyReplicas())
 	}
 }
 
@@ -1179,17 +1195,17 @@ func TestGetControlMetrics_CPUInitializationPeriod(t *testing.T) {
 			}
 
 			memStore.CalculateAll()
-			cm := getControlMetrics(t, ctx, client, id)
+			res := getControlMetrics(t, ctx, client, id)
 
 			wantValues := map[string]float64{"cpu_include": 2, "mem": 512}
 			if tc.wantCPUReport {
 				wantValues["cpu"] = tc.wantCPU
 			}
-			if diff := cmp.Diff(wantValues, cm.GetValues()); diff != "" {
+			if diff := cmp.Diff(wantValues, res.GetControlMetrics().GetValues()); diff != "" {
 				t.Errorf("ControlMetrics.Values mismatch (-want +got):\n%s", diff)
 			}
-			if cm.GetReadyReplicas() != 1 {
-				t.Errorf("ReadyReplicas = %d, want 1", cm.GetReadyReplicas())
+			if res.GetReadyReplicas() != 1 {
+				t.Errorf("ReadyReplicas = %d, want 1", res.GetReadyReplicas())
 			}
 		})
 	}
@@ -1215,13 +1231,15 @@ func TestGetControlMetrics_PolicyUpdate(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
-	wantCM1 := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"m1": 10},
+	res := getControlMetrics(t, ctx, client, id)
+	wantRes1 := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"m1": 10},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM1, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	if diff := cmp.Diff(wantRes1, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("Initial ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 
@@ -1238,14 +1256,16 @@ func TestGetControlMetrics_PolicyUpdate(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm = getControlMetrics(t, ctx, client, id)
+	res = getControlMetrics(t, ctx, client, id)
 
-	wantCM2 := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"m2": 20},
+	wantRes2 := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"m2": 20},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM2, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	if diff := cmp.Diff(wantRes2, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("Updated ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -1294,16 +1314,18 @@ func TestGetControlMetrics_SlidingWindow(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
-	wantCM1 := pb.ControlMetrics_builder{
-		Values: map[string]float64{
-			"m_instant": 20.0,
-			"c_avg":     0.333,
-		},
+	res := getControlMetrics(t, ctx, client, id)
+	wantRes1 := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{
+				"m_instant": 20.0,
+				"c_avg":     0.333,
+			},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM1, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes1, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics mismatch at T1 (-want +got):\n%s", diff)
 	}
 
@@ -1311,16 +1333,18 @@ func TestGetControlMetrics_SlidingWindow(t *testing.T) {
 	clk.Advance(60 * time.Second)
 	ts = clk.Now().Unix()
 	memStore.CalculateAll()
-	cm = getControlMetrics(t, ctx, client, id)
-	wantCM2 := pb.ControlMetrics_builder{
-		Values: map[string]float64{
-			"m_instant": 20.0,
-			"c_avg":     0.333,
-		},
+	res = getControlMetrics(t, ctx, client, id)
+	wantRes2 := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{
+				"m_instant": 20.0,
+				"c_avg":     0.333,
+			},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM2, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes2, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics mismatch at T2 (-want +got):\n%s", diff)
 	}
 }
@@ -1368,18 +1392,20 @@ func TestGetControlMetrics_DecayingHistogramWindow(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values: map[string]float64{
-			"m_max": 1.1,
-			"c_max": 1.1,
-		},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{
+				"m_max": 1.1,
+				"c_max": 1.1,
+			},
+		}.Build(),
 	}.Build()
 	// Using EquateApprox for bucket upper bounds (0.1 bucket size)
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.11)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.11)); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -1957,18 +1983,20 @@ func TestIngestMetrics_Global(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values: map[string]float64{
-			"g_sum": 100,
-			"c_sum": 1.0,
-			"h_p50": 0.5,
-		},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{
+				"g_sum": 100,
+				"c_sum": 1.0,
+				"h_p50": 0.5,
+			},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -2017,12 +2045,12 @@ func TestGetControlMetrics_AggregatedDecayingHistogram(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
 	// Aggregate samples: [10, 20]. Weight total = 2.0. Target p50 Rank = 1.0.
 	// Bucket 10 has weight 1.0. It reaches target.
 	// Upper bound of bucket 10 is 11.0.
-	if val := cm.GetValues()["m_hist"]; val != 11.0 {
+	if val := res.GetControlMetrics().GetValues()["m_hist"]; val != 11.0 {
 		t.Errorf("Aggregated Histogram: Expected 11.0 (upper bound of bucket 10), got %f", val)
 	}
 
@@ -2053,12 +2081,12 @@ func TestGetControlMetrics_AggregatedDecayingHistogram(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm = getControlMetrics(t, ctx, client, id)
+	res = getControlMetrics(t, ctx, client, id)
 
 	// Target p95 Rank = 2.0 * 0.95 = 1.9.
 	// Bucket 10 reaches 1.0.
 	// Bucket 20 reaches 2.0. (Target met)
-	if val := cm.GetValues()["m_hist"]; val != 21.0 {
+	if val := res.GetControlMetrics().GetValues()["m_hist"]; val != 21.0 {
 		t.Errorf("Aggregated Histogram (P95): Expected 21.0 (upper bound of bucket 20), got %f", val)
 	}
 
@@ -2081,13 +2109,13 @@ func TestGetControlMetrics_AggregatedDecayingHistogram(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm = getControlMetrics(t, ctx, client, id)
+	res = getControlMetrics(t, ctx, client, id)
 
 	// Weights: bucket 1 = 2.0, bucket 10 = 1/32, bucket 20 = 1/32.
 	// Total = 2.0625. Target p95 Rank = 1.959. Bucket 1 reaches 2.0: target
 	// met, upper bound 2.0. Without decay the total would be 4.0 and the
 	// p95 (rank 3.8) would still land on bucket 20.
-	if val := cm.GetValues()["m_hist"]; val != 2.0 {
+	if val := res.GetControlMetrics().GetValues()["m_hist"]; val != 2.0 {
 		t.Errorf("Aggregated Histogram (Decay): Expected 2.0, got %f", val)
 	}
 }
@@ -2131,14 +2159,16 @@ func TestGetControlMetrics_DecayingHistogramPodChurn(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm1 := getControlMetrics(t, ctx, client, id)
+	res1 := getControlMetrics(t, ctx, client, id)
 
-	wantCM1 := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"cpu": 1.1}, // p100 of bucket 1.0 (size 0.1)
+	wantRes1 := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts0, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"cpu": 1.1}, // p100 of bucket 1.0 (size 0.1)
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM1, cm1, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes1, res1, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("Step 1 mismatch (-want +got):\n%s", diff)
 	}
 
@@ -2162,14 +2192,16 @@ func TestGetControlMetrics_DecayingHistogramPodChurn(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm2 := getControlMetrics(t, ctx, client, id)
+	res2 := getControlMetrics(t, ctx, client, id)
 
-	wantCM2 := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"cpu": 1.1}, // Persistent from pod-1
+	wantRes2 := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts1, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"cpu": 1.1}, // Persistent from pod-1
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM2, cm2, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes2, res2, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("Step 2 mismatch (-want +got):\n%s", diff)
 	}
 
@@ -2186,14 +2218,16 @@ func TestGetControlMetrics_DecayingHistogramPodChurn(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm3 := getControlMetrics(t, ctx, client, id)
+	res3 := getControlMetrics(t, ctx, client, id)
 
-	wantCM3 := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"cpu": 0.2}, // Now pod-1 has decayed, pod-2 is max
+	wantRes3 := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts2, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"cpu": 0.2}, // Now pod-1 has decayed, pod-2 is max
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM3, cm3, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes3, res3, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("Step 3 mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -2249,18 +2283,20 @@ func TestIntent_GaugeAggregation(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values: map[string]float64{
-			"g_avg": 20.0, // (10+30)/2
-			"g_sum": 30.0, // 10+20
-			"g_max": 40.0, // max(10, 40)
-		},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(2),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{
+				"g_avg": 20.0, // (10+30)/2
+				"g_sum": 30.0, // 10+20
+				"g_max": 40.0, // max(10, 40)
+			},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -2309,15 +2345,17 @@ func TestIntent_RateCalculation(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
 	// Rate = (110 - 100) / 10s = 1.0
-	wantCM := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"rps": 1.0},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"rps": 1.0},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -2365,14 +2403,16 @@ func TestIntent_DistributionPercentile(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"latency": 1.0},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"latency": 1.0},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -2411,8 +2451,8 @@ func TestIntent_DecayingDistributionPersistence(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm1 := getControlMetrics(t, ctx, client, id)
-	if val := cm1.GetValues()["peak_cpu"]; val < 1.5 || val > 1.6 {
+	res1 := getControlMetrics(t, ctx, client, id)
+	if val := res1.GetControlMetrics().GetValues()["peak_cpu"]; val < 1.5 || val > 1.6 {
 		t.Errorf("Expected peak_cpu around 1.6 (upper bound), got %f", val)
 	}
 
@@ -2435,8 +2475,8 @@ func TestIntent_DecayingDistributionPersistence(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm2 := getControlMetrics(t, ctx, client, id)
-	if val := cm2.GetValues()["peak_cpu"]; val < 1.5 || val > 1.6 {
+	res2 := getControlMetrics(t, ctx, client, id)
+	if val := res2.GetControlMetrics().GetValues()["peak_cpu"]; val < 1.5 || val > 1.6 {
 		t.Errorf("Expected peak_cpu to persist around 1.6, got %f", val)
 	}
 }
@@ -2524,18 +2564,20 @@ func TestIntent_PodScope_Gauge(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values: map[string]float64{},
-		PodMetrics: map[string]*pb.MetricValues{
-			"pod1": pb.MetricValues_builder{Values: map[string]float64{"g_avg": 10.0}}.Build(),
-			"pod2": pb.MetricValues_builder{Values: map[string]float64{"g_avg": 30.0}}.Build(),
-		},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(2),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{},
+			PodMetrics: map[string]*pb.MetricValues{
+				"pod1": pb.MetricValues_builder{Values: map[string]float64{"g_avg": 10.0}}.Build(),
+				"pod2": pb.MetricValues_builder{Values: map[string]float64{"g_avg": 30.0}}.Build(),
+			},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -2574,17 +2616,19 @@ func TestIntent_PodScope_Rate(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values: map[string]float64{},
-		PodMetrics: map[string]*pb.MetricValues{
-			"pod1": pb.MetricValues_builder{Values: map[string]float64{"c_rate": 1.0}}.Build(), // Rate = 10/10s = 1.0
-		},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{},
+			PodMetrics: map[string]*pb.MetricValues{
+				"pod1": pb.MetricValues_builder{Values: map[string]float64{"c_rate": 1.0}}.Build(), // Rate = 10/10s = 1.0
+			},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -2623,17 +2667,19 @@ func TestIntent_PodScope_Distribution(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values: map[string]float64{},
-		PodMetrics: map[string]*pb.MetricValues{
-			"pod1": pb.MetricValues_builder{Values: map[string]float64{"h_p99": 1.0}}.Build(),
-		},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{},
+			PodMetrics: map[string]*pb.MetricValues{
+				"pod1": pb.MetricValues_builder{Values: map[string]float64{"h_p99": 1.0}}.Build(),
+			},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -2668,17 +2714,19 @@ func TestIntent_PodScope_DecayingDistribution(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, id)
+	res := getControlMetrics(t, ctx, client, id)
 
-	wantCM := pb.ControlMetrics_builder{
-		Values: map[string]float64{},
-		PodMetrics: map[string]*pb.MetricValues{
-			"pod1": pb.MetricValues_builder{Values: map[string]float64{"decay_p100": 1.1}}.Build(), // Upper bound of bucket 1.0 (size 0.1)
-		},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{},
+			PodMetrics: map[string]*pb.MetricValues{
+				"pod1": pb.MetricValues_builder{Values: map[string]float64{"decay_p100": 1.1}}.Build(), // Upper bound of bucket 1.0 (size 0.1)
+			},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }

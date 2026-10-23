@@ -66,16 +66,15 @@ func setupGRPCServer(t *testing.T, c clock.Clock) (*store.MemoryStore, pb.XASSer
 	return memStore, client, cleanup
 }
 
-// getControlMetrics reads the policy-wide control metrics of a policy, failing
-// the test if the call does. The metrics owned by recommenders are left out:
-// read the response directly to check them.
-func getControlMetrics(t *testing.T, ctx context.Context, client pb.XASServerClient, id *pb.PolicyId) *pb.ControlMetrics {
+// getControlMetrics reads the control metrics of a policy, failing the test if
+// the call does.
+func getControlMetrics(t *testing.T, ctx context.Context, client pb.XASServerClient, id *pb.PolicyId) *pb.GetControlMetricsResponse {
 	t.Helper()
 	res, err := client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{Id: id}.Build())
 	if err != nil {
 		t.Fatalf("GetControlMetrics(%s/%s) failed: %v", id.GetNamespace(), id.GetName(), err)
 	}
-	return res.GetControlMetrics()
+	return res
 }
 
 // TestServerEndToEndGRPC validates the full lifecycle of a scaling policy.
@@ -153,14 +152,16 @@ func TestServerEndToEndGRPC(t *testing.T) {
 	// 5. Calc Control Metrics
 	memStore.CalculateAll()
 
-	cm := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	res := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
 
-	wantCM := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"cpu_avg": 0.8},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(1010, 0)),
 		ReadyReplicas: proto.Int32(2),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"cpu_avg": 0.8},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 
@@ -286,9 +287,9 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 
-	cm := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	res := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
 	// Avg = 2.0
-	if diff := cmp.Diff(pb.ControlMetrics_builder{Values: map[string]float64{"cpu_avg": 2.0}, Timestamp: timestamppb.New(time.Unix(1012, 0)), ReadyReplicas: proto.Int32(4)}.Build(), cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	if diff := cmp.Diff(pb.GetControlMetricsResponse_builder{Timestamp: timestamppb.New(time.Unix(1012, 0)), ReadyReplicas: proto.Int32(4), ControlMetrics: pb.ControlMetrics_builder{Values: map[string]float64{"cpu_avg": 2.0}}.Build()}.Build(), res, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 
@@ -362,9 +363,9 @@ func TestExternalMetricGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 
-	cm := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	res := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
 	// Avg = 1000/10 = 100.
-	if diff := cmp.Diff(pb.ControlMetrics_builder{Values: map[string]float64{"queue": 100.0}, Timestamp: timestamppb.New(time.Unix(1000, 0)), ReadyReplicas: proto.Int32(10)}.Build(), cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	if diff := cmp.Diff(pb.GetControlMetricsResponse_builder{Timestamp: timestamppb.New(time.Unix(1000, 0)), ReadyReplicas: proto.Int32(10), ControlMetrics: pb.ControlMetrics_builder{Values: map[string]float64{"queue": 100.0}}.Build()}.Build(), res, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 
@@ -438,9 +439,9 @@ func TestPerPodExternalMetricGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 
-	cm := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	res := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
 	// Avg = (50+150)/2 = 100.
-	if diff := cmp.Diff(pb.ControlMetrics_builder{Values: map[string]float64{"sidecar_latency": 100.0}, Timestamp: timestamppb.New(time.Unix(1000, 0)), ReadyReplicas: proto.Int32(2)}.Build(), cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	if diff := cmp.Diff(pb.GetControlMetricsResponse_builder{Timestamp: timestamppb.New(time.Unix(1000, 0)), ReadyReplicas: proto.Int32(2), ControlMetrics: pb.ControlMetrics_builder{Values: map[string]float64{"sidecar_latency": 100.0}}.Build()}.Build(), res, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 
@@ -765,10 +766,10 @@ func TestHistogramWithFilterGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 
-	cm := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	res := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
 	// Value 0.492
-	wantCM := pb.ControlMetrics_builder{Values: map[string]float64{"api_latency": 0.492}, Timestamp: timestamppb.New(time.Unix(1010, 0)), ReadyReplicas: proto.Int32(1)}.Build()
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
+	wantRes := pb.GetControlMetricsResponse_builder{Timestamp: timestamppb.New(time.Unix(1010, 0)), ReadyReplicas: proto.Int32(1), ControlMetrics: pb.ControlMetrics_builder{Values: map[string]float64{"api_latency": 0.492}}.Build()}.Build()
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -910,13 +911,15 @@ func TestWindowedMetricsGRPC(t *testing.T) {
 	memStore.CalculateAll()
 
 	// Verify Control Metrics
-	cm := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
-	wantCM := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"cpu_hist": 1.1},
+	res := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(1000, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"cpu_hist": 1.1},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
 		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -1122,23 +1125,27 @@ func TestMultiplePoliciesGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 
-	cm1 := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("default"), Name: proto.String(p1)}.Build())
-	wantCM1 := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"cpu": 0.5},
+	res1 := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("default"), Name: proto.String(p1)}.Build())
+	wantRes1 := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"cpu": 0.5},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM1, cm1, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	if diff := cmp.Diff(wantRes1, res1, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("Policy 1 ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 
-	cm2 := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("default"), Name: proto.String(p2)}.Build())
-	wantCM2 := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"mem": 1024},
+	res2 := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("default"), Name: proto.String(p2)}.Build())
+	wantRes2 := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"mem": 1024},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM2, cm2, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	if diff := cmp.Diff(wantRes2, res2, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("Policy 2 ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -1199,23 +1206,27 @@ func TestNamespaceIsolationGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 
-	cm1 := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("ns1"), Name: proto.String(name)}.Build())
-	wantCM1 := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"m": 10},
+	res1 := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("ns1"), Name: proto.String(name)}.Build())
+	wantRes1 := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"m": 10},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM1, cm1, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	if diff := cmp.Diff(wantRes1, res1, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("NS1 ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 
-	cm2 := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("ns2"), Name: proto.String(name)}.Build())
-	wantCM2 := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"m": 20},
+	res2 := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("ns2"), Name: proto.String(name)}.Build())
+	wantRes2 := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"m": 20},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM2, cm2, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	if diff := cmp.Diff(wantRes2, res2, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("NS2 ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -1284,20 +1295,22 @@ func TestMetricAggregationGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 
-	cm := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	res := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
 
-	wantCM := pb.ControlMetrics_builder{
-		Values: map[string]float64{
-			"m_avg": 20.0,
-			"m_sum": 40.0,
-			"m_max": 30.0,
-			"m_min": 10.0,
-		},
+	wantRes := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
 		ReadyReplicas: proto.Int32(2),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{
+				"m_avg": 20.0,
+				"m_sum": 40.0,
+				"m_max": 30.0,
+				"m_min": 10.0,
+			},
+		}.Build(),
 	}.Build()
 
-	if diff := cmp.Diff(wantCM, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("Aggregation mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -1411,28 +1424,32 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
-	wantCM0 := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"load": 101.0}, // Bucket upper bound
+	res := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	wantRes0 := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(1000, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"load": 101.0}, // Bucket upper bound
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM0, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
+	if diff := cmp.Diff(wantRes0, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
 		t.Errorf("T0 ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 
 	// 3. T1: 10s later (1 Half-Life). No new data.
 	clk.Advance(10 * time.Second)
 	memStore.CalculateAll()
-	cm = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	res = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
 
 	// Expectation: Histogram p100 sticks to the last maximum seen until new data arrives.
-	wantCM1 := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"load": 101.0},
+	wantRes1 := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(1010, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"load": 101.0},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM1, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
+	if diff := cmp.Diff(wantRes1, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
 		t.Errorf("T1 ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 
@@ -1444,14 +1461,16 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	res = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
 
-	wantCM3 := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"load": 201.0},
+	wantRes3 := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(1010, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"load": 201.0},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM3, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
+	if diff := cmp.Diff(wantRes3, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
 		t.Errorf("T3 ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 
@@ -1464,14 +1483,16 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	cm = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	res = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
 
-	wantCM4 := pb.ControlMetrics_builder{
-		Values:        map[string]float64{"load": 301.0},
+	wantRes4 := pb.GetControlMetricsResponse_builder{
 		Timestamp:     timestamppb.New(time.Unix(4610, 0)),
 		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"load": 301.0},
+		}.Build(),
 	}.Build()
-	if diff := cmp.Diff(wantCM4, cm, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
+	if diff := cmp.Diff(wantRes4, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
 		t.Errorf("T4 ControlMetrics mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -1594,8 +1615,8 @@ func TestSlidingWindowGRPC(t *testing.T) {
 		Policies: []*pb.PolicyBatch{pb.PolicyBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
-	checkCM(t, cm, map[string]float64{"m": 10}, ts)
+	res := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	checkControlMetrics(t, res, map[string]float64{"m": 10}, ts)
 
 	// T1: 30s later, Ingest 20. Gauge is instantaneous, so it should see 20.
 	clk.Advance(30 * time.Second)
@@ -1605,8 +1626,8 @@ func TestSlidingWindowGRPC(t *testing.T) {
 		Policies: []*pb.PolicyBatch{pb.PolicyBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(20), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 	memStore.CalculateAll()
-	cm = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
-	checkCM(t, cm, map[string]float64{"m": 20}, ts)
+	res = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	checkControlMetrics(t, res, map[string]float64{"m": 20}, ts)
 
 	// T2: 90s later (60s after T1). Window contains [20] (10 expired after 60s).
 	clk.Advance(60 * time.Second)
@@ -1616,8 +1637,8 @@ func TestSlidingWindowGRPC(t *testing.T) {
 		Policies: []*pb.PolicyBatch{pb.PolicyBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(20), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 	memStore.CalculateAll()
-	cm = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
-	checkCM(t, cm, map[string]float64{"m": 20}, ts)
+	res = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	checkControlMetrics(t, res, map[string]float64{"m": 20}, ts)
 }
 
 // TestMetricGCGRPC validates that old metric series are garbage collected.
@@ -1654,8 +1675,8 @@ func TestMetricGCGRPC(t *testing.T) {
 
 	// Verify exists
 	memStore.CalculateAll()
-	cm := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
-	if len(cm.GetValues()) == 0 {
+	res := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	if len(res.GetControlMetrics().GetValues()) == 0 {
 		t.Fatal("Metric should exist")
 	}
 
@@ -1668,9 +1689,9 @@ func TestMetricGCGRPC(t *testing.T) {
 	// Verify gone.
 	// GetControlMetrics returns the last calculated state.
 	// If GC removed the series, CalculateAll should produce empty ControlMetrics.
-	cm = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
-	if len(cm.GetValues()) > 0 {
-		t.Errorf("Metric should be GC'd, found: %v", cm.GetValues())
+	res = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+	if len(res.GetControlMetrics().GetValues()) > 0 {
+		t.Errorf("Metric should be GC'd, found: %v", res.GetControlMetrics().GetValues())
 	}
 }
 
@@ -1746,9 +1767,9 @@ func TestPolicyMutationGRPC(t *testing.T) {
 	}.Build())
 	memStore.CalculateAll()
 
-	cm := getControlMetrics(t, ctx, client, pid)
-	if cm.GetValues()["m"] != 10 {
-		t.Errorf("Initial Gauge mismatch: %v", cm.GetValues()["m"])
+	res := getControlMetrics(t, ctx, client, pid)
+	if res.GetControlMetrics().GetValues()["m"] != 10 {
+		t.Errorf("Initial Gauge mismatch: %v", res.GetControlMetrics().GetValues()["m"])
 	}
 
 	// 2. Update to Counter (Rate)
@@ -1770,9 +1791,9 @@ func TestPolicyMutationGRPC(t *testing.T) {
 	}.Build())
 	memStore.CalculateAll()
 
-	cm = getControlMetrics(t, ctx, client, pid)
-	if _, ok := cm.GetValues()["m"]; ok {
-		t.Errorf("Mutation Counter: want no value from a single sample, got %v", cm.GetValues()["m"])
+	res = getControlMetrics(t, ctx, client, pid)
+	if _, ok := res.GetControlMetrics().GetValues()["m"]; ok {
+		t.Errorf("Mutation Counter: want no value from a single sample, got %v", res.GetControlMetrics().GetValues()["m"])
 	}
 
 	// 4. T2 (10s later): Value 30. Diff=10. Rate=1.
@@ -1784,21 +1805,23 @@ func TestPolicyMutationGRPC(t *testing.T) {
 	}.Build())
 	memStore.CalculateAll()
 
-	cm = getControlMetrics(t, ctx, client, pid)
+	res = getControlMetrics(t, ctx, client, pid)
 	// Rate = (30-20)/10 = 1.0
-	if cm.GetValues()["m"] != 1.0 {
-		t.Errorf("Mutation Counter mismatch: Want 1.0, Got %v", cm.GetValues()["m"])
+	if res.GetControlMetrics().GetValues()["m"] != 1.0 {
+		t.Errorf("Mutation Counter mismatch: Want 1.0, Got %v", res.GetControlMetrics().GetValues()["m"])
 	}
 }
 
-func checkCM(t *testing.T, got *pb.ControlMetrics, wantVals map[string]float64, wantTS int64) {
+// checkControlMetrics checks that the control metrics were calculated at
+// wantTS, and that the policy-wide metrics have the wantVals values.
+func checkControlMetrics(t *testing.T, got *pb.GetControlMetricsResponse, wantVals map[string]float64, wantTS int64) {
 	t.Helper()
 	if got.GetTimestamp().AsTime().Unix() != wantTS {
 		t.Errorf("Timestamp mismatch: want %d, got %d", wantTS, got.GetTimestamp().AsTime().Unix())
 	}
 	for k, v := range wantVals {
-		if got.GetValues()[k] != v {
-			t.Errorf("Value mismatch for %s: want %f, got %f", k, v, got.GetValues()[k])
+		if got.GetControlMetrics().GetValues()[k] != v {
+			t.Errorf("Value mismatch for %s: want %f, got %f", k, v, got.GetControlMetrics().GetValues()[k])
 		}
 	}
 }
@@ -1884,15 +1907,18 @@ func TestRecommenderOwnedMetricsGRPC(t *testing.T) {
 		t.Fatalf("GetControlMetrics failed: %v", err)
 	}
 	// Policy-wide scope: Avg(2, 4).
-	checkCM(t, res.GetControlMetrics(), map[string]float64{"cpu": 3}, start.Unix())
+	checkControlMetrics(t, res, map[string]float64{"cpu": 3}, start.Unix())
+	// The workload state is reported once, for every scope.
+	if res.GetReadyReplicas() != 2 {
+		t.Errorf("GetControlMetrics() ready replicas = %d, want 2", res.GetReadyReplicas())
+	}
 	// Recommender scope: only its own metric, with its own aggregation Max(20, 40).
 	owned := res.GetRecommenderControlMetrics()
 	if _, ok := owned["vpa"]; !ok {
 		t.Fatalf("GetControlMetrics() recommender_control_metrics = %v, want an entry for vpa", owned)
 	}
-	checkCM(t, owned["vpa"], map[string]float64{"cpu": 40}, start.Unix())
-	if owned["vpa"].GetReadyReplicas() != 2 {
-		t.Errorf("GetControlMetrics() vpa ready replicas = %d, want 2", owned["vpa"].GetReadyReplicas())
+	if diff := cmp.Diff(map[string]float64{"cpu": 40}, owned["vpa"].GetValues()); diff != "" {
+		t.Errorf("GetControlMetrics() vpa values mismatch (-want +got):\n%s", diff)
 	}
 	// A recommender that owns no metric has no entry.
 	if _, ok := owned["hpa"]; ok {
@@ -2127,9 +2153,9 @@ func TestWatchControlMetricsGRPC(t *testing.T) {
 	wantResponse := func(qps, owned float64) *pb.WatchControlMetricsResponse {
 		return pb.WatchControlMetricsResponse_builder{
 			Id:             id,
-			ControlMetrics: pb.ControlMetrics_builder{Values: map[string]float64{"qps": qps}, ReadyReplicas: proto.Int32(1), Timestamp: timestamppb.New(clk.Now())}.Build(),
+			ControlMetrics: pb.ControlMetrics_builder{Values: map[string]float64{"qps": qps}}.Build(),
 			RecommenderControlMetrics: map[string]*pb.ControlMetrics{
-				"lin": pb.ControlMetrics_builder{Values: map[string]float64{"owned": owned}, ReadyReplicas: proto.Int32(1), Timestamp: timestamppb.New(clk.Now())}.Build(),
+				"lin": pb.ControlMetrics_builder{Values: map[string]float64{"owned": owned}}.Build(),
 			},
 		}.Build()
 	}

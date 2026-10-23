@@ -2884,11 +2884,15 @@ func (b0 GetControlMetricsRequest_builder) Build() *GetControlMetricsRequest {
 }
 
 // GetControlMetricsResponse contains ControlMetrics (both global and
-// recommender-owned).
+// recommender-owned), as well as basic workload information.
 type GetControlMetricsResponse struct {
 	state                                protoimpl.MessageState     `protogen:"opaque.v1"`
-	xxx_hidden_ControlMetrics            *ControlMetrics            `protobuf:"bytes,1,opt,name=control_metrics,json=controlMetrics"`
-	xxx_hidden_RecommenderControlMetrics map[string]*ControlMetrics `protobuf:"bytes,2,rep,name=recommender_control_metrics,json=recommenderControlMetrics" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	xxx_hidden_Timestamp                 *timestamppb.Timestamp     `protobuf:"bytes,1,opt,name=timestamp"`
+	xxx_hidden_ReadyReplicas             int32                      `protobuf:"varint,2,opt,name=ready_replicas,json=readyReplicas"`
+	xxx_hidden_ControlMetrics            *ControlMetrics            `protobuf:"bytes,3,opt,name=control_metrics,json=controlMetrics"`
+	xxx_hidden_RecommenderControlMetrics map[string]*ControlMetrics `protobuf:"bytes,4,rep,name=recommender_control_metrics,json=recommenderControlMetrics" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	XXX_raceDetectHookData               protoimpl.RaceDetectHookData
+	XXX_presence                         [1]uint32
 	unknownFields                        protoimpl.UnknownFields
 	sizeCache                            protoimpl.SizeCache
 }
@@ -2918,6 +2922,20 @@ func (x *GetControlMetricsResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
+func (x *GetControlMetricsResponse) GetTimestamp() *timestamppb.Timestamp {
+	if x != nil {
+		return x.xxx_hidden_Timestamp
+	}
+	return nil
+}
+
+func (x *GetControlMetricsResponse) GetReadyReplicas() int32 {
+	if x != nil {
+		return x.xxx_hidden_ReadyReplicas
+	}
+	return 0
+}
+
 func (x *GetControlMetricsResponse) GetControlMetrics() *ControlMetrics {
 	if x != nil {
 		return x.xxx_hidden_ControlMetrics
@@ -2932,12 +2950,35 @@ func (x *GetControlMetricsResponse) GetRecommenderControlMetrics() map[string]*C
 	return nil
 }
 
+func (x *GetControlMetricsResponse) SetTimestamp(v *timestamppb.Timestamp) {
+	x.xxx_hidden_Timestamp = v
+}
+
+func (x *GetControlMetricsResponse) SetReadyReplicas(v int32) {
+	x.xxx_hidden_ReadyReplicas = v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 4)
+}
+
 func (x *GetControlMetricsResponse) SetControlMetrics(v *ControlMetrics) {
 	x.xxx_hidden_ControlMetrics = v
 }
 
 func (x *GetControlMetricsResponse) SetRecommenderControlMetrics(v map[string]*ControlMetrics) {
 	x.xxx_hidden_RecommenderControlMetrics = v
+}
+
+func (x *GetControlMetricsResponse) HasTimestamp() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Timestamp != nil
+}
+
+func (x *GetControlMetricsResponse) HasReadyReplicas() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
 }
 
 func (x *GetControlMetricsResponse) HasControlMetrics() bool {
@@ -2947,6 +2988,15 @@ func (x *GetControlMetricsResponse) HasControlMetrics() bool {
 	return x.xxx_hidden_ControlMetrics != nil
 }
 
+func (x *GetControlMetricsResponse) ClearTimestamp() {
+	x.xxx_hidden_Timestamp = nil
+}
+
+func (x *GetControlMetricsResponse) ClearReadyReplicas() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
+	x.xxx_hidden_ReadyReplicas = 0
+}
+
 func (x *GetControlMetricsResponse) ClearControlMetrics() {
 	x.xxx_hidden_ControlMetrics = nil
 }
@@ -2954,7 +3004,13 @@ func (x *GetControlMetricsResponse) ClearControlMetrics() {
 type GetControlMetricsResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	ControlMetrics            *ControlMetrics
+	// Timestamp of the calculation.
+	Timestamp *timestamppb.Timestamp
+	// The number of ready replicas.
+	ReadyReplicas *int32
+	// Global metrics.
+	ControlMetrics *ControlMetrics
+	// Per-recommender metrics.
 	RecommenderControlMetrics map[string]*ControlMetrics
 }
 
@@ -2962,6 +3018,11 @@ func (b0 GetControlMetricsResponse_builder) Build() *GetControlMetricsResponse {
 	m0 := &GetControlMetricsResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
+	x.xxx_hidden_Timestamp = b.Timestamp
+	if b.ReadyReplicas != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 4)
+		x.xxx_hidden_ReadyReplicas = *b.ReadyReplicas
+	}
 	x.xxx_hidden_ControlMetrics = b.ControlMetrics
 	x.xxx_hidden_RecommenderControlMetrics = b.RecommenderControlMetrics
 	return m0
@@ -3088,14 +3149,10 @@ func (b0 ContainerMetrics_builder) Build() *ContainerMetrics {
 // ControlMetrics contains the aggregated values calculated by the Server.
 type ControlMetrics struct {
 	state                          protoimpl.MessageState       `protogen:"opaque.v1"`
-	xxx_hidden_Timestamp           *timestamppb.Timestamp       `protobuf:"bytes,2,opt,name=timestamp"`
-	xxx_hidden_ReadyReplicas       int32                        `protobuf:"varint,3,opt,name=ready_replicas,json=readyReplicas"`
 	xxx_hidden_Values              map[string]float64           `protobuf:"bytes,1,rep,name=values" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"fixed64,2,opt,name=value"`
 	xxx_hidden_PodMetrics          map[string]*MetricValues     `protobuf:"bytes,4,rep,name=pod_metrics,json=podMetrics" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	xxx_hidden_PodContainerMetrics map[string]*ContainerMetrics `protobuf:"bytes,5,rep,name=pod_container_metrics,json=podContainerMetrics" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	xxx_hidden_ContainerMetrics    *ContainerMetrics            `protobuf:"bytes,6,opt,name=container_metrics,json=containerMetrics"`
-	XXX_raceDetectHookData         protoimpl.RaceDetectHookData
-	XXX_presence                   [1]uint32
 	unknownFields                  protoimpl.UnknownFields
 	sizeCache                      protoimpl.SizeCache
 }
@@ -3123,20 +3180,6 @@ func (x *ControlMetrics) ProtoReflect() protoreflect.Message {
 		return ms
 	}
 	return mi.MessageOf(x)
-}
-
-func (x *ControlMetrics) GetTimestamp() *timestamppb.Timestamp {
-	if x != nil {
-		return x.xxx_hidden_Timestamp
-	}
-	return nil
-}
-
-func (x *ControlMetrics) GetReadyReplicas() int32 {
-	if x != nil {
-		return x.xxx_hidden_ReadyReplicas
-	}
-	return 0
 }
 
 func (x *ControlMetrics) GetValues() map[string]float64 {
@@ -3167,15 +3210,6 @@ func (x *ControlMetrics) GetContainerMetrics() *ContainerMetrics {
 	return nil
 }
 
-func (x *ControlMetrics) SetTimestamp(v *timestamppb.Timestamp) {
-	x.xxx_hidden_Timestamp = v
-}
-
-func (x *ControlMetrics) SetReadyReplicas(v int32) {
-	x.xxx_hidden_ReadyReplicas = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 6)
-}
-
 func (x *ControlMetrics) SetValues(v map[string]float64) {
 	x.xxx_hidden_Values = v
 }
@@ -3192,34 +3226,11 @@ func (x *ControlMetrics) SetContainerMetrics(v *ContainerMetrics) {
 	x.xxx_hidden_ContainerMetrics = v
 }
 
-func (x *ControlMetrics) HasTimestamp() bool {
-	if x == nil {
-		return false
-	}
-	return x.xxx_hidden_Timestamp != nil
-}
-
-func (x *ControlMetrics) HasReadyReplicas() bool {
-	if x == nil {
-		return false
-	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
-}
-
 func (x *ControlMetrics) HasContainerMetrics() bool {
 	if x == nil {
 		return false
 	}
 	return x.xxx_hidden_ContainerMetrics != nil
-}
-
-func (x *ControlMetrics) ClearTimestamp() {
-	x.xxx_hidden_Timestamp = nil
-}
-
-func (x *ControlMetrics) ClearReadyReplicas() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
-	x.xxx_hidden_ReadyReplicas = 0
 }
 
 func (x *ControlMetrics) ClearContainerMetrics() {
@@ -3229,10 +3240,6 @@ func (x *ControlMetrics) ClearContainerMetrics() {
 type ControlMetrics_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// Timestamp of the calculation.
-	Timestamp *timestamppb.Timestamp
-	// The number of ready replicas.
-	ReadyReplicas *int32
 	// Global metric values, keyed by metric name.
 	Values map[string]float64
 	// Per pod metric values, keyed by pod name.
@@ -3247,11 +3254,6 @@ func (b0 ControlMetrics_builder) Build() *ControlMetrics {
 	m0 := &ControlMetrics{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_Timestamp = b.Timestamp
-	if b.ReadyReplicas != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 6)
-		x.xxx_hidden_ReadyReplicas = *b.ReadyReplicas
-	}
 	x.xxx_hidden_Values = b.Values
 	x.xxx_hidden_PodMetrics = b.PodMetrics
 	x.xxx_hidden_PodContainerMetrics = b.PodContainerMetrics
@@ -5826,10 +5828,12 @@ const file_xas_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"A\n" +
 	"\x18GetControlMetricsRequest\x12%\n" +
-	"\x02id\x18\x01 \x01(\v2\x15.xas.v1alpha.PolicyIdR\x02id\"\xd4\x02\n" +
-	"\x19GetControlMetricsResponse\x12D\n" +
-	"\x0fcontrol_metrics\x18\x01 \x01(\v2\x1b.xas.v1alpha.ControlMetricsR\x0econtrolMetrics\x12\x85\x01\n" +
-	"\x1brecommender_control_metrics\x18\x02 \x03(\v2E.xas.v1alpha.GetControlMetricsResponse.RecommenderControlMetricsEntryR\x19recommenderControlMetrics\x1ai\n" +
+	"\x02id\x18\x01 \x01(\v2\x15.xas.v1alpha.PolicyIdR\x02id\"\xb5\x03\n" +
+	"\x19GetControlMetricsResponse\x128\n" +
+	"\ttimestamp\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12%\n" +
+	"\x0eready_replicas\x18\x02 \x01(\x05R\rreadyReplicas\x12D\n" +
+	"\x0fcontrol_metrics\x18\x03 \x01(\v2\x1b.xas.v1alpha.ControlMetricsR\x0econtrolMetrics\x12\x85\x01\n" +
+	"\x1brecommender_control_metrics\x18\x04 \x03(\v2E.xas.v1alpha.GetControlMetricsResponse.RecommenderControlMetricsEntryR\x19recommenderControlMetrics\x1ai\n" +
 	"\x1eRecommenderControlMetricsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x121\n" +
 	"\x05value\x18\x02 \x01(\v2\x1b.xas.v1alpha.ControlMetricsR\x05value:\x028\x01\"\x88\x01\n" +
@@ -5842,10 +5846,8 @@ const file_xas_proto_rawDesc = "" +
 	"\x11container_metrics\x18\x01 \x03(\v23.xas.v1alpha.ContainerMetrics.ContainerMetricsEntryR\x10containerMetrics\x1a^\n" +
 	"\x15ContainerMetricsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12/\n" +
-	"\x05value\x18\x02 \x01(\v2\x19.xas.v1alpha.MetricValuesR\x05value:\x028\x01\"\xb2\x05\n" +
-	"\x0eControlMetrics\x128\n" +
-	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12%\n" +
-	"\x0eready_replicas\x18\x03 \x01(\x05R\rreadyReplicas\x12?\n" +
+	"\x05value\x18\x02 \x01(\v2\x19.xas.v1alpha.MetricValuesR\x05value:\x028\x01\"\xd1\x04\n" +
+	"\x0eControlMetrics\x12?\n" +
 	"\x06values\x18\x01 \x03(\v2'.xas.v1alpha.ControlMetrics.ValuesEntryR\x06values\x12L\n" +
 	"\vpod_metrics\x18\x04 \x03(\v2+.xas.v1alpha.ControlMetrics.PodMetricsEntryR\n" +
 	"podMetrics\x12h\n" +
@@ -6071,11 +6073,11 @@ var file_xas_proto_depIdxs = []int32{
 	48, // 31: xas.v1alpha.ContainerState.requests:type_name -> xas.v1alpha.ContainerState.RequestsEntry
 	49, // 32: xas.v1alpha.ContainerState.limits:type_name -> xas.v1alpha.ContainerState.LimitsEntry
 	0,  // 33: xas.v1alpha.GetControlMetricsRequest.id:type_name -> xas.v1alpha.PolicyId
-	25, // 34: xas.v1alpha.GetControlMetricsResponse.control_metrics:type_name -> xas.v1alpha.ControlMetrics
-	50, // 35: xas.v1alpha.GetControlMetricsResponse.recommender_control_metrics:type_name -> xas.v1alpha.GetControlMetricsResponse.RecommenderControlMetricsEntry
-	51, // 36: xas.v1alpha.MetricValues.values:type_name -> xas.v1alpha.MetricValues.ValuesEntry
-	52, // 37: xas.v1alpha.ContainerMetrics.container_metrics:type_name -> xas.v1alpha.ContainerMetrics.ContainerMetricsEntry
-	63, // 38: xas.v1alpha.ControlMetrics.timestamp:type_name -> google.protobuf.Timestamp
+	63, // 34: xas.v1alpha.GetControlMetricsResponse.timestamp:type_name -> google.protobuf.Timestamp
+	25, // 35: xas.v1alpha.GetControlMetricsResponse.control_metrics:type_name -> xas.v1alpha.ControlMetrics
+	50, // 36: xas.v1alpha.GetControlMetricsResponse.recommender_control_metrics:type_name -> xas.v1alpha.GetControlMetricsResponse.RecommenderControlMetricsEntry
+	51, // 37: xas.v1alpha.MetricValues.values:type_name -> xas.v1alpha.MetricValues.ValuesEntry
+	52, // 38: xas.v1alpha.ContainerMetrics.container_metrics:type_name -> xas.v1alpha.ContainerMetrics.ContainerMetricsEntry
 	53, // 39: xas.v1alpha.ControlMetrics.values:type_name -> xas.v1alpha.ControlMetrics.ValuesEntry
 	54, // 40: xas.v1alpha.ControlMetrics.pod_metrics:type_name -> xas.v1alpha.ControlMetrics.PodMetricsEntry
 	55, // 41: xas.v1alpha.ControlMetrics.pod_container_metrics:type_name -> xas.v1alpha.ControlMetrics.PodContainerMetricsEntry

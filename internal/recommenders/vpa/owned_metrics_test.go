@@ -294,7 +294,7 @@ func TestRecommendOwnedMetrics(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &VPARecommender{}
-			got := r.Recommend(pb.RecommenderDefinition_builder{Params: tt.params}.Build(), tt.state, tt.owned, workload)
+			got := r.Recommend(pb.RecommenderDefinition_builder{Params: tt.params}.Build(), tt.state, tt.owned, 0, workload)
 			if !got.GetIsActive() {
 				t.Fatalf("Recommend() inactive: %s", got.GetMessage())
 			}
@@ -310,7 +310,7 @@ func TestRecommendOwnedMetrics(t *testing.T) {
 
 func TestRecommendNoOwnedData(t *testing.T) {
 	r := &VPARecommender{}
-	got := r.Recommend(pb.RecommenderDefinition_builder{Params: map[string]string{"container": "app"}}.Build(), &pb.ControlMetrics{}, &pb.ControlMetrics{}, nil)
+	got := r.Recommend(pb.RecommenderDefinition_builder{Params: map[string]string{"container": "app"}}.Build(), &pb.ControlMetrics{}, &pb.ControlMetrics{}, 0, nil)
 	if got.GetIsActive() {
 		t.Fatalf("Recommend() active, want inactive without data")
 	}

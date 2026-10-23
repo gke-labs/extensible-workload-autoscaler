@@ -24,10 +24,11 @@ import (
 
 type Recommender interface {
 	// Recommend returns the recommendation of a recommender, given the
-	// policy-wide metrics, the metrics it owns (nil if it owns none), and
-	// the workload's pods with their current requests (e.g. to only resize
-	// the pods that need it).
-	Recommend(def *pb.RecommenderDefinition, metrics, ownedMetrics *pb.ControlMetrics, workload *pb.Workload) *pb.Recommendation
+	// policy-wide metrics, the metrics it owns (nil if it owns none), the
+	// number of ready replicas the metrics were calculated against, and the
+	// workload's pods with their current requests (e.g. to only resize the
+	// pods that need it).
+	Recommend(def *pb.RecommenderDefinition, metrics, ownedMetrics *pb.ControlMetrics, readyReplicas int32, workload *pb.Workload) *pb.Recommendation
 }
 
 // The VPA recommender owns the metrics the user doesn't configure.
@@ -111,8 +112,8 @@ func (e *Engine) processPolicy(policy *pb.Policy) {
 	}
 
 	// Call each recommender to get their recommendation. Provide the
-	// policy-wide metrics, the metrics owned by the recommender, and the
-	// workload.
+	// policy-wide metrics, the metrics owned by the recommender, the ready
+	// replicas, and the workload.
 	var recommendations []namedRecommendation
 	for _, def := range slices.Concat(policy.GetActivation(), policy.GetScaling()) {
 		if err, ok := configErrs[def.GetName()]; ok {
@@ -130,7 +131,7 @@ func (e *Engine) processPolicy(policy *pb.Policy) {
 		}
 		// Recommenders that own no metric have no entry: ownedMetrics is nil.
 		ownedMetrics := metrics.GetRecommenderControlMetrics()[def.GetName()]
-		if v := rec.Recommend(def, metrics.GetControlMetrics(), ownedMetrics, workload); v != nil {
+		if v := rec.Recommend(def, metrics.GetControlMetrics(), ownedMetrics, metrics.GetReadyReplicas(), workload); v != nil {
 			recommendations = append(recommendations, namedRecommendation{name: def.GetName(), recommendation: v})
 		}
 	}

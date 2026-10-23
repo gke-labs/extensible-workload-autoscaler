@@ -320,10 +320,16 @@ message GetControlMetricsRequest {
 }
 
 // GetControlMetricsResponse contains ControlMetrics (both global and
-// recommender-owned).
+// recommender-owned), as well as basic workload information.
 message GetControlMetricsResponse {
-  ControlMetrics control_metrics = 1; 
-  map<string, ControlMetrics> recommender_control_metrics = 2; 
+  // Timestamp of the calculation.
+  google.protobuf.Timestamp timestamp = 1;
+  // The number of ready replicas.
+  int32 ready_replicas = 2;
+  // Global metrics.
+  ControlMetrics control_metrics = 3; 
+  // Per-recommender metrics.
+  map<string, ControlMetrics> recommender_control_metrics = 4;
 }
 
 // A set of control metric values.
@@ -340,10 +346,6 @@ message ContainerMetrics {
 
 // ControlMetrics contains the aggregated values calculated by the Server.
 message ControlMetrics {
-  // Timestamp of the calculation.
-  google.protobuf.Timestamp timestamp = 2;
-  // The number of ready replicas.
-  int32 ready_replicas = 3;
   // Global metric values, keyed by metric name.
   map<string, double> values = 1;
   // Per pod metric values, keyed by pod name.

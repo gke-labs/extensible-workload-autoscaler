@@ -241,7 +241,7 @@ func TestMetricCalculations(t *testing.T) {
 
 			s.CalculateAll()
 
-			cm, _, _ := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
+			cm := policyControlMetrics(s, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
 			got := make(map[string]float64)
 			if cm != nil {
 				got = cm.GetValues()
@@ -260,6 +260,13 @@ func TestMetricCalculations(t *testing.T) {
 }
 
 // --- Helpers ---
+
+// policyControlMetrics returns the policy-wide control metrics of a policy,
+// nil if it has not been calculated.
+func policyControlMetrics(s *MemoryStore, id *pb.PolicyId) *pb.ControlMetrics {
+	res, _ := s.GetControlMetrics(id)
+	return res.GetControlMetrics()
+}
 
 func ingest(s *MemoryStore, ts int64, ns, pol, pod, metric string, val float64) {
 	ingestWithLabels(s, ts, ns, pol, pod, metric, val, nil)
@@ -519,11 +526,12 @@ func TestDump(t *testing.T) {
     "ControlMetrics": {
       "timestamp": "1970-01-01T00:16:40Z",
       "ready_replicas": 1,
-      "values": {
-        "cpu": 1
+      "control_metrics": {
+        "values": {
+          "cpu": 1
+        }
       }
-    },
-    "RecommenderControlMetrics": null
+    }
   }
 }`
 	expected = strings.Replace(expected, `"etag": "ETAG"`, `"etag": "`+stored.GetEtag()+`"`, 1)
@@ -581,7 +589,7 @@ func TestWindowedMetrics(t *testing.T) {
 	ingest(s, clk.Now().Unix(), ns, pol, "p1", "cpu_slide", 0.1)
 
 	s.CalculateAll()
-	cm, _, _ := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build())
+	cm := policyControlMetrics(s, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build())
 
 	// Histogram should remember the 1.0 spike (approx 1.0 bucket upper bound -> 1.1)
 	// Sliding Window (Max) should see 1.0.
@@ -606,7 +614,7 @@ func TestWindowedMetrics(t *testing.T) {
 	ingest(s, clk.Now().Unix(), ns, pol, "p1", "cpu_slide", 0.2)
 
 	s.CalculateAll()
-	cm, _, _ = s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build())
+	cm = policyControlMetrics(s, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build())
 
 	// Gauge should see 0.2.
 	if cm.GetValues()["cpu_slide"] != 0.2 {
@@ -656,7 +664,7 @@ func TestAggregatedDecayingHistogram(t *testing.T) {
 	ingest(s, clk.Now().Unix(), ns, pol, "p2", "cpu", 1.5)
 
 	s.CalculateAll()
-	cm, _, _ := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build())
+	cm := policyControlMetrics(s, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build())
 	val := cm.GetValues()["cpu"]
 
 	// If it's 1.1, it's per-pod aggregation (Avg of p95s).
@@ -741,14 +749,14 @@ func TestMultiTenantIsolation(t *testing.T) {
 	s.CalculateAll()
 
 	// 4. Verify Isolation
-	cmA, _, okA := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("cluster-A"), Namespace: proto.String(ns), Name: proto.String(name)}.Build())
-	if !okA || cmA.GetValues()["m"] != 100 {
-		t.Errorf("Cluster A: Want 100, Got %v", cmA)
+	resA, okA := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("cluster-A"), Namespace: proto.String(ns), Name: proto.String(name)}.Build())
+	if !okA || resA.GetControlMetrics().GetValues()["m"] != 100 {
+		t.Errorf("Cluster A: Want 100, Got %v", resA)
 	}
 
-	cmB, _, okB := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("cluster-B"), Namespace: proto.String(ns), Name: proto.String(name)}.Build())
-	if !okB || cmB.GetValues()["m"] != 200 {
-		t.Errorf("Cluster B: Want 200, Got %v", cmB)
+	resB, okB := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("cluster-B"), Namespace: proto.String(ns), Name: proto.String(name)}.Build())
+	if !okB || resB.GetControlMetrics().GetValues()["m"] != 200 {
+		t.Errorf("Cluster B: Want 200, Got %v", resB)
 	}
 
 	// 5. Verify ListPolicies Filtering
@@ -899,7 +907,7 @@ func TestPodScopedDecayingHistogram(t *testing.T) {
 	ingest(s, clk.Now().Unix(), ns, pol, "p2", "cpu", 1.5)
 
 	s.CalculateAll()
-	cm, _, _ := s.GetControlMetrics(pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build())
+	cm := policyControlMetrics(s, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(pol)}.Build())
 
 	if cm.GetValues()["cpu"] != 0 {
 		t.Errorf("Pod scoped metric should not have a global value, got %f", cm.GetValues()["cpu"])
@@ -996,10 +1004,11 @@ func TestContainerResourceRequestWeighting(t *testing.T) {
 	}
 
 	s.CalculateAll()
-	cm, _, ok := s.GetControlMetrics(id)
+	res, ok := s.GetControlMetrics(id)
 	if !ok {
 		t.Fatalf("No control metrics")
 	}
+	cm := res.GetControlMetrics()
 
 	// p1: 0.5*(100/400) + 0.1*(300/400) = 0.2
 	if got, want := cm.GetPodMetrics()["p1"].GetValues()["cpu_util"], 0.2; math.Abs(got-want) > 1e-9 {
@@ -1198,32 +1207,30 @@ func TestRecommenderOwnedMetrics(t *testing.T) {
 
 	s.CalculateAll()
 
-	cm, rcm, ok := s.GetControlMetrics(id)
+	res, ok := s.GetControlMetrics(id)
 	if !ok {
 		t.Fatal("GetControlMetrics() not found")
 	}
-	// Policy-wide metrics are unaffected by the owned ones: Avg(1, 3).
-	if diff := cmp.Diff(map[string]float64{"cpu": 2}, cm.GetValues()); diff != "" {
-		t.Errorf("GetControlMetrics() policy-wide values mismatch (-want +got):\n%s", diff)
+	// The workload state is reported once, for all the owners.
+	if res.GetReadyReplicas() != 2 {
+		t.Errorf("GetControlMetrics() ready replicas = %d, want 2", res.GetReadyReplicas())
 	}
-	if cm.GetReadyReplicas() != 2 {
-		t.Errorf("GetControlMetrics() policy-wide ready replicas = %d, want 2", cm.GetReadyReplicas())
+	// Policy-wide metrics are unaffected by the owned ones: Avg(1, 3).
+	if diff := cmp.Diff(map[string]float64{"cpu": 2}, res.GetControlMetrics().GetValues()); diff != "" {
+		t.Errorf("GetControlMetrics() policy-wide values mismatch (-want +got):\n%s", diff)
 	}
 
 	// Each owner gets its metrics, aggregated its own way. A recommender
-	// owning no metric has no entry: the workload state is in the policy-wide
-	// metrics.
+	// owning no metric has no entry.
 	wantOwned := map[string]map[string]float64{
 		// Max(10, 30), plus its own metric.
 		"vpa": {"cpu": 30, "memory": 100},
 		"hpa": {"cpu": 7},
 	}
+	rcm := res.GetRecommenderControlMetrics()
 	gotOwned := make(map[string]map[string]float64, len(rcm))
 	for owner, ocm := range rcm {
 		gotOwned[owner] = ocm.GetValues()
-		if ocm.GetReadyReplicas() != 2 {
-			t.Errorf("GetControlMetrics() %q ready replicas = %d, want 2", owner, ocm.GetReadyReplicas())
-		}
 	}
 	if diff := cmp.Diff(wantOwned, gotOwned); diff != "" {
 		t.Errorf("GetControlMetrics() owned values mismatch (-want +got):\n%s", diff)

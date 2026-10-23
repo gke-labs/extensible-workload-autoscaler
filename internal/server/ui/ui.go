@@ -324,19 +324,23 @@ const pageTemplate = `
 
         // metricOwners returns every scope holding control metrics: the
         // policy-wide one first, then one per recommender owning metrics.
-        // Metric names are only unique within their owner.
+        // Metric names are only unique within their owner. All the scopes
+        // are calculated together: they share the response's timestamp.
         function metricOwners(ps) {
+            const res = ps.ControlMetrics || {};
             const owners = [{
                 name: '',
                 defs: ps.Policy.metrics || [],
-                cm: ps.ControlMetrics,
+                cm: res.control_metrics,
+                timestamp: res.timestamp,
             }];
             const owned = ps.Policy.recommender_metrics || {};
             Object.keys(owned).sort().forEach(name => {
                 owners.push({
                     name: name,
                     defs: (owned[name] && owned[name].definitions) || [],
-                    cm: (ps.RecommenderControlMetrics || {})[name],
+                    cm: (res.recommender_control_metrics || {})[name],
+                    timestamp: res.timestamp,
                 });
             });
             return owners;
@@ -404,7 +408,7 @@ const pageTemplate = `
                             '<td class="text-muted-small">' + d.params + '</td>' +
                             '<td class="text-muted-small">' + d.config + '</td>' +
                             '<td><strong>' + formatFloat(val) + '</strong></td>' +
-                            '<td>' + formatTime(cm.timestamp) + '</td>' +
+                            '<td>' + formatTime(owner.timestamp) + '</td>' +
                         '</tr>';
                 }
             }
@@ -457,7 +461,7 @@ const pageTemplate = `
                             '<td class="text-muted-small">' + d.params + '</td>' +
                             '<td class="text-muted-small">' + d.config + '</td>' +
                             '<td>' + podValsHtml + '</td>' +
-                            '<td>' + formatTime(cm.timestamp) + '</td>' +
+                            '<td>' + formatTime(owner.timestamp) + '</td>' +
                         '</tr>';
                 }
             }
@@ -494,7 +498,7 @@ const pageTemplate = `
                             '<td class="text-muted-small">' + d.params + '</td>' +
                             '<td class="text-muted-small">' + d.config + '</td>' +
                             '<td>' + containerValsHtml + '</td>' +
-                            '<td>' + formatTime(cm.timestamp) + '</td>' +
+                            '<td>' + formatTime(owner.timestamp) + '</td>' +
                         '</tr>';
                 }
             }

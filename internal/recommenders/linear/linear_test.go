@@ -81,11 +81,8 @@ func TestLinearRecommend(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			state := pb.ControlMetrics_builder{
-				Values:        tc.controlMetrics,
-				ReadyReplicas: proto.Int32(tc.readyReplicas),
-			}.Build()
-			got := rec.Recommend(tc.def, state, nil, nil)
+			state := pb.ControlMetrics_builder{Values: tc.controlMetrics}.Build()
+			got := rec.Recommend(tc.def, state, nil, tc.readyReplicas, nil)
 			if diff := cmp.Diff(tc.want, got, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 				t.Errorf("Recommend() mismatch (-want +got):\n%s", diff)
 			}

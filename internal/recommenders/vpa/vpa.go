@@ -213,7 +213,7 @@ func (r *VPARecommender) OwnedMetrics(def *pb.RecommenderDefinition, policyMetri
 // needsUpdate), otherwise the target. The limits keep the limit/request ratio
 // of the cpu-limit-ratio / mem-limit-ratio params, or else the pods' current
 // one (see limitFor). The target and bounds are reported in the message.
-func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, ownedMetrics *pb.ControlMetrics, workload *pb.Workload) *pb.Recommendation {
+func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, ownedMetrics *pb.ControlMetrics, _ int32, workload *pb.Workload) *pb.Recommendation {
 	var warnings []string
 
 	//Parse the configuration from def.Params using parseConfig.
