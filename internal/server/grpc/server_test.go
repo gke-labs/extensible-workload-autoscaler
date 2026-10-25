@@ -2063,8 +2063,10 @@ func TestGetWorkloadGRPC(t *testing.T) {
 //  2. Register the workload, ingest metrics and calculate.
 //  3. Open a watch and recalculate without changes: nothing must be streamed.
 //  4. Ingest a new value: the change must be streamed, including the
-//     recommender-owned metrics.
-//  5. Validation: a request without cluster must be rejected.
+//     recommender-owned metrics and the ready replicas.
+//  5. Add a ready pod without changing the metrics: the change in ready
+//     replicas must be streamed on its own.
+//  6. Validation: a request without cluster must be rejected.
 func TestWatchControlMetricsGRPC(t *testing.T) {
 	clk := &clock.FakeClock{CurrentTime: time.Unix(1000, 0)}
 	memStore, client, cleanup := setupGRPCServer(t, clk)
@@ -2150,23 +2152,43 @@ func TestWatchControlMetricsGRPC(t *testing.T) {
 		}
 		return res
 	}
-	wantResponse := func(qps, owned float64) *pb.WatchControlMetricsResponse {
+	wantResponse := func(readyReplicas int32, qps, owned float64) *pb.WatchControlMetricsResponse {
 		return pb.WatchControlMetricsResponse_builder{
 			Id:             id,
 			ControlMetrics: pb.ControlMetrics_builder{Values: map[string]float64{"qps": qps}}.Build(),
 			RecommenderControlMetrics: map[string]*pb.ControlMetrics{
 				"lin": pb.ControlMetrics_builder{Values: map[string]float64{"owned": owned}}.Build(),
 			},
+			ReadyReplicas: proto.Int32(readyReplicas),
 		}.Build()
 	}
 	opts := []cmp.Option{protocmp.Transform(), protocmp.IgnoreDefaultScalars(), protocmp.IgnoreEmptyMessages()}
 	clk.Advance(10 * time.Second)
 	ingest(7, 70)
-	if diff := cmp.Diff(wantResponse(7, 70), recv(), opts...); diff != "" {
+	if diff := cmp.Diff(wantResponse(1, 7, 70), recv(), opts...); diff != "" {
 		t.Errorf("change mismatch (-want +got):\n%s", diff)
 	}
 
-	// 5. Validation.
+	// 5. A change in the ready replicas alone is streamed too. Re-ingesting
+	// the same values publishes nothing (the event is a duplicate), so the
+	// next message received must be the one with the second ready pod, whose
+	// metrics are unchanged as that pod reports no sample.
+	ingest(7, 70)
+	if _, err := client.UpdateWorkload(ctx, pb.UpdateWorkloadRequest_builder{
+		Id: id,
+		Workload: pb.Workload_builder{Pods: []*pb.PodState{
+			pb.PodState_builder{Name: proto.String("p1"), IsReady: proto.Bool(true)}.Build(),
+			pb.PodState_builder{Name: proto.String("p2"), IsReady: proto.Bool(true)}.Build(),
+		}}.Build(),
+	}.Build()); err != nil {
+		t.Fatalf("UpdateWorkload: %v", err)
+	}
+	ingest(7, 70)
+	if diff := cmp.Diff(wantResponse(2, 7, 70), recv(), opts...); diff != "" {
+		t.Errorf("ready replicas change mismatch (-want +got):\n%s", diff)
+	}
+
+	// 6. Validation.
 	bad, err := client.WatchControlMetrics(ctx, pb.WatchControlMetricsRequest_builder{}.Build())
 	if err != nil {
 		t.Fatalf("WatchControlMetrics: %v", err)

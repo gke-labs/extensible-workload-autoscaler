@@ -268,7 +268,7 @@ func (s *MemoryStore) AddBatch(req *pb.IngestMetricsRequest) error {
 		watchers, watchersOk := s.watchers[key.cluster]
 		if watchersOk && !watchers.Throttled(key) {
 			res := calculatePolicy(ps, s.clock.Now())
-			watchers.Notify(key, res.GetControlMetrics(), res.GetRecommenderControlMetrics())
+			watchers.Notify(key, res.GetReadyReplicas(), res.GetControlMetrics(), res.GetRecommenderControlMetrics())
 		}
 	}
 	return nil

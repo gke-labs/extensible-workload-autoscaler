@@ -12,11 +12,13 @@ import (
 )
 
 // ControlMetricEvent reports the control metrics of a policy after a
-// recalculation.
+// recalculation, along with the number of ready replicas they were calculated
+// against.
 type ControlMetricEvent struct {
-	id  policyID
-	cm  *pb.ControlMetrics
-	rcm map[string]*pb.ControlMetrics
+	id            policyID
+	readyReplicas int32
+	cm            *pb.ControlMetrics
+	rcm           map[string]*pb.ControlMetrics
 }
 
 // PolicyID returns the ID of the policy the event is about.
@@ -28,6 +30,10 @@ func (e ControlMetricEvent) PolicyID() *pb.PolicyId {
 	}.Build()
 }
 
+// ReadyReplicas returns the number of ready replicas the control metrics were
+// calculated against.
+func (e ControlMetricEvent) ReadyReplicas() int32 { return e.readyReplicas }
+
 // ControlMetrics returns the policy-wide control metrics.
 func (e ControlMetricEvent) ControlMetrics() *pb.ControlMetrics { return e.cm }
 
@@ -35,12 +41,10 @@ func (e ControlMetricEvent) ControlMetrics() *pb.ControlMetrics { return e.cm }
 // recommender, keyed by recommender name.
 func (e ControlMetricEvent) RecommenderControlMetrics() map[string]*pb.ControlMetrics { return e.rcm }
 
-// equal reports whether both events carry the same metrics. Protobuf messages
-// must be compared with proto.Equal: reflect.DeepEqual also looks at their
-// internal state (e.g. the size cache filled when a message is marshalled),
-// which differs between a sent message and a freshly computed one.
+// equal reports whether both events carry the exact same data.
 func (e ControlMetricEvent) equal(o ControlMetricEvent) bool {
 	return e.id == o.id &&
+		e.readyReplicas == o.readyReplicas &&
 		proto.Equal(e.cm, o.cm) &&
 		maps.EqualFunc(e.rcm, o.rcm, func(a, b *pb.ControlMetrics) bool { return proto.Equal(a, b) })
 }
@@ -130,11 +134,12 @@ func (w *Watchers) Throttled(id policyID) bool {
 
 // Notify notifies watchers of a new control metric event.
 // Callers should first call Throttled to determine whether to call Notify.
-func (w *Watchers) Notify(id policyID, cm *pb.ControlMetrics, rcm map[string]*pb.ControlMetrics) {
+func (w *Watchers) Notify(id policyID, readyReplicas int32, cm *pb.ControlMetrics, rcm map[string]*pb.ControlMetrics) {
 	evt := ControlMetricEvent{
-		id:  id,
-		cm:  cm,
-		rcm: rcm,
+		id:            id,
+		readyReplicas: readyReplicas,
+		cm:            cm,
+		rcm:           rcm,
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()

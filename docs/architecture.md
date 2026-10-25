@@ -17,8 +17,9 @@ with the highest recommendation.
 
 1.  *Collect:* Providers scrape metrics (via Plugins) and push them to the
     *Server*.
-2.  *Recommend:* The *Recommender Engine* polls the *Server*, calculates
-    desired replicas based on your policy, and pushes a *Recommendation*.
+2.  *Recommend:* The *Recommender Engine* watches the *Server* for control
+    metric updates, calculates desired replicas based on your policy, and
+    pushes a *Recommendation*.
 3.  *Arbitrate:* The Server aggregates all recommendations into an arbitrated
     recommendation:
     *   *Activation Phase:* Checks if *any* recommender says "Active". If not,
@@ -55,8 +56,8 @@ The xAS prototype has four main components:
     one of the core recommenders. Responsible for reading scaling policies and
     metrics, and pushing scaling recommendations, to the Server.
 
-    Note that using bidirectional gRPC streams would allow the Server to
-    push metric updates to the recommender while preserving the requirement that
-    recommenders have no network connectivity to user workloads.
+    Recommenders open a gRPC stream to the Server to receive control metric
+    updates as they happen, which preserves the requirement that recommenders
+    have no network connectivity to user workloads.
 
 ![Life of a Recommendation](assets/life-of-a-query.svg)

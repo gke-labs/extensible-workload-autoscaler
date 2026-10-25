@@ -122,7 +122,8 @@ func (s *Server) GetControlMetrics(ctx context.Context, req *pb.GetControlMetric
 }
 
 // WatchControlMetrics streams the control metrics of every policy in the
-// requested cluster. The stream stays open until the client cancels it, or
+// requested cluster, together with the number of ready replicas they were
+// calculated against. The stream stays open until the client cancels it, or
 // until the client falls too far behind, in which case it is terminated with
 // ResourceExhausted and must be reopened.
 func (s *Server) WatchControlMetrics(req *pb.WatchControlMetricsRequest, stream grpc.ServerStreamingServer[pb.WatchControlMetricsResponse]) error {
@@ -152,6 +153,7 @@ func (s *Server) WatchControlMetrics(req *pb.WatchControlMetricsRequest, stream 
 				Id:                        evt.PolicyID(),
 				ControlMetrics:            evt.ControlMetrics(),
 				RecommenderControlMetrics: evt.RecommenderControlMetrics(),
+				ReadyReplicas:             proto.Int32(evt.ReadyReplicas()),
 			}.Build()
 			if err := stream.Send(res); err != nil {
 				return err

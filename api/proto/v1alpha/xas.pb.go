@@ -3343,12 +3343,15 @@ func (b0 WatchControlMetricsRequest_builder) Build() *WatchControlMetricsRequest
 
 // WatchControlMetricsResponse is the response sent on the WatchControlMetrics
 // streaming RPC. Unless throttled, such an object is sent every time a metric
-// changes its value.
+// or the number of ready replicas changes.
 type WatchControlMetricsResponse struct {
 	state                                protoimpl.MessageState     `protogen:"opaque.v1"`
 	xxx_hidden_Id                        *PolicyId                  `protobuf:"bytes,1,opt,name=id"`
 	xxx_hidden_ControlMetrics            *ControlMetrics            `protobuf:"bytes,2,opt,name=control_metrics,json=controlMetrics"`
 	xxx_hidden_RecommenderControlMetrics map[string]*ControlMetrics `protobuf:"bytes,3,rep,name=recommender_control_metrics,json=recommenderControlMetrics" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	xxx_hidden_ReadyReplicas             int32                      `protobuf:"varint,4,opt,name=ready_replicas,json=readyReplicas"`
+	XXX_raceDetectHookData               protoimpl.RaceDetectHookData
+	XXX_presence                         [1]uint32
 	unknownFields                        protoimpl.UnknownFields
 	sizeCache                            protoimpl.SizeCache
 }
@@ -3399,6 +3402,13 @@ func (x *WatchControlMetricsResponse) GetRecommenderControlMetrics() map[string]
 	return nil
 }
 
+func (x *WatchControlMetricsResponse) GetReadyReplicas() int32 {
+	if x != nil {
+		return x.xxx_hidden_ReadyReplicas
+	}
+	return 0
+}
+
 func (x *WatchControlMetricsResponse) SetId(v *PolicyId) {
 	x.xxx_hidden_Id = v
 }
@@ -3409,6 +3419,11 @@ func (x *WatchControlMetricsResponse) SetControlMetrics(v *ControlMetrics) {
 
 func (x *WatchControlMetricsResponse) SetRecommenderControlMetrics(v map[string]*ControlMetrics) {
 	x.xxx_hidden_RecommenderControlMetrics = v
+}
+
+func (x *WatchControlMetricsResponse) SetReadyReplicas(v int32) {
+	x.xxx_hidden_ReadyReplicas = v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 4)
 }
 
 func (x *WatchControlMetricsResponse) HasId() bool {
@@ -3425,12 +3440,24 @@ func (x *WatchControlMetricsResponse) HasControlMetrics() bool {
 	return x.xxx_hidden_ControlMetrics != nil
 }
 
+func (x *WatchControlMetricsResponse) HasReadyReplicas() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 3)
+}
+
 func (x *WatchControlMetricsResponse) ClearId() {
 	x.xxx_hidden_Id = nil
 }
 
 func (x *WatchControlMetricsResponse) ClearControlMetrics() {
 	x.xxx_hidden_ControlMetrics = nil
+}
+
+func (x *WatchControlMetricsResponse) ClearReadyReplicas() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 3)
+	x.xxx_hidden_ReadyReplicas = 0
 }
 
 type WatchControlMetricsResponse_builder struct {
@@ -3441,6 +3468,8 @@ type WatchControlMetricsResponse_builder struct {
 	ControlMetrics *ControlMetrics
 	// Per-recommender metrics.
 	RecommenderControlMetrics map[string]*ControlMetrics
+	// The number of ready replicas the metrics were calculated against.
+	ReadyReplicas *int32
 }
 
 func (b0 WatchControlMetricsResponse_builder) Build() *WatchControlMetricsResponse {
@@ -3450,6 +3479,10 @@ func (b0 WatchControlMetricsResponse_builder) Build() *WatchControlMetricsRespon
 	x.xxx_hidden_Id = b.Id
 	x.xxx_hidden_ControlMetrics = b.ControlMetrics
 	x.xxx_hidden_RecommenderControlMetrics = b.RecommenderControlMetrics
+	if b.ReadyReplicas != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 4)
+		x.xxx_hidden_ReadyReplicas = *b.ReadyReplicas
+	}
 	return m0
 }
 
@@ -5892,11 +5925,12 @@ const file_xas_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x123\n" +
 	"\x05value\x18\x02 \x01(\v2\x1d.xas.v1alpha.ContainerMetricsR\x05value:\x028\x01\"?\n" +
 	"\x1aWatchControlMetricsRequest\x12!\n" +
-	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\"\xff\x02\n" +
+	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\"\xa6\x03\n" +
 	"\x1bWatchControlMetricsResponse\x12%\n" +
 	"\x02id\x18\x01 \x01(\v2\x15.xas.v1alpha.PolicyIdR\x02id\x12D\n" +
 	"\x0fcontrol_metrics\x18\x02 \x01(\v2\x1b.xas.v1alpha.ControlMetricsR\x0econtrolMetrics\x12\x87\x01\n" +
-	"\x1brecommender_control_metrics\x18\x03 \x03(\v2G.xas.v1alpha.WatchControlMetricsResponse.RecommenderControlMetricsEntryR\x19recommenderControlMetrics\x1ai\n" +
+	"\x1brecommender_control_metrics\x18\x03 \x03(\v2G.xas.v1alpha.WatchControlMetricsResponse.RecommenderControlMetricsEntryR\x19recommenderControlMetrics\x12%\n" +
+	"\x0eready_replicas\x18\x04 \x01(\x05R\rreadyReplicas\x1ai\n" +
 	"\x1eRecommenderControlMetricsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x121\n" +
 	"\x05value\x18\x02 \x01(\v2\x1b.xas.v1alpha.ControlMetricsR\x05value:\x028\x01\"\xb6\x01\n" +

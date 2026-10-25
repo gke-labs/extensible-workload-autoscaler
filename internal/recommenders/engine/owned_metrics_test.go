@@ -85,6 +85,7 @@ func newTestEngine(t *testing.T, client pb.XASServerClient, classes map[string]s
 	}
 	return &Engine{
 		client:                 client,
+		state:                  make(State),
 		recommenderClassLister: listers.NewRecommenderClassLister(indexer),
 		recommenders:           recommenders,
 		clusterName:            "default",
@@ -389,17 +390,19 @@ func TestSyncRecommenderMetricsPassesPolicyMetrics(t *testing.T) {
 	}
 }
 
-// TestSyncRecommenderMetricsConfigError checks that an OwnedMetrics error is
-// returned for its recommender, and that the metrics it owned are dropped.
+// TestSyncRecommenderMetricsConfigError checks that the OwnedMetrics errors of
+// every misconfigured recommender are returned, joined, and that the metrics
+// they owned are dropped while those of the valid recommenders are kept.
 func TestSyncRecommenderMetricsConfigError(t *testing.T) {
 	id := pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("web")}.Build()
 	client := &fakeXASServerClient{}
-	configErr := errors.New("cpu-metric \"gauge\" is not a decaying distribution")
+	badErr := errors.New("cpu-metric \"gauge\" is not a decaying distribution")
+	worseErr := errors.New("memory-metric \"mem\" is not defined in the policy metrics")
 	e := newTestEngine(t, client,
 		map[string]string{"owning-class": "Owning"},
 		map[string]Recommender{"Owning": &owningRecommender{
 			metrics: map[string][]*pb.MetricDefinition{"ok": {cpuMetric("ok")}},
-			errs:    map[string]error{"bad": configErr},
+			errs:    map[string]error{"bad": badErr, "worse": worseErr},
 		}},
 	)
 	pol := pb.Policy_builder{
@@ -407,19 +410,39 @@ func TestSyncRecommenderMetricsConfigError(t *testing.T) {
 		Scaling: []*pb.RecommenderDefinition{
 			pb.RecommenderDefinition_builder{Name: proto.String("ok"), Recommender: proto.String("owning-class")}.Build(),
 			pb.RecommenderDefinition_builder{Name: proto.String("bad"), Recommender: proto.String("owning-class")}.Build(),
+			pb.RecommenderDefinition_builder{Name: proto.String("worse"), Recommender: proto.String("owning-class")}.Build(),
 		},
 		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
-			"bad": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{cpuMetric("bad")}}.Build(),
+			"bad":   pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{cpuMetric("bad")}}.Build(),
+			"worse": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{memoryMetric("worse")}}.Build(),
 		},
 	}.Build()
 
-	got, errs := e.syncRecommenderMetrics(pol)
+	got, err := e.syncRecommenderMetrics(pol)
 
-	if diff := cmp.Diff(map[string]error{"bad": configErr}, errs, cmpopts.EquateErrors()); diff != "" {
-		t.Errorf("syncRecommenderMetrics() errors mismatch (-want +got):\n%s", diff)
+	for _, want := range []error{badErr, worseErr} {
+		if !errors.Is(err, want) {
+			t.Errorf("syncRecommenderMetrics() error = %v, want it to wrap %q", err, want)
+		}
 	}
 	want := map[string]*pb.MetricDefinitionList{"ok": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{cpuMetric("ok")}}.Build()}
 	if diff := cmp.Diff(want, got.GetRecommenderMetrics(), protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("RecommenderMetrics mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// TestSyncRecommenderMetricsNoConfigError checks that a nil error is returned
+// when every recommender is well configured, so that the caller can rely on
+// it to skip the policy.
+func TestSyncRecommenderMetricsNoConfigError(t *testing.T) {
+	id := pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("web")}.Build()
+	e := newTestEngine(t, &fakeXASServerClient{},
+		map[string]string{"owning-class": "Owning"},
+		map[string]Recommender{"Owning": &owningRecommender{metrics: map[string][]*pb.MetricDefinition{"vpa": {cpuMetric("vpa")}}}},
+	)
+	pol := pb.Policy_builder{Id: id, Scaling: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("vpa"), Recommender: proto.String("owning-class")}.Build()}}.Build()
+
+	if _, err := e.syncRecommenderMetrics(pol); err != nil {
+		t.Errorf("syncRecommenderMetrics() error = %v, want nil", err)
 	}
 }

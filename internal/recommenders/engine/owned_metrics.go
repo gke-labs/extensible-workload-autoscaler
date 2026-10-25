@@ -2,6 +2,8 @@ package engine
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
 	"time"
@@ -22,8 +24,8 @@ type MetricsOwner interface {
 	// def.Name; the engine stamps the owner on them.
 	//
 	// An error means the definition is invalid: the engine then drops the
-	// metrics the recommender owns and reports it as inactive with the error,
-	// without calling Recommend.
+	// metrics the recommender owns, logs the error and skips the whole policy,
+	// i.e. none of its recommenders run until the definition is fixed.
 	OwnedMetrics(def *pb.RecommenderDefinition, policyMetrics []*pb.MetricDefinition) ([]*pb.MetricDefinition, error)
 }
 
@@ -33,13 +35,15 @@ type MetricsOwner interface {
 // It takes the ScalingPolicy from the Server as the argument `pol`, and
 // returns an updated version of this ScalingPolicy where all the recommender-owned
 // metrics have been added, along with the configuration errors returned by
-// OwnedMetrics, keyed by recommender name.
+// OwnedMetrics, joined into a single error (nil if there is none). The policy
+// is synced and returned even then: the metrics owned by the misconfigured
+// recommenders are dropped from it.
 //
 // Only the metrics of the recommenders this binary manages (e.g. 'linear') are
 // updated; others are left untouched.
-func (e *Engine) syncRecommenderMetrics(pol *pb.Policy) (*pb.Policy, map[string]error) {
+func (e *Engine) syncRecommenderMetrics(pol *pb.Policy) (*pb.Policy, error) {
 	owned := make(map[string]*pb.MetricDefinitionList)
-	configErrs := make(map[string]error)
+	errs := []error{}
 
 	for _, recDef := range slices.Concat(pol.GetActivation(), pol.GetScaling()) {
 		rec, err := e.recommenderFor(recDef.GetRecommender())
@@ -53,7 +57,7 @@ func (e *Engine) syncRecommenderMetrics(pol *pb.Policy) (*pb.Policy, map[string]
 
 		ownedMetrics, err := owner.OwnedMetrics(recDef, pol.GetMetrics())
 		if err != nil {
-			configErrs[recDef.GetName()] = err
+			errs = append(errs, fmt.Errorf("policy %s metric %s: getting owned metrics: %w", pol.GetId().String(), recDef.GetName(), err))
 			ownedMetrics = nil
 		}
 		stamped := make([]*pb.MetricDefinition, 0, len(ownedMetrics))
@@ -87,8 +91,9 @@ func (e *Engine) syncRecommenderMetrics(pol *pb.Policy) (*pb.Policy, map[string]
 			changed[name] = list
 		}
 	}
+	configErr := errors.Join(errs...)
 	if len(changed) == 0 {
-		return pol, configErrs
+		return pol, configErr
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -113,9 +118,9 @@ func (e *Engine) syncRecommenderMetrics(pol *pb.Policy) (*pb.Policy, map[string]
 	updated, err := e.client.UpdatePolicy(ctx, req)
 	if err != nil {
 		slog.Error("Failed to register recommender owned metrics", "policy", pol.GetId().GetName(), "error", err)
-		return pol, configErrs
+		return pol, configErr
 	}
 	slog.Debug("Registered recommender owned metrics", "policy", pol.GetId().GetName(), "recommenders", len(changed))
 
-	return updated, configErrs
+	return updated, configErr
 }

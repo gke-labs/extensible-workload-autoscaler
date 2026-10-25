@@ -368,13 +368,15 @@ message WatchControlMetricsRequest {
 
 // WatchControlMetricsResponse is the response sent on the WatchControlMetrics
 // streaming RPC. Unless throttled, such an object is sent every time a metric
-// changes its value.
+// or the number of ready replicas changes.
 message WatchControlMetricsResponse {
   PolicyId id = 1;
   // Global metrics.
   ControlMetrics control_metrics = 2;
   // Per-recommender metrics.
   map<string, ControlMetrics> recommender_control_metrics = 3;
+  // The number of ready replicas the metrics were calculated against.
+  int32 ready_replicas = 4;
 }
 
 // --- Recommender State ---

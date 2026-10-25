@@ -16,6 +16,7 @@ import (
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/cron"
+	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/engine/watchclient"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/linear"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/perpodvertical"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/vpa"
@@ -37,6 +38,7 @@ var _ MetricsOwner = (*vpa.VPARecommender)(nil)
 type Engine struct {
 	grpcConn               *grpc.ClientConn
 	client                 pb.XASServerClient
+	state                  State
 	recommenderClassLister listers.RecommenderClassLister
 	// recommenders holds the implementation backing each RecommenderClass type
 	// this binary supports, keyed by type (e.g. "Linear").
@@ -56,6 +58,7 @@ func NewEngine(recommenderClassLister listers.RecommenderClassLister, nodeLister
 	return &Engine{
 		grpcConn:               conn,
 		client:                 client,
+		state:                  make(State),
 		recommenderClassLister: recommenderClassLister,
 		recommenders: map[string]Recommender{
 			"Linear":         &linear.LinearRecommender{},
@@ -72,8 +75,17 @@ func (e *Engine) Run(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second) // Fast loop
 	defer ticker.Stop()
 
+	// Learn the policies before watching their metrics.
+	e.Tick()
+
+	ch := make(chan *pb.WatchControlMetricsResponse, 100)
+	cmc := watchclient.NewControlMetricsClient(e.grpcConn, e.clusterName)
+	go cmc.Run(ctx, ch)
+
 	for {
 		select {
+		case metric := <-ch:
+			e.handleControlMetricsUpdate(ctx, metric)
 		case <-ticker.C:
 			e.Tick()
 		case <-ctx.Done():
@@ -82,64 +94,87 @@ func (e *Engine) Run(ctx context.Context) {
 	}
 }
 
-func (e *Engine) Tick() {
-	// 1. Fetch Policies
-	policies, err := e.fetchPolicies()
-	if err != nil {
-		slog.Error("Error fetching policies", "error", err)
+// handleControlMetricsUpdate runs the recommenders of a policy on its new
+// control metrics and pushes their recommendations. Updates for policies the
+// engine does not know about (see Tick) are dropped.
+func (e *Engine) handleControlMetricsUpdate(ctx context.Context, metric *pb.WatchControlMetricsResponse) {
+	policyID, clusterName := PolicyIDFromProto(metric.GetId())
+
+	if clusterName != e.clusterName {
+		slog.Error("Received metrics from another cluster", "unexpected_cluster_name", clusterName)
 		return
 	}
-
-	// 2. Iterate
-	for _, policy := range policies {
-		e.processPolicy(policy)
-	}
-}
-
-func (e *Engine) processPolicy(policy *pb.Policy) {
-	// Make sure the metrics owned by our recommenders are registered on the
-	// policy, so the providers collect them before we read them back.
-	policy, configErrs := e.syncRecommenderMetrics(policy)
-
-	metrics, err := e.fetchControlMetrics(policy.GetId().GetNamespace(), policy.GetId().GetName())
-	if err != nil {
+	ps, ok := e.state[policyID]
+	if !ok {
+		slog.Debug("Ignoring the metrics of an unknown policy", "policy", metric.GetId().GetName())
 		return
 	}
-	workload, err := e.fetchWorkload(policy.GetId().GetNamespace(), policy.GetId().GetName())
-	if err != nil {
-		slog.Error("Failed to fetch the workload", "policy", policy.GetId().GetName(), "error", err)
-		return
-	}
+	policy, workload := ps.policy, ps.workload
 
-	// Call each recommender to get their recommendation. Provide the
-	// policy-wide metrics, the metrics owned by the recommender, the ready
-	// replicas, and the workload.
+	// Call each recommender to get their recommendation.
 	var recommendations []namedRecommendation
 	for _, def := range slices.Concat(policy.GetActivation(), policy.GetScaling()) {
-		if err, ok := configErrs[def.GetName()]; ok {
-			recommendations = append(recommendations, namedRecommendation{name: def.GetName(), recommendation: pb.Recommendation_builder{
-				IsActive: proto.Bool(false),
-				Message:  proto.String(fmt.Sprintf("Invalid configuration: %v", err)),
-			}.Build()})
-			continue
-		}
-
+		recName := def.GetName()
 		rec, err := e.recommenderFor(def.GetRecommender())
 		if err != nil {
 			slog.Warn("RecommenderClass not found for policy", "recommender", def.GetRecommender(), "policy", policy.GetId().GetName(), "error", err)
 			return
 		}
 		// Recommenders that own no metric have no entry: ownedMetrics is nil.
-		ownedMetrics := metrics.GetRecommenderControlMetrics()[def.GetName()]
-		if v := rec.Recommend(def, metrics.GetControlMetrics(), ownedMetrics, metrics.GetReadyReplicas(), workload); v != nil {
-			recommendations = append(recommendations, namedRecommendation{name: def.GetName(), recommendation: v})
+		ownedMetrics := metric.GetRecommenderControlMetrics()[recName]
+		if v := rec.Recommend(def, metric.GetControlMetrics(), ownedMetrics, metric.GetReadyReplicas(), workload); v != nil {
+			recommendations = append(recommendations, namedRecommendation{name: recName, recommendation: v})
 		}
 	}
 
 	slog.Debug("Recommendations generated", "policy", policy.GetId().GetName(), "count", len(recommendations))
 	if len(recommendations) > 0 {
-		e.pushRecommendations(policy, recommendations)
+		e.pushRecommendations(ctx, policy, recommendations)
 	}
+}
+
+// Tick refreshes the engine's state from the policies the Server lists: the
+// recommenders run against it when control metrics arrive. Policies that are
+// no longer listed, or that can't be processed, are dropped from the state.
+func (e *Engine) Tick() {
+	policies, err := e.fetchPolicies()
+	if err != nil {
+		slog.Error("Error fetching policies", "error", err)
+		return
+	}
+	state := make(State, len(policies))
+	for _, policy := range policies {
+		policyID, clusterName := PolicyIDFromProto(policy.GetId())
+		if clusterName != e.clusterName {
+			slog.Error("Received a policy from another cluster", "unexpected_cluster_name", clusterName)
+			continue
+		}
+		if ps := e.processPolicy(policy); ps != nil {
+			state[policyID] = ps
+		}
+	}
+	e.state = state
+}
+
+// processPolicy prepares a policy for its recommenders: it registers the
+// metrics they own on the policy and reads the policy's workload. It returns
+// nil if the policy is to be skipped: a recommender is misconfigured (see
+// MetricsOwner) or the workload can't be read.
+func (e *Engine) processPolicy(policy *pb.Policy) *PolicyState {
+	// Make sure the metrics owned by our recommenders are registered on the
+	// policy, so the providers collect them before we read them back.
+	policy, err := e.syncRecommenderMetrics(policy)
+	if err != nil {
+		slog.Error("Failed to sync recommender metrics", "policy", policy.GetId().String(), "error", err)
+		return nil
+	}
+
+	workload, err := e.fetchWorkload(policy.GetId().GetNamespace(), policy.GetId().GetName())
+	if err != nil {
+		slog.Error("Failed to fetch the workload", "policy", policy.GetId().GetName(), "error", err)
+		return nil
+	}
+	return &PolicyState{policy: policy, workload: workload}
 }
 
 func (e *Engine) fetchPolicies() ([]*pb.Policy, error) {
@@ -153,17 +188,6 @@ func (e *Engine) fetchPolicies() ([]*pb.Policy, error) {
 		return nil, err
 	}
 	return resp.GetPolicies(), nil
-}
-
-// fetchControlMetrics reads the control metrics of a policy: the policy-wide
-// ones and, keyed by recommender name, those owned by each recommender.
-func (e *Engine) fetchControlMetrics(ns, name string) (*pb.GetControlMetricsResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	return e.client.GetControlMetrics(ctx, pb.GetControlMetricsRequest_builder{
-		Id: pb.PolicyId_builder{ClusterName: proto.String(e.clusterName), Namespace: proto.String(ns), Name: proto.String(name)}.Build(),
-	}.Build())
 }
 
 // fetchWorkload reads the workload of a policy: its pods and their current
@@ -182,8 +206,8 @@ type namedRecommendation struct {
 	recommendation *pb.Recommendation
 }
 
-func (e *Engine) pushRecommendations(policy *pb.Policy, recommendations []namedRecommendation) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+func (e *Engine) pushRecommendations(ctx context.Context, policy *pb.Policy, recommendations []namedRecommendation) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	for _, r := range recommendations {
