@@ -87,6 +87,15 @@ spec:
                           self.wfile.write(f'Updated service_requests to {service_requests}\n'.encode())
                           return
 
+                      # Handle API Discovery: /apis/custom.metrics.k8s.io/v1beta2.
+                      if self.path.split('?')[0].rstrip('/') == '/apis/custom.metrics.k8s.io/v1beta2':
+                          res = {'kind': 'APIResourceList', 'apiVersion': 'v1', 'groupVersion': 'custom.metrics.k8s.io/v1beta2', 'resources': []}
+                          self.send_response(200)
+                          self.send_header('Content-Type', 'application/json')
+                          self.end_headers()
+                          self.wfile.write(json.dumps(res).encode())
+                          return
+
                       # Handle Pod Metric Query: /apis/custom.metrics.k8s.io/v1beta2/namespaces/{ns}/pods/*/{metric}
                       if '/pods/' in self.path or '/pods*' in self.path:
                           pod_names = []

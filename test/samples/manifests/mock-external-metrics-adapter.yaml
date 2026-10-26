@@ -42,6 +42,16 @@ spec:
                           self.wfile.write(f'Updated queue_depth to {queue_depth}\n'.encode())
                           return
 
+                      # Handle API Discovery: /apis/external.metrics.k8s.io/v1beta1.
+                      if self.path.split('?')[0].rstrip('/') == '/apis/external.metrics.k8s.io/v1beta1':
+                          res = {'kind': 'APIResourceList', 'apiVersion': 'v1', 'groupVersion': 'external.metrics.k8s.io/v1beta1', 'resources': []}
+                          self.send_response(200)
+                          self.send_header('Content-Type', 'application/json')
+                          self.end_headers()
+                          self.wfile.write(json.dumps(res).encode())
+                          return
+
+                      # Handle External Metric Query: /apis/external.metrics.k8s.io/v1beta1/namespaces/{ns}/{metric}
                       res = {
                           'kind': 'ExternalMetricValueList',
                           'apiVersion': 'external.metrics.k8s.io/v1beta1',
