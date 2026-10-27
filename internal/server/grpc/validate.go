@@ -164,6 +164,13 @@ func validateWatchControlMetricsRequest(req *pb.WatchControlMetricsRequest) erro
 	return validateClusterName(req.GetClusterName())
 }
 
+func validateWatchRecommendationsRequest(req *pb.WatchRecommendationsRequest) error {
+	if req == nil {
+		return status.Errorf(codes.InvalidArgument, "request is nil")
+	}
+	return validateClusterName(req.GetClusterName())
+}
+
 func validateGetWorkloadRequest(req *pb.GetWorkloadRequest) error {
 	if req == nil {
 		return status.Errorf(codes.InvalidArgument, "request is nil")

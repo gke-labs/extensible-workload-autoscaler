@@ -2197,3 +2197,178 @@ func TestWatchControlMetricsGRPC(t *testing.T) {
 		t.Errorf("Recv() on invalid request: got %v, want %v", err, codes.InvalidArgument)
 	}
 }
+
+// TestWatchRecommendationsGRPC validates the WatchRecommendations stream.
+// Steps:
+//  1. Create a policy with an activation and a scaling recommender, activate
+//     it and calculate: there is no arbitrated recommendation yet.
+//  2. Open a watch and recalculate: the current state of the policy is
+//     streamed. Recalculating again streams nothing: only the timestamps of
+//     the metric statuses changed.
+//  3. Push a scaling recommendation: the arbitrated recommendation is
+//     streamed, with its explanation and metric statuses.
+//  4. Push the same recommendation again: nothing is streamed, only its
+//     last_updated changed.
+//  5. Deactivate: the workload stays active for the window, so only the
+//     explanation changes, which is streamed on its own.
+//  6. Let the window expire and recalculate: the scale to zero is streamed,
+//     although no recommender pushed anything.
+//  7. Clear the activation recommender: the change is streamed.
+//  8. A new watcher is primed with the last event.
+//  9. Validation: a request without cluster must be rejected.
+//
+// The steps that publish must stay within the notification burst of the
+// policy (see store.notifyBurst): the fake clock does not refill the limiter.
+func TestWatchRecommendationsGRPC(t *testing.T) {
+	clk := &clock.FakeClock{CurrentTime: time.Unix(1000, 0)}
+	memStore, client, cleanup := setupGRPCServer(t, clk)
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	ns, policyName := "default", "watch-rec-policy"
+	id := pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()
+
+	// 1. Policy, activated, calculated.
+	if _, err := client.CreatePolicy(ctx, pb.CreatePolicyRequest_builder{
+		Policy: pb.Policy_builder{
+			Id:          id,
+			Workload:    pb.WorkloadRef_builder{Group: proto.String("apps"), Version: proto.String("v1"), Kind: proto.String("Deployment"), Name: proto.String("web-app"), Namespace: proto.String(ns)}.Build(),
+			Metrics:     []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: proto.String("m"), Provider: proto.String("prometheus"), Gauge: pb.Gauge_builder{Aggregation: proto.String("Avg")}.Build()}.Build()},
+			Activation:  []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Recommender: proto.String("Threshold"), Name: proto.String("act"), Type: proto.String("Threshold"), Params: map[string]string{"metric": "m", "threshold": "0", "window": "5"}}.Build()},
+			Scaling:     []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Recommender: proto.String("Linear"), Name: proto.String("lin"), Type: proto.String("Linear"), Params: map[string]string{"metric": "m", "target": "10"}}.Build()},
+			MinReplicas: proto.Int32(1), MaxReplicas: proto.Int32(10),
+		}.Build(),
+	}.Build()); err != nil {
+		t.Fatalf("CreatePolicy: %v", err)
+	}
+	push := func(recommender string, rec *pb.Recommendation) {
+		t.Helper()
+		if _, err := client.UpdateRecommenderState(ctx, pb.UpdateRecommenderStateRequest_builder{
+			Id: id, RecommenderName: proto.String(recommender), Recommendation: rec,
+		}.Build()); err != nil {
+			t.Fatalf("UpdateRecommenderState(%s): %v", recommender, err)
+		}
+	}
+	push("act", pb.Recommendation_builder{IsActive: proto.Bool(true)}.Build())
+	memStore.CalculateAll()
+
+	// 2. Watch, then recalculate.
+	stream, err := client.WatchRecommendations(ctx, pb.WatchRecommendationsRequest_builder{
+		ClusterName: proto.String("default"),
+	}.Build())
+	if err != nil {
+		t.Fatalf("WatchRecommendations: %v", err)
+	}
+	// The headers are sent once the watch is registered: wait for them so
+	// that the changes made below cannot race with the registration.
+	if _, err := stream.Header(); err != nil {
+		t.Fatalf("Header: %v", err)
+	}
+
+	recv := func() *pb.WatchRecommendationsResponse {
+		t.Helper()
+		res, err := stream.Recv()
+		if err != nil {
+			t.Fatalf("Recv: %v", err)
+		}
+		return res
+	}
+	// Every response carries the status of the policy's only metric, which
+	// never gets any sample.
+	wantResponse := func(rec *pb.Recommendation, explanation ...*pb.RecommenderStatus) *pb.WatchRecommendationsResponse {
+		return pb.WatchRecommendationsResponse_builder{
+			Id:             id,
+			Recommendation: rec,
+			Explanation:    explanation,
+			MetricStatuses: []*pb.MetricStatus{pb.MetricStatus_builder{Name: proto.String("m"), Error: proto.String("No data available")}.Build()},
+		}.Build()
+	}
+	actActive := pb.RecommenderStatus_builder{Name: proto.String("act"), Type: proto.String("Threshold"), Phase: proto.String("Activation"), IsActive: proto.Bool(true)}.Build()
+	actInactive := pb.RecommenderStatus_builder{Name: proto.String("act"), Type: proto.String("Threshold"), Phase: proto.String("Activation"), IsActive: proto.Bool(false)}.Build()
+	lin3 := pb.RecommenderStatus_builder{Name: proto.String("lin"), Type: proto.String("Linear"), Phase: proto.String("Scaling"), IsActive: proto.Bool(true), Replicas: proto.Int32(3)}.Build()
+	replicas := func(n int32) *pb.Recommendation { return pb.Recommendation_builder{Replicas: proto.Int32(n)}.Build() }
+	// The timestamps are not part of the comparison: they are checked by
+	// other tests, and the stream ignores them when dropping duplicates.
+	opts := []cmp.Option{
+		protocmp.Transform(), protocmp.IgnoreDefaultScalars(), protocmp.IgnoreEmptyMessages(),
+		protocmp.IgnoreFields(&pb.RecommenderStatus{}, "last_updated"),
+		protocmp.IgnoreFields(&pb.MetricStatus{}, "timestamp"),
+	}
+
+	// Nothing was published for the cluster before the watch, so the first
+	// recalculation streams the current state: no recommendation yet, as no
+	// scaling recommender has decided.
+	memStore.CalculateAll()
+	if diff := cmp.Diff(wantResponse(nil), recv(), opts...); diff != "" {
+		t.Errorf("initial state mismatch (-want +got):\n%s", diff)
+	}
+	// Recalculating later changes nothing but the metric status timestamps:
+	// nothing is streamed, so the next message received must be the one
+	// with the scaling recommendation pushed below.
+	clk.Advance(time.Second)
+	memStore.CalculateAll()
+
+	// 3. A scaling recommendation is arbitrated and streamed right away.
+	push("lin", pb.Recommendation_builder{Replicas: proto.Int32(3), IsActive: proto.Bool(true)}.Build())
+	if diff := cmp.Diff(wantResponse(replicas(3), actActive, lin3), recv(), opts...); diff != "" {
+		t.Errorf("recommendation mismatch (-want +got):\n%s", diff)
+	}
+
+	// 4. The same recommendation pushed later only moves its last_updated:
+	// nothing is streamed, so the next message received must be the one
+	// with the deactivation below.
+	clk.Advance(time.Second)
+	push("lin", pb.Recommendation_builder{Replicas: proto.Int32(3), IsActive: proto.Bool(true)}.Build())
+
+	// 5. Deactivating within the window keeps the workload active: only the
+	// explanation changes, which is streamed on its own.
+	push("act", pb.Recommendation_builder{IsActive: proto.Bool(false)}.Build())
+	if diff := cmp.Diff(wantResponse(replicas(3), actInactive, lin3), recv(), opts...); diff != "" {
+		t.Errorf("explanation change mismatch (-want +got):\n%s", diff)
+	}
+
+	// 6. Once the window expires, the recalculation scales to zero without
+	// any recommender pushing anything, and streams it.
+	clk.Advance(6 * time.Second)
+	memStore.CalculateAll()
+	got := recv()
+	if diff := cmp.Diff(wantResponse(replicas(0), actInactive), got, opts...); diff != "" {
+		t.Errorf("scale to zero mismatch (-want +got):\n%s", diff)
+	}
+	// Zero is indistinguishable from unset under the comparison options.
+	if !got.GetRecommendation().HasReplicas() {
+		t.Errorf("scale to zero: replicas not set, want 0")
+	}
+
+	// 7. Clearing a recommender re-arbitrates and streams the change.
+	push("act", nil)
+	if diff := cmp.Diff(wantResponse(replicas(0)), recv(), opts...); diff != "" {
+		t.Errorf("clearing mismatch (-want +got):\n%s", diff)
+	}
+
+	// 8. A new watcher starts from the last event of every policy.
+	late, err := client.WatchRecommendations(ctx, pb.WatchRecommendationsRequest_builder{
+		ClusterName: proto.String("default"),
+	}.Build())
+	if err != nil {
+		t.Fatalf("WatchRecommendations: %v", err)
+	}
+	primed, err := late.Recv()
+	if err != nil {
+		t.Fatalf("Recv: %v", err)
+	}
+	if diff := cmp.Diff(wantResponse(replicas(0)), primed, opts...); diff != "" {
+		t.Errorf("primed event mismatch (-want +got):\n%s", diff)
+	}
+
+	// 9. Validation.
+	bad, err := client.WatchRecommendations(ctx, pb.WatchRecommendationsRequest_builder{}.Build())
+	if err != nil {
+		t.Fatalf("WatchRecommendations: %v", err)
+	}
+	if _, err := bad.Recv(); status.Code(err) != codes.InvalidArgument {
+		t.Errorf("Recv() on invalid request: got %v, want %v", err, codes.InvalidArgument)
+	}
+}

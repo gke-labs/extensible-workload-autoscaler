@@ -31,6 +31,7 @@ const (
 	XASServer_GetWorkload_FullMethodName            = "/xas.v1alpha.XASServer/GetWorkload"
 	XASServer_UpdateRecommenderState_FullMethodName = "/xas.v1alpha.XASServer/UpdateRecommenderState"
 	XASServer_GetRecommendation_FullMethodName      = "/xas.v1alpha.XASServer/GetRecommendation"
+	XASServer_WatchRecommendations_FullMethodName   = "/xas.v1alpha.XASServer/WatchRecommendations"
 	XASServer_IngestMetrics_FullMethodName          = "/xas.v1alpha.XASServer/IngestMetrics"
 )
 
@@ -77,6 +78,8 @@ type XASServerClient interface {
 	// Retrieve the final arbitrated recommendation for a policy.
 	// The Controller uses this to scale the target workload.
 	GetRecommendation(ctx context.Context, in *GetRecommendationRequest, opts ...grpc.CallOption) (*GetRecommendationResponse, error)
+	// Stream changes to arbitrated recommendations.
+	WatchRecommendations(ctx context.Context, in *WatchRecommendationsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WatchRecommendationsResponse], error)
 	// --- Ingestion (Agent -> Server) ---
 	// Push raw metric samples from an Agent (Node).
 	IngestMetrics(ctx context.Context, in *IngestMetricsRequest, opts ...grpc.CallOption) (*IngestMetricsResponse, error)
@@ -209,6 +212,25 @@ func (c *xASServerClient) GetRecommendation(ctx context.Context, in *GetRecommen
 	return out, nil
 }
 
+func (c *xASServerClient) WatchRecommendations(ctx context.Context, in *WatchRecommendationsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WatchRecommendationsResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &XASServer_ServiceDesc.Streams[1], XASServer_WatchRecommendations_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[WatchRecommendationsRequest, WatchRecommendationsResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type XASServer_WatchRecommendationsClient = grpc.ServerStreamingClient[WatchRecommendationsResponse]
+
 func (c *xASServerClient) IngestMetrics(ctx context.Context, in *IngestMetricsRequest, opts ...grpc.CallOption) (*IngestMetricsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(IngestMetricsResponse)
@@ -262,6 +284,8 @@ type XASServerServer interface {
 	// Retrieve the final arbitrated recommendation for a policy.
 	// The Controller uses this to scale the target workload.
 	GetRecommendation(context.Context, *GetRecommendationRequest) (*GetRecommendationResponse, error)
+	// Stream changes to arbitrated recommendations.
+	WatchRecommendations(*WatchRecommendationsRequest, grpc.ServerStreamingServer[WatchRecommendationsResponse]) error
 	// --- Ingestion (Agent -> Server) ---
 	// Push raw metric samples from an Agent (Node).
 	IngestMetrics(context.Context, *IngestMetricsRequest) (*IngestMetricsResponse, error)
@@ -307,6 +331,9 @@ func (UnimplementedXASServerServer) UpdateRecommenderState(context.Context, *Upd
 }
 func (UnimplementedXASServerServer) GetRecommendation(context.Context, *GetRecommendationRequest) (*GetRecommendationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRecommendation not implemented")
+}
+func (UnimplementedXASServerServer) WatchRecommendations(*WatchRecommendationsRequest, grpc.ServerStreamingServer[WatchRecommendationsResponse]) error {
+	return status.Error(codes.Unimplemented, "method WatchRecommendations not implemented")
 }
 func (UnimplementedXASServerServer) IngestMetrics(context.Context, *IngestMetricsRequest) (*IngestMetricsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method IngestMetrics not implemented")
@@ -523,6 +550,17 @@ func _XASServer_GetRecommendation_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _XASServer_WatchRecommendations_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(WatchRecommendationsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(XASServerServer).WatchRecommendations(m, &grpc.GenericServerStream[WatchRecommendationsRequest, WatchRecommendationsResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type XASServer_WatchRecommendationsServer = grpc.ServerStreamingServer[WatchRecommendationsResponse]
+
 func _XASServer_IngestMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(IngestMetricsRequest)
 	if err := dec(in); err != nil {
@@ -597,6 +635,11 @@ var XASServer_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "WatchControlMetrics",
 			Handler:       _XASServer_WatchControlMetrics_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "WatchRecommendations",
+			Handler:       _XASServer_WatchRecommendations_Handler,
 			ServerStreams: true,
 		},
 	},

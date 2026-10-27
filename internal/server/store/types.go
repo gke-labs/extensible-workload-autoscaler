@@ -3,6 +3,8 @@ package store
 import (
 	"fmt"
 
+	"google.golang.org/protobuf/proto"
+
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
 )
 
@@ -19,6 +21,15 @@ type policyID struct {
 // newPolicyID returns the policyID of the policy identified by id.
 func newPolicyID(id *pb.PolicyId) policyID {
 	return policyID{cluster: id.GetClusterName(), ns: id.GetNamespace(), name: id.GetName()}
+}
+
+// toProto returns the proto PolicyId identifying the policy.
+func (id policyID) toProto() *pb.PolicyId {
+	return pb.PolicyId_builder{
+		ClusterName: proto.String(id.cluster),
+		Namespace:   proto.String(id.ns),
+		Name:        proto.String(id.name),
+	}.Build()
 }
 
 // MarshalText implements encoding.TextMarshaler for JSON encoding.

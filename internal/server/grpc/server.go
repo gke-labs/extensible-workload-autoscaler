@@ -133,9 +133,52 @@ func (s *Server) WatchControlMetrics(req *pb.WatchControlMetricsRequest, stream 
 	slog.Debug("WatchControlMetrics: Started", "cluster", req.GetClusterName())
 	defer slog.Debug("WatchControlMetrics: Stopped", "cluster", req.GetClusterName())
 
-	events, unwatch := s.store.Watch(req.GetClusterName())
+	events, unwatch := s.store.WatchControlMetrics(req.GetClusterName())
 	defer unwatch()
 
+	return serveWatch(stream, events, func(evt store.ControlMetricEvent) *pb.WatchControlMetricsResponse {
+		return pb.WatchControlMetricsResponse_builder{
+			Id:                        evt.ID,
+			ControlMetrics:            evt.ControlMetrics,
+			RecommenderControlMetrics: evt.RecommenderControlMetrics,
+			ReadyReplicas:             proto.Int32(evt.ReadyReplicas),
+		}.Build()
+	})
+}
+
+// WatchRecommendations streams the arbitrated recommendation of every policy
+// in the requested cluster each time it changes, together with its
+// explanation and the status of the metrics it was calculated from. The
+// stream stays open until the client cancels it, or until the client falls
+// too far behind, in which case it is terminated with ResourceExhausted and
+// must be reopened.
+func (s *Server) WatchRecommendations(req *pb.WatchRecommendationsRequest, stream grpc.ServerStreamingServer[pb.WatchRecommendationsResponse]) error {
+	if err := validateWatchRecommendationsRequest(req); err != nil {
+		return err
+	}
+	slog.Debug("WatchRecommendations: Started", "cluster", req.GetClusterName())
+	defer slog.Debug("WatchRecommendations: Stopped", "cluster", req.GetClusterName())
+
+	events, unwatch := s.store.WatchRecommendations(req.GetClusterName())
+	defer unwatch()
+
+	return serveWatch(stream, events, func(evt store.RecommendationEvent) *pb.WatchRecommendationsResponse {
+		return pb.WatchRecommendationsResponse_builder{
+			Id:             evt.ID,
+			Recommendation: evt.Recommendation,
+			Explanation:    evt.Explanation,
+			MetricStatuses: evt.MetricStatuses,
+		}.Build()
+	})
+}
+
+// serveWatch streams the events of a store watch to the client, converting
+// each with toResponse, until the client cancels the stream. The headers are
+// sent right away so that the client knows the watch is registered. The
+// store closes the events channel when the watcher is too slow and events
+// were dropped: the stream is then terminated with ResourceExhausted and the
+// client must reopen it.
+func serveWatch[E any, R any](stream grpc.ServerStreamingServer[R], events <-chan E, toResponse func(E) *R) error {
 	if err := stream.SendHeader(nil); err != nil {
 		return err
 	}
@@ -149,13 +192,7 @@ func (s *Server) WatchControlMetrics(req *pb.WatchControlMetricsRequest, stream 
 			if !ok {
 				return status.Errorf(codes.ResourceExhausted, "watcher too slow, events were dropped: reopen the stream")
 			}
-			res := pb.WatchControlMetricsResponse_builder{
-				Id:                        evt.PolicyID(),
-				ControlMetrics:            evt.ControlMetrics(),
-				RecommenderControlMetrics: evt.RecommenderControlMetrics(),
-				ReadyReplicas:             proto.Int32(evt.ReadyReplicas()),
-			}.Build()
-			if err := stream.Send(res); err != nil {
+			if err := stream.Send(toResponse(evt)); err != nil {
 				return err
 			}
 		}

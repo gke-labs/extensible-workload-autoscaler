@@ -11,6 +11,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,6 +40,25 @@ import (
 
 const xasFinalizer = "xas.io/finalizer"
 
+// policyID identifies a ScalingPolicy in the workqueue.
+type policyID struct {
+	namespace string
+	name      string
+}
+
+func policyIDOf(p *xasv1.ScalingPolicy) policyID {
+	return policyID{namespace: p.Namespace, name: p.Name}
+}
+
+// protoPolicyID converts a policyID to the gRPC PolicyId, scoped to this controller's cluster.
+func (c *Controller) protoPolicyID(id policyID) *pb.PolicyId {
+	return pb.PolicyId_builder{
+		ClusterName: new(c.clusterName),
+		Namespace:   new(id.namespace),
+		Name:        new(id.name),
+	}.Build()
+}
+
 type Controller struct {
 	kubeclientset        kubernetes.Interface
 	xasclientset         clientset.Interface
@@ -46,7 +66,7 @@ type Controller struct {
 	metricProviderLister listers.MetricProviderClassLister
 	recommenderLister    listers.RecommenderClassLister
 	policiesSynced       cache.InformerSynced
-	workqueue            workqueue.RateLimitingInterface
+	workqueue            workqueue.TypedRateLimitingInterface[policyID]
 
 	grpcConn   *grpc.ClientConn
 	grpcClient pb.XASServerClient
@@ -77,10 +97,13 @@ func NewController(
 		metricProviderLister: metricProviderInformer.Lister(),
 		recommenderLister:    recommenderInformer.Lister(),
 		policiesSynced:       policyInformer.Informer().HasSynced,
-		workqueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ScalingPolicies"),
-		grpcConn:             conn,
-		grpcClient:           client,
-		clusterName:          clusterName,
+		workqueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[policyID](),
+			workqueue.TypedRateLimitingQueueConfig[policyID]{Name: "ScalingPolicies"},
+		),
+		grpcConn:    conn,
+		grpcClient:  client,
+		clusterName: clusterName,
 	}
 
 	slog.Info("Setting up event handlers")
@@ -126,45 +149,26 @@ func (c *Controller) runWorker() {
 }
 
 func (c *Controller) processNextWorkItem() bool {
-	obj, shutdown := c.workqueue.Get()
+	id, shutdown := c.workqueue.Get()
 	if shutdown {
 		return false
 	}
+	defer c.workqueue.Done(id)
 
-	err := func(obj interface{}) error {
-		defer c.workqueue.Done(obj)
-		var key string
-		var ok bool
-		if key, ok = obj.(string); !ok {
-			c.workqueue.Forget(obj)
-			utilruntime.HandleError(fmt.Errorf("expected string in workqueue but got %#v", obj))
-			return nil
-		}
-		if err := c.syncHandler(key); err != nil {
-			c.workqueue.AddRateLimited(key)
-			return fmt.Errorf("error syncing '%s': %s, requeuing", key, err.Error())
-		}
-		c.workqueue.Forget(obj)
-		return nil
-	}(obj)
-
-	if err != nil {
-		utilruntime.HandleError(err)
+	if err := c.syncHandler(id); err != nil {
+		c.workqueue.AddRateLimited(id)
+		utilruntime.HandleError(fmt.Errorf("error syncing '%s/%s': %w, requeuing", id.namespace, id.name, err))
+		return true
 	}
+	c.workqueue.Forget(id)
 	return true
 }
 
-func (c *Controller) syncHandler(key string) error {
-	namespace, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("invalid resource key: %s", key))
-		return nil
-	}
-
-	policy, err := c.policiesLister.ScalingPolicies(namespace).Get(name)
+func (c *Controller) syncHandler(id policyID) error {
+	policy, err := c.policiesLister.ScalingPolicies(id.namespace).Get(id.name)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return c.reconcileDelete(namespace, name)
+			return c.reconcileDelete(id)
 		}
 		return err
 	}
@@ -191,14 +195,10 @@ func (c *Controller) validateReferences(p *xasv1.ScalingPolicy) error {
 	return nil
 }
 
-func (c *Controller) reconcileDelete(namespace, name string) error {
-	slog.Info("Policy deleted in K8s, syncing deletion to Server", "namespace", namespace, "name", name)
+func (c *Controller) reconcileDelete(id policyID) error {
+	slog.Info("Policy deleted in K8s, syncing deletion to Server", "namespace", id.namespace, "name", id.name)
 	req := pb.DeletePolicyRequest_builder{
-		Id: pb.PolicyId_builder{
-			ClusterName: proto.String(c.clusterName),
-			Namespace:   proto.String(namespace),
-			Name:        proto.String(name),
-		}.Build(),
+		Id: c.protoPolicyID(id),
 	}.Build()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -213,7 +213,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		// The object is being deleted
 		if containsString(policy.ObjectMeta.Finalizers, xasFinalizer) {
 			// our finalizer is present, so lets handle any external dependency
-			if err := c.reconcileDelete(policy.Namespace, policy.Name); err != nil {
+			if err := c.reconcileDelete(policyIDOf(policy)); err != nil {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
 				return err
@@ -265,7 +265,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	}
 
 	// 4. Poll Server
-	resp, err := c.getRecommendation(policy.Namespace, policy.Name)
+	resp, err := c.getRecommendation(policyIDOf(policy))
 	if err != nil {
 		slog.Error("Failed to get recommendation", "deployment", deploymentName, "error", err)
 		return nil
@@ -438,9 +438,9 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 	return err
 }
 
-func (c *Controller) getRecommendation(namespace, policyName string) (*pb.GetRecommendationResponse, error) {
+func (c *Controller) getRecommendation(id policyID) (*pb.GetRecommendationResponse, error) {
 	req := pb.GetRecommendationRequest_builder{
-		Id: pb.PolicyId_builder{ClusterName: proto.String(c.clusterName), Namespace: proto.String(namespace), Name: proto.String(policyName)}.Build(),
+		Id: c.protoPolicyID(id),
 	}.Build()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -543,11 +543,7 @@ func (c *Controller) pushPolicy(p *xasv1.ScalingPolicy, deployment *appsv1.Deplo
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	policyId := pb.PolicyId_builder{
-		ClusterName: proto.String(c.clusterName),
-		Namespace:   proto.String(p.Namespace),
-		Name:        proto.String(p.Name),
-	}.Build()
+	policyId := c.protoPolicyID(policyIDOf(p))
 	getPoliciesReq := pb.GetPolicyRequest_builder{
 		Id: policyId,
 	}.Build()
@@ -590,13 +586,16 @@ func (c *Controller) pushPolicy(p *xasv1.ScalingPolicy, deployment *appsv1.Deplo
 }
 
 func (c *Controller) enqueuePolicy(obj interface{}) {
-	var key string
-	var err error
-	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
-		utilruntime.HandleError(err)
+	// Handle tombstones from the informer on missed deletes.
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("cannot enqueue object %#v: %w", obj, err))
 		return
 	}
-	c.workqueue.Add(key)
+	c.workqueue.Add(policyID{namespace: accessor.GetNamespace(), name: accessor.GetName()})
 }
 
 func (c *Controller) poller() {
@@ -607,10 +606,7 @@ func (c *Controller) poller() {
 	}
 
 	for _, p := range allPolicies {
-		key, err := cache.MetaNamespaceKeyFunc(p)
-		if err == nil {
-			c.workqueue.Add(key)
-		}
+		c.workqueue.Add(policyIDOf(p))
 	}
 }
 
@@ -630,7 +626,7 @@ func (c *Controller) syncWorkload(policy *xasv1.ScalingPolicy, deployment *appsv
 
 	// 3. Send
 	req := pb.UpdateWorkloadRequest_builder{
-		Id: pb.PolicyId_builder{ClusterName: proto.String(c.clusterName), Namespace: proto.String(policy.Namespace), Name: proto.String(policy.Name)}.Build(),
+		Id: c.protoPolicyID(policyIDOf(policy)),
 		Workload: pb.Workload_builder{
 			Pods: replicas,
 		}.Build(),

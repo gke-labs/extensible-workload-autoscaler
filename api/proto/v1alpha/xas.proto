@@ -59,6 +59,9 @@ service XASServer {
   // The Controller uses this to scale the target workload.
   rpc GetRecommendation(GetRecommendationRequest) returns (GetRecommendationResponse);
 
+  // Stream changes to arbitrated recommendations.
+  rpc WatchRecommendations(WatchRecommendationsRequest) returns (stream WatchRecommendationsResponse);
+
   // --- Ingestion (Agent -> Server) ---
   // Push raw metric samples from an Agent (Node).
   rpc IngestMetrics(IngestMetricsRequest) returns (IngestMetricsResponse);
@@ -489,6 +492,28 @@ message GetRecommendationResponse {
   repeated MetricStatus metric_statuses = 2;
 }
 
+// WatchRecommendationsRequest retrieves all arbitrated recommendations for all
+// policies in the given cluster.
+message WatchRecommendationsRequest {
+  string cluster_name = 1;
+}
+
+// WatchRecommendationsResponse is the response sent on the WatchRecommendations
+// streaming RPC. Unless throttled, such an object is sent every time a new
+// arbitrated recommendation is emitted: when the recommendation, its
+// explanation or the status of its metrics change. Timestamps alone do not
+// count as a change.
+message WatchRecommendationsResponse {
+  PolicyId id = 1;
+  // The arbitrated recommendation.
+  Recommendation recommendation = 2;
+  // Explains the arbitrated recommendation by listing the status of all
+  // recommenders.
+  repeated RecommenderStatus explanation = 3;
+  // Status of the input metrics used for the arbitrated recommendation.
+  repeated MetricStatus metric_statuses = 4;
+}
+
 // MetricStatus represents the state of a single input metric.
 message MetricStatus {
   // The name of the metric.
@@ -500,6 +525,7 @@ message MetricStatus {
   // Error message if data is missing or invalid.
   string error = 4;
 }
+
 
 
 // --- Ingestion ---
