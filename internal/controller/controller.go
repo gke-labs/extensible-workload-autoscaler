@@ -176,6 +176,8 @@ func (c *Controller) syncHandler(id policyID) error {
 	return c.reconcilePolicy(policy)
 }
 
+// validateReferences returns an error if a policy refers to unknown
+// recommenders or metric providers.
 func (c *Controller) validateReferences(p *xasv1.ScalingPolicy) error {
 	for _, m := range p.Spec.Metrics {
 		if _, err := c.metricProviderLister.Get(m.Provider); err != nil {
@@ -236,7 +238,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		}
 	}
 
-	// 0. Validate References
+	// 0. Warn about unknown recommenders or metric providers.
 	if err := c.validateReferences(policy); err != nil {
 		// TODO: Update status with validation error condition
 		slog.Error("Validation failed for policy", "namespace", policy.Namespace, "name", policy.Name, "error", err)
@@ -258,13 +260,13 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		return nil
 	}
 
-	// 3. Sync Workload State (Topology) to Server
+	// 3. Sync Workload State to Server
 	if err := c.syncWorkload(policy, deployment); err != nil {
 		slog.Error("Failed to sync workload", "error", err)
 		return nil
 	}
 
-	// 4. Poll Server
+	// 4. Get recommendation for policy
 	resp, err := c.getRecommendation(policyIDOf(policy))
 	if err != nil {
 		slog.Error("Failed to get recommendation", "deployment", deploymentName, "error", err)
@@ -276,14 +278,27 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		return nil
 	}
 
-	rec := resp.GetRecommendation()
+	// 5. Actuate recommendation
+	if err := c.actuate(policy, deployment, resp.GetRecommendation()); err != nil {
+		return err
+	}
+
+	// 6. Update ScalingPolicy Status
+	return c.updateStatus(policy, deployment, resp)
+}
+
+// actuate applies a recommendation to the target deployment and its pods:
+// horizontal scaling via the deployment's replica count, in-place vertical
+// scaling via the pod /resize subresource, and the eviction fallback for
+// infeasible resizes when configured by the policy.
+func (c *Controller) actuate(policy *xasv1.ScalingPolicy, deployment *appsv1.Deployment, rec *pb.Recommendation) error {
+	deploymentName := deployment.Name
 	currentReplicas := int32(0)
 	if deployment.Spec.Replicas != nil {
 		currentReplicas = *deployment.Spec.Replicas
 	}
 	slog.Info("Recommendation", "deployment", deploymentName, "replicas", proto.ValueOrNil(rec.HasReplicas(), rec.GetReplicas), "currentReplicas", currentReplicas)
 
-	// 5. Actuate
 	// If there's a horizontal recommendation, and it differs from the deployment's current value, actuate.
 	if rec.HasReplicas() &&
 		(deployment.Spec.Replicas == nil || *deployment.Spec.Replicas != rec.GetReplicas()) {
@@ -362,7 +377,13 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		}
 	}
 
-	// 5. Update Status
+	return nil
+}
+
+// updateStatus populates the ScalingPolicy status from the target deployment
+// and the server's recommendation response, then persists it via UpdateStatus.
+func (c *Controller) updateStatus(policy *xasv1.ScalingPolicy, deployment *appsv1.Deployment, resp *pb.GetRecommendationResponse) error {
+	rec := resp.GetRecommendation()
 	policyCopy := policy.DeepCopy()
 	if deployment.Spec.Replicas != nil {
 		policyCopy.Status.CurrentReplicas = *deployment.Spec.Replicas
