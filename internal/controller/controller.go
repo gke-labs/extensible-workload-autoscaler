@@ -31,6 +31,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	"github.com/gke-labs/extensible-workload-autoscaler/internal/controller/watchclient"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/podutil"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
 	clientset "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/clientset/versioned"
@@ -38,7 +39,10 @@ import (
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 )
 
-const xasFinalizer = "xas.io/finalizer"
+const (
+	xasFinalizer    = "xas.io/finalizer"
+	recChanCapacity = 100
+)
 
 // policyID identifies a ScalingPolicy in the workqueue.
 type policyID struct {
@@ -130,9 +134,15 @@ func (c *Controller) Run(workers int, ctx context.Context) error {
 	}
 
 	slog.Info("Starting workers")
-	for i := 0; i < workers; i++ {
+	for range workers {
 		go wait.Until(c.runWorker, time.Second, ctx.Done())
 	}
+
+	// Start the recommendation stream and its consumer.
+	recChan := make(chan *pb.WatchRecommendationsResponse, recChanCapacity)
+	recClient := watchclient.NewRecommendationsClient(c.grpcConn, c.clusterName)
+	go recClient.Run(ctx, recChan)
+	go c.handleRecommendations(ctx, recChan)
 
 	// Start a poller loop to re-enqueue items periodically
 	go wait.Until(c.poller, 5*time.Second, ctx.Done())
@@ -141,6 +151,57 @@ func (c *Controller) Run(workers int, ctx context.Context) error {
 	<-ctx.Done()
 	slog.Info("Shutting down workers")
 	return nil
+}
+
+// handleRecommendations consumes streamed recommendations and, for each one,
+// actuates it on the target workload and updates the policy status.
+func (c *Controller) handleRecommendations(ctx context.Context, ch <-chan *pb.WatchRecommendationsResponse) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case resp := <-ch:
+			if err := c.handleRecommendation(resp); err != nil {
+				slog.Error("Failed to handle streamed recommendation",
+					"namespace", resp.GetId().GetNamespace(), "name", resp.GetId().GetName(), "error", err)
+			}
+		}
+	}
+}
+
+// handleRecommendation applies a single streamed recommendation: it resolves
+// the policy and its target deployment, then runs actuate and updateStatus.
+func (c *Controller) handleRecommendation(resp *pb.WatchRecommendationsResponse) error {
+	id := policyID{namespace: resp.GetId().GetNamespace(), name: resp.GetId().GetName()}
+
+	policy, err := c.policiesLister.ScalingPolicies(id.namespace).Get(id.name)
+	if err != nil {
+		return fmt.Errorf("getting policy: %w", err)
+	}
+	if !policy.ObjectMeta.DeletionTimestamp.IsZero() {
+		return nil // Policy is being deleted; nothing to actuate.
+	}
+
+	deployment, err := c.kubeclientset.AppsV1().Deployments(policy.Namespace).
+		Get(context.TODO(), policy.Spec.ScaleTargetRef.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("getting deployment: %w", err)
+	}
+
+	// actuate and updateStatus operate on a GetRecommendationResponse, which
+	// carries the same payload as the streamed message minus the policy id.
+	recResp := pb.GetRecommendationResponse_builder{
+		Recommendation: resp.GetRecommendation(),
+		Explanation:    resp.GetExplanation(),
+		MetricStatuses: resp.GetMetricStatuses(),
+	}.Build()
+
+	if recResp.HasRecommendation() {
+		if err := c.actuate(policy, deployment, recResp.GetRecommendation()); err != nil {
+			return fmt.Errorf("actuating: %w", err)
+		}
+	}
+	return c.updateStatus(policy, deployment, recResp)
 }
 
 func (c *Controller) runWorker() {
@@ -265,26 +326,7 @@ func (c *Controller) reconcilePolicy(policy *xasv1.ScalingPolicy) error {
 		slog.Error("Failed to sync workload", "error", err)
 		return nil
 	}
-
-	// 4. Get recommendation for policy
-	resp, err := c.getRecommendation(policyIDOf(policy))
-	if err != nil {
-		slog.Error("Failed to get recommendation", "deployment", deploymentName, "error", err)
-		return nil
-	}
-
-	if !resp.HasRecommendation() {
-		slog.Debug("No recommendation available for policy", "policy", policy.Name)
-		return nil
-	}
-
-	// 5. Actuate recommendation
-	if err := c.actuate(policy, deployment, resp.GetRecommendation()); err != nil {
-		return err
-	}
-
-	// 6. Update ScalingPolicy Status
-	return c.updateStatus(policy, deployment, resp)
+	return nil
 }
 
 // actuate applies a recommendation to the target deployment and its pods:
