@@ -6,19 +6,20 @@ import (
 	"log/slog"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	"github.com/gke-labs/extensible-workload-autoscaler/pkg/client/watch"
 	"google.golang.org/grpc"
 )
 
 // ControlMetricsClient implements a client watching ControlMetrics updates.
 // Not thread-safe.
 type ControlMetricsClient struct {
-	connection *connection[pb.WatchControlMetricsResponse]
+	connection *watch.Connection[pb.WatchControlMetricsResponse]
 }
 
 // NewControlMetricsClient creates a new client using a given UAS connection.
 func NewControlMetricsClient(c *grpc.ClientConn, clusterName string) *ControlMetricsClient {
 	return &ControlMetricsClient{
-		connection: newConnection(c, clusterName, openControlMetricsStream),
+		connection: watch.NewConnection(c, clusterName, openControlMetricsStream),
 	}
 }
 

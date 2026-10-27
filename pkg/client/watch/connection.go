@@ -1,4 +1,4 @@
-package watchclient
+package watch
 
 import (
 	"context"
@@ -15,10 +15,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-type connection[T any] struct {
+// Connection is a self-healing server-streaming gRPC connection to xAS Server
+// that delivers messages of type T. Not thread-safe.
+type Connection[T any] struct {
 	grpcClient         *grpc.ClientConn
 	clusterName        string
-	createStreamClient clientCreate[T]
+	createStreamClient ClientCreate[T]
 
 	// Stream and its context cancel function. Can be nil if the streamClient
 	// connection is not established.
@@ -26,13 +28,13 @@ type connection[T any] struct {
 	streamCancel context.CancelFunc
 }
 
-// clientCreate creates a streaming client receiving messages of type T.
-type clientCreate[T any] func(ctx context.Context, grpcClient *grpc.ClientConn, clusterName string) (grpc.ServerStreamingClient[T], error)
+// ClientCreate creates a streaming client receiving messages of type T.
+type ClientCreate[T any] func(ctx context.Context, grpcClient *grpc.ClientConn, clusterName string) (grpc.ServerStreamingClient[T], error)
 
-// newConnection handles a streaming connection to xAS Server. It handles
+// NewConnection handles a streaming connection to xAS Server. It handles
 // reconnections in case of failure.
-func newConnection[T any](c *grpc.ClientConn, clusterName string, openStream clientCreate[T]) *connection[T] {
-	return &connection[T]{
+func NewConnection[T any](c *grpc.ClientConn, clusterName string, openStream ClientCreate[T]) *Connection[T] {
+	return &Connection[T]{
 		grpcClient:         c,
 		clusterName:        clusterName,
 		createStreamClient: openStream,
@@ -45,7 +47,7 @@ func newConnection[T any](c *grpc.ClientConn, clusterName string, openStream cli
 // If any error occurs when receiving the request, this function closes the
 // stream and returns an error. This function can then be called again to
 // recreate the stream connection.
-func (c *connection[T]) Recv(ctx context.Context) (*T, error) {
+func (c *Connection[T]) Recv(ctx context.Context) (*T, error) {
 	if c.streamClient == nil {
 		if err := c.initializeStream(ctx); err != nil {
 			return nil, fmt.Errorf("error creating UAS streaming client: %w", err)
@@ -68,7 +70,7 @@ func (c *connection[T]) Recv(ctx context.Context) (*T, error) {
 //
 // This function keeps retrying to create the client until it succeeds or the
 // given context is canceled (in which case it returns an error).
-func (c *connection[T]) initializeStream(ctx context.Context) error {
+func (c *Connection[T]) initializeStream(ctx context.Context) error {
 	backoff := wait.Backoff{
 		Steps:    math.MaxInt, // Only stop retrying when ctx is canceled
 		Duration: 10 * time.Millisecond,
@@ -100,7 +102,7 @@ func (c *connection[T]) initializeStream(ctx context.Context) error {
 	return nil
 }
 
-func (c *connection[T]) terminateStream() {
+func (c *Connection[T]) terminateStream() {
 	c.streamClient = nil
 	c.streamCancel()
 	c.streamCancel = nil

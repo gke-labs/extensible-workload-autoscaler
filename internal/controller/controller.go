@@ -644,13 +644,18 @@ func (c *Controller) syncWorkload(policy *xasv1.ScalingPolicy, deployment *appsv
 	for i := range pods.Items {
 		replicas = append(replicas, buildPodState(&pods.Items[i]))
 	}
+	workload := pb.Workload_builder{
+		Pods: replicas,
+	}.Build()
 
-	// 3. Send
+	// 3. Record the observed workload in local state
+	id := policyIDOf(policy)
+	c.state.setWorkload(id, workload)
+
+	// 4. Send
 	req := pb.UpdateWorkloadRequest_builder{
-		Id: c.protoPolicyID(policyIDOf(policy)),
-		Workload: pb.Workload_builder{
-			Pods: replicas,
-		}.Build(),
+		Id:       c.protoPolicyID(id),
+		Workload: workload,
 	}.Build()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -664,9 +669,9 @@ func (c *Controller) syncWorkload(policy *xasv1.ScalingPolicy, deployment *appsv
 // Server needs to decide whether the pod's metrics should be considered.
 func buildPodState(pod *corev1.Pod) *pb.PodState {
 	state := pb.PodState_builder{
-		Name:       proto.String(pod.Name),
-		NodeName:   proto.String(pod.Spec.NodeName),
-		Phase:      proto.String(string(pod.Status.Phase)),
+		Name:       new(pod.Name),
+		NodeName:   new(pod.Spec.NodeName),
+		Phase:      new(string(pod.Status.Phase)),
 		Containers: buildContainerStates(pod),
 	}.Build()
 	if pod.DeletionTimestamp != nil {
