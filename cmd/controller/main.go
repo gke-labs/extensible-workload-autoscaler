@@ -9,8 +9,12 @@ import (
 	"syscall"
 	"time"
 
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
+	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/controller"
@@ -60,11 +64,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	// A discovery-backed scale client lets the controller read and update the
+	// /scale subresource of any scalable workload (Deployments, StatefulSets,
+	// CRDs) without depending on a specific typed client.
+	cachedDiscovery := memory.NewMemCacheClient(kubeClient.Discovery())
+	mapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscovery)
+	scaleClient, err := scale.NewForConfig(cfg, mapper, dynamic.LegacyAPIPathResolverFunc, scale.NewDiscoveryScaleKindResolver(cachedDiscovery))
+	if err != nil {
+		slog.Error("Error building scale client", "error", err)
+		os.Exit(1)
+	}
+
 	xasInformerFactory := informers.NewSharedInformerFactory(xasClient, time.Second*30)
 
 	ctl := controller.NewController(
 		kubeClient,
 		xasClient,
+		scaleClient,
+		mapper,
 		xasInformerFactory.XAS().V1().ScalingPolicies(),
 		xasInformerFactory.XAS().V1().MetricProviderClasses(),
 		xasInformerFactory.XAS().V1().RecommenderClasses(),

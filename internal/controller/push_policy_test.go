@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
-	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
@@ -79,11 +78,7 @@ func TestPushPolicy(t *testing.T) {
 			Scaling:        []xasv1.RecommenderDefinition{{Name: "linear", Recommender: "linear-class"}},
 		},
 	}
-	deployment := &appsv1.Deployment{
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}},
-		},
-	}
+	selector := "app=web"
 
 	id := pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("web")}.Build()
 	// fromCRD is what pushPolicy builds from sp alone.
@@ -154,7 +149,7 @@ func TestPushPolicy(t *testing.T) {
 			client := &fakePolicyClient{policies: tc.serverHas, getErr: tc.getErr, updateErr: tc.updateErr}
 			c := newPushPolicyController(t, client)
 
-			err := c.pushPolicy(sp, deployment)
+			err := c.pushPolicy(sp, selector)
 
 			if gotErr := err != nil; gotErr != tc.wantErr {
 				t.Fatalf("pushPolicy() error = %v, wantErr %v", err, tc.wantErr)
@@ -214,11 +209,8 @@ func TestPushPolicyRemovedRecommenderOwnedMetrics(t *testing.T) {
 			Scaling:        []xasv1.RecommenderDefinition{{Name: "linear", Recommender: "linear-class"}},
 		},
 	}
-	deployment := &appsv1.Deployment{Spec: appsv1.DeploymentSpec{
-		Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}},
-	}}
 	c := newPushPolicyController(t, &storeClient{store: s})
-	if err := c.pushPolicy(sp, deployment); err != nil {
+	if err := c.pushPolicy(sp, "app=web"); err != nil {
 		t.Fatalf("pushPolicy() error = %v", err)
 	}
 
