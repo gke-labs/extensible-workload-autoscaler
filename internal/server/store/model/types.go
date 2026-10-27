@@ -64,8 +64,9 @@ type Series struct {
 	ResourceName string
 	Labels       map[string]string
 
-	// LastRaw is the most recent sample ingested for the series. Its timestamp
-	// is the time at which the sample was measured by its source.
+	// LastRaw is the most recent sample recorded in the time window of the
+	// series. Its timestamp is the time at which the sample was measured by
+	// its source.
 	LastRaw Sample
 	// LastRawWindow is the time elapsed between LastRaw and the sample before
 	// it, i.e. the interval LastRaw was measured over when the source reports
@@ -100,12 +101,12 @@ func NewSeries(podName, containerName, resourceName string, labels map[string]st
 // timestamp) rather than on ingestTime, so that a source lagging behind by
 // more than the window duration still fills its window.
 //
-// A sample carrying the same timestamp as the last one (e.g. a re-scrape of a
+// A sample identical to the last one (e.g. a source re-reporting its last
+// value) only shows that the series is still being reported. A sample carrying
+// the same timestamp as the last one with a new value (e.g. a re-scrape of a
 // source within the same second) supersedes it in the time window, unless the
 // window cannot supersede a sample (see TimeWindow.Supersedes), in which case
-// the first sample is kept. A sample identical to the last one (e.g. a source
-// re-reporting its last value) only shows that the series is still being
-// reported.
+// the sample is not recorded: the window keeps the sample it already holds.
 func (s *Series) AddSample(sample Sample, ingestTime time.Time) {
 	// Requests may be delivered out of order.
 	if ingestTime.After(s.LastIngested) {
@@ -115,9 +116,10 @@ func (s *Series) AddSample(sample Sample, ingestTime time.Time) {
 		return
 	}
 	sameTimestamp := !s.LastRaw.Timestamp.IsZero() && sample.Timestamp.Equal(s.LastRaw.Timestamp)
-	if !sameTimestamp || s.TimeWindow.Supersedes() {
-		s.TimeWindow.AddSample(sample, sample.Timestamp)
+	if sameTimestamp && !s.TimeWindow.Supersedes() {
+		return
 	}
+	s.TimeWindow.AddSample(sample, sample.Timestamp)
 	// A superseding sample was measured over the same interval as the sample
 	// it supersedes.
 	if !s.LastRaw.Timestamp.IsZero() && !sameTimestamp {

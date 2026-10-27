@@ -298,10 +298,16 @@ func TestIngest_DecayingDistributionDuplicatesAndOutOfOrder(t *testing.T) {
 	}
 
 	// Same timestamp, different value: a histogram cannot supersede an
-	// observation, so the first one wins.
+	// observation, so the first one wins and the sample is not recorded.
 	ingestSample(t, ms, policy, newSample("cpu", at(-10*time.Second), 3), at(20*time.Second))
 	if got, want := totalWeight(ser), 1.0; got != want {
 		t.Errorf("after same timestamp: TotalWeight = %v, want %v", got, want)
+	}
+	if got, want := ser.LastRaw.Value, 1.0; got != want {
+		t.Errorf("after same timestamp: LastRaw.Value = %v, want %v", got, want)
+	}
+	if got, want := ser.LastIngested, at(20*time.Second); !got.Equal(want) {
+		t.Errorf("after same timestamp: LastIngested = %v, want %v", got, want)
 	}
 
 	// Out of order: dropped entirely.
