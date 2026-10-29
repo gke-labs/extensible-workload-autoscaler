@@ -277,7 +277,7 @@ func (s *MemoryStore) AddBatch(req *pb.IngestMetricsRequest) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, pBatch := range req.GetPolicies() {
+	for _, pBatch := range req.GetPolicyMetrics() {
 		key := policyID{cluster: req.GetClusterName(), ns: pBatch.GetNamespace(), name: pBatch.GetName()}
 		ps, ok := s.state[key]
 		if !ok || ps.Policy == nil {

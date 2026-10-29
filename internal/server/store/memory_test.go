@@ -276,7 +276,7 @@ func ingestWithLabels(s *MemoryStore, ts int64, ns, pol, pod, metric string, val
 	s.AddBatch(pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"),
 		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
-		Policies: []*pb.PolicyBatch{pb.PolicyBatch_builder{
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
 			Namespace: proto.String(ns), Name: proto.String(pol),
 			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{
 				PodName: proto.String(pod),
@@ -295,7 +295,7 @@ func ingestHist(s *MemoryStore, ts int64, ns, pol, pod, metric string, buckets m
 	s.AddBatch(pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"),
 		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
-		Policies: []*pb.PolicyBatch{pb.PolicyBatch_builder{
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
 			Namespace: proto.String(ns), Name: proto.String(pol),
 			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{
 				PodName: proto.String(pod),
@@ -404,7 +404,7 @@ func TestDump(t *testing.T) {
 	s.AddBatch(pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"),
 		Timestamp:   timestamppb.New(time.Unix(1000, 0)),
-		Policies: []*pb.PolicyBatch{pb.PolicyBatch_builder{
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
 			Namespace: proto.String("default"), Name: proto.String("dump-pol"),
 			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{
 				PodName: proto.String("p1"),
@@ -734,14 +734,14 @@ func TestMultiTenantIsolation(t *testing.T) {
 	// 3. Ingest Data (Value 100 for A, 200 for B)
 	s.AddBatch(pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("cluster-A"), Timestamp: timestamppb.New(time.Unix(1000, 0)),
-		Policies: []*pb.PolicyBatch{pb.PolicyBatch_builder{
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
 			Namespace: proto.String(ns), Name: proto.String(name),
 			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("pod-a"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(1000, 0))}.Build()}}.Build()},
 		}.Build()},
 	}.Build())
 	s.AddBatch(pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("cluster-B"), Timestamp: timestamppb.New(time.Unix(1000, 0)),
-		Policies: []*pb.PolicyBatch{pb.PolicyBatch_builder{
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
 			Namespace: proto.String(ns), Name: proto.String(name),
 			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("pod-b"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(200), Timestamp: timestamppb.New(time.Unix(1000, 0))}.Build()}}.Build()},
 		}.Build()},
@@ -1130,7 +1130,7 @@ func ingestResource(s *MemoryStore, ts int64, ns, pol, pod, container, metric, r
 	s.AddBatch(pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"),
 		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
-		Policies: []*pb.PolicyBatch{pb.PolicyBatch_builder{
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
 			Namespace: proto.String(ns), Name: proto.String(pol),
 			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{
 				PodName:       proto.String(pod),
@@ -1151,7 +1151,7 @@ func ingestOwned(s *MemoryStore, ts int64, ns, pol, pod, owner, metric string, v
 	s.AddBatch(pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"),
 		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
-		Policies: []*pb.PolicyBatch{pb.PolicyBatch_builder{
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
 			Namespace: proto.String(ns), Name: proto.String(pol),
 			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{
 				PodName: proto.String(pod),

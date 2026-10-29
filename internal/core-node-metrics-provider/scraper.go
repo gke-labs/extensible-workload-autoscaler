@@ -235,8 +235,8 @@ func (a *CoreNodeMetricsProvider) processGroupedPolicy(policy *groupedPolicy, ku
 	if len(podMetrics) > 0 {
 		req := pb.IngestMetricsRequest_builder{
 			Timestamp: timestamppb.Now(),
-			Policies: []*pb.PolicyBatch{
-				pb.PolicyBatch_builder{
+			PolicyMetrics: []*pb.PolicyMetricBatch{
+				pb.PolicyMetricBatch_builder{
 					Namespace: proto.String(policy.Namespace),
 					Name:      proto.String(policy.Name),
 					Batches:   podMetrics,
@@ -253,7 +253,7 @@ func (a *CoreNodeMetricsProvider) sendBatch(pbReq *pb.IngestMetricsRequest) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	slog.Debug("Sending metrics batch", "policies", len(pbReq.GetPolicies()))
+	slog.Debug("Sending metrics batch", "policies", len(pbReq.GetPolicyMetrics()))
 	resp, err := a.grpcClient.IngestMetrics(ctx, pbReq)
 	if err != nil {
 		slog.Error("Failed to send batch", "error", err)

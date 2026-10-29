@@ -85,7 +85,7 @@ func (p *CoreClusterMetricsProvider) scrapeAndSend() {
 		return
 	}
 
-	var policyBatches []*pb.PolicyBatch
+	var policyBatches []*pb.PolicyMetricBatch
 
 	for _, pol := range resp.GetPolicies() {
 		var policyMetrics []*pb.MetricBatch
@@ -112,7 +112,7 @@ func (p *CoreClusterMetricsProvider) scrapeAndSend() {
 		}
 
 		if len(policyMetrics) > 0 {
-			policyBatches = append(policyBatches, pb.PolicyBatch_builder{
+			policyBatches = append(policyBatches, pb.PolicyMetricBatch_builder{
 				Namespace: proto.String(pol.GetId().GetNamespace()),
 				Name:      proto.String(pol.GetId().GetName()),
 				Batches:   policyMetrics,
@@ -122,9 +122,9 @@ func (p *CoreClusterMetricsProvider) scrapeAndSend() {
 
 	if len(policyBatches) > 0 {
 		req := pb.IngestMetricsRequest_builder{
-			ClusterName: proto.String(p.clusterName),
-			Timestamp:   timestamppb.Now(),
-			Policies:    policyBatches,
+			ClusterName:   proto.String(p.clusterName),
+			Timestamp:     timestamppb.Now(),
+			PolicyMetrics: policyBatches,
 		}.Build()
 		p.sendBatch(req)
 	}
@@ -134,7 +134,7 @@ func (p *CoreClusterMetricsProvider) sendBatch(req *pb.IngestMetricsRequest) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	slog.Debug("Sending cluster metrics batch", "policies", len(req.GetPolicies()))
+	slog.Debug("Sending cluster metrics batch", "policies", len(req.GetPolicyMetrics()))
 	resp, err := p.grpcClient.IngestMetrics(ctx, req)
 	if err != nil {
 		slog.Error("Failed to send cluster metrics batch", "error", err)

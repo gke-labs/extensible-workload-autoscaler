@@ -253,7 +253,7 @@ func (s *Server) IngestMetrics(ctx context.Context, req *pb.IngestMetricsRequest
 	if err := validateIngestMetricsRequest(req); err != nil {
 		return nil, err
 	}
-	slog.Debug("IngestMetrics", "cluster", req.GetClusterName(), "policies", len(req.GetPolicies()))
+	slog.Debug("IngestMetrics", "cluster", req.GetClusterName(), "policies", len(req.GetPolicyMetrics()))
 	if err := s.store.AddBatch(req); err != nil {
 		if strings.Contains(err.Error(), "policy not found") {
 			return nil, status.Errorf(codes.NotFound, "%v", err)

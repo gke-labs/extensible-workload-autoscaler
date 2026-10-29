@@ -3134,7 +3134,7 @@ func (x *ContainerMetrics) SetContainerMetrics(v map[string]*MetricValues) {
 type ContainerMetrics_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// Per container metric values, keyed by container name.
+	// Metrics sourced from specific containers, keyed by container name.
 	ContainerMetrics map[string]*MetricValues
 }
 
@@ -5037,14 +5037,14 @@ func (b0 MetricStatus_builder) Build() *MetricStatus {
 
 // IngestMetricsRequest pushes a batch of raw metrics to the Server.
 type IngestMetricsRequest struct {
-	state                  protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_ClusterName *string                `protobuf:"bytes,1,opt,name=cluster_name,json=clusterName"`
-	xxx_hidden_Timestamp   *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=timestamp"`
-	xxx_hidden_Policies    *[]*PolicyBatch        `protobuf:"bytes,3,rep,name=policies"`
-	XXX_raceDetectHookData protoimpl.RaceDetectHookData
-	XXX_presence           [1]uint32
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_ClusterName   *string                `protobuf:"bytes,1,opt,name=cluster_name,json=clusterName"`
+	xxx_hidden_Timestamp     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=timestamp"`
+	xxx_hidden_PolicyMetrics *[]*PolicyMetricBatch  `protobuf:"bytes,3,rep,name=policy_metrics,json=policyMetrics"`
+	XXX_raceDetectHookData   protoimpl.RaceDetectHookData
+	XXX_presence             [1]uint32
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *IngestMetricsRequest) Reset() {
@@ -5089,10 +5089,10 @@ func (x *IngestMetricsRequest) GetTimestamp() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *IngestMetricsRequest) GetPolicies() []*PolicyBatch {
+func (x *IngestMetricsRequest) GetPolicyMetrics() []*PolicyMetricBatch {
 	if x != nil {
-		if x.xxx_hidden_Policies != nil {
-			return *x.xxx_hidden_Policies
+		if x.xxx_hidden_PolicyMetrics != nil {
+			return *x.xxx_hidden_PolicyMetrics
 		}
 	}
 	return nil
@@ -5107,8 +5107,8 @@ func (x *IngestMetricsRequest) SetTimestamp(v *timestamppb.Timestamp) {
 	x.xxx_hidden_Timestamp = v
 }
 
-func (x *IngestMetricsRequest) SetPolicies(v []*PolicyBatch) {
-	x.xxx_hidden_Policies = &v
+func (x *IngestMetricsRequest) SetPolicyMetrics(v []*PolicyMetricBatch) {
+	x.xxx_hidden_PolicyMetrics = &v
 }
 
 func (x *IngestMetricsRequest) HasClusterName() bool {
@@ -5150,7 +5150,7 @@ type IngestMetricsRequest_builder struct {
 	// that the metric sources (or the scraping) are falling behind.
 	Timestamp *timestamppb.Timestamp
 	// Group metrics by policy.
-	Policies []*PolicyBatch
+	PolicyMetrics []*PolicyMetricBatch
 }
 
 func (b0 IngestMetricsRequest_builder) Build() *IngestMetricsRequest {
@@ -5162,12 +5162,12 @@ func (b0 IngestMetricsRequest_builder) Build() *IngestMetricsRequest {
 		x.xxx_hidden_ClusterName = b.ClusterName
 	}
 	x.xxx_hidden_Timestamp = b.Timestamp
-	x.xxx_hidden_Policies = &b.Policies
+	x.xxx_hidden_PolicyMetrics = &b.PolicyMetrics
 	return m0
 }
 
-// PolicyBatch groups metrics for a specific policy.
-type PolicyBatch struct {
+// PolicyMetricBatch groups metrics for a specific policy.
+type PolicyMetricBatch struct {
 	state                  protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_Namespace   *string                `protobuf:"bytes,1,opt,name=namespace"`
 	xxx_hidden_Name        *string                `protobuf:"bytes,2,opt,name=name"`
@@ -5178,20 +5178,20 @@ type PolicyBatch struct {
 	sizeCache              protoimpl.SizeCache
 }
 
-func (x *PolicyBatch) Reset() {
-	*x = PolicyBatch{}
+func (x *PolicyMetricBatch) Reset() {
+	*x = PolicyMetricBatch{}
 	mi := &file_server_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PolicyBatch) String() string {
+func (x *PolicyMetricBatch) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PolicyBatch) ProtoMessage() {}
+func (*PolicyMetricBatch) ProtoMessage() {}
 
-func (x *PolicyBatch) ProtoReflect() protoreflect.Message {
+func (x *PolicyMetricBatch) ProtoReflect() protoreflect.Message {
 	mi := &file_server_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -5203,7 +5203,7 @@ func (x *PolicyBatch) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *PolicyBatch) GetNamespace() string {
+func (x *PolicyMetricBatch) GetNamespace() string {
 	if x != nil {
 		if x.xxx_hidden_Namespace != nil {
 			return *x.xxx_hidden_Namespace
@@ -5213,7 +5213,7 @@ func (x *PolicyBatch) GetNamespace() string {
 	return ""
 }
 
-func (x *PolicyBatch) GetName() string {
+func (x *PolicyMetricBatch) GetName() string {
 	if x != nil {
 		if x.xxx_hidden_Name != nil {
 			return *x.xxx_hidden_Name
@@ -5223,7 +5223,7 @@ func (x *PolicyBatch) GetName() string {
 	return ""
 }
 
-func (x *PolicyBatch) GetBatches() []*MetricBatch {
+func (x *PolicyMetricBatch) GetBatches() []*MetricBatch {
 	if x != nil {
 		if x.xxx_hidden_Batches != nil {
 			return *x.xxx_hidden_Batches
@@ -5232,45 +5232,45 @@ func (x *PolicyBatch) GetBatches() []*MetricBatch {
 	return nil
 }
 
-func (x *PolicyBatch) SetNamespace(v string) {
+func (x *PolicyMetricBatch) SetNamespace(v string) {
 	x.xxx_hidden_Namespace = &v
 	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 3)
 }
 
-func (x *PolicyBatch) SetName(v string) {
+func (x *PolicyMetricBatch) SetName(v string) {
 	x.xxx_hidden_Name = &v
 	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 3)
 }
 
-func (x *PolicyBatch) SetBatches(v []*MetricBatch) {
+func (x *PolicyMetricBatch) SetBatches(v []*MetricBatch) {
 	x.xxx_hidden_Batches = &v
 }
 
-func (x *PolicyBatch) HasNamespace() bool {
+func (x *PolicyMetricBatch) HasNamespace() bool {
 	if x == nil {
 		return false
 	}
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
 }
 
-func (x *PolicyBatch) HasName() bool {
+func (x *PolicyMetricBatch) HasName() bool {
 	if x == nil {
 		return false
 	}
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
 }
 
-func (x *PolicyBatch) ClearNamespace() {
+func (x *PolicyMetricBatch) ClearNamespace() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
 	x.xxx_hidden_Namespace = nil
 }
 
-func (x *PolicyBatch) ClearName() {
+func (x *PolicyMetricBatch) ClearName() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
 	x.xxx_hidden_Name = nil
 }
 
-type PolicyBatch_builder struct {
+type PolicyMetricBatch_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	// The namespace of the policy.
@@ -5281,8 +5281,8 @@ type PolicyBatch_builder struct {
 	Batches []*MetricBatch
 }
 
-func (b0 PolicyBatch_builder) Build() *PolicyBatch {
-	m0 := &PolicyBatch{}
+func (b0 PolicyMetricBatch_builder) Build() *PolicyMetricBatch {
+	m0 := &PolicyMetricBatch{}
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.Namespace != nil {
@@ -5297,7 +5297,8 @@ func (b0 PolicyBatch_builder) Build() *PolicyBatch {
 	return m0
 }
 
-// MetricBatch contains metrics for a specific pod.
+// MetricBatch contains metrics for a specific pod, for a given container in a
+// given pod, or for a whole policy.
 type MetricBatch struct {
 	state                    protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_PodName       *string                `protobuf:"bytes,1,opt,name=pod_name,json=podName"`
@@ -6222,12 +6223,12 @@ const file_server_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x01R\x05value\x128\n" +
 	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x14\n" +
-	"\x05error\x18\x04 \x01(\tR\x05error\"\xb0\x01\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error\"\xc1\x01\n" +
 	"\x14IngestMetricsRequest\x12!\n" +
 	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\x128\n" +
-	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12;\n" +
-	"\bpolicies\x18\x03 \x03(\v2\x1f.xas.server.v1alpha.PolicyBatchR\bpolicies\"z\n" +
-	"\vPolicyBatch\x12\x1c\n" +
+	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12L\n" +
+	"\x0epolicy_metrics\x18\x03 \x03(\v2%.xas.server.v1alpha.PolicyMetricBatchR\rpolicyMetrics\"\x80\x01\n" +
+	"\x11PolicyMetricBatch\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x129\n" +
 	"\abatches\x18\x03 \x03(\v2\x1f.xas.server.v1alpha.MetricBatchR\abatches\"\x8b\x01\n" +
@@ -6313,7 +6314,7 @@ var file_server_proto_goTypes = []any{
 	(*ArbitratedRecommendationsEvent)(nil),        // 37: xas.server.v1alpha.ArbitratedRecommendationsEvent
 	(*MetricStatus)(nil),                          // 38: xas.server.v1alpha.MetricStatus
 	(*IngestMetricsRequest)(nil),                  // 39: xas.server.v1alpha.IngestMetricsRequest
-	(*PolicyBatch)(nil),                           // 40: xas.server.v1alpha.PolicyBatch
+	(*PolicyMetricBatch)(nil),                     // 40: xas.server.v1alpha.PolicyMetricBatch
 	(*MetricBatch)(nil),                           // 41: xas.server.v1alpha.MetricBatch
 	(*MetricSample)(nil),                          // 42: xas.server.v1alpha.MetricSample
 	(*Histogram)(nil),                             // 43: xas.server.v1alpha.Histogram
@@ -6410,8 +6411,8 @@ var file_server_proto_depIdxs = []int32{
 	38, // 65: xas.server.v1alpha.ArbitratedRecommendationsEvent.metric_statuses:type_name -> xas.server.v1alpha.MetricStatus
 	65, // 66: xas.server.v1alpha.MetricStatus.timestamp:type_name -> google.protobuf.Timestamp
 	65, // 67: xas.server.v1alpha.IngestMetricsRequest.timestamp:type_name -> google.protobuf.Timestamp
-	40, // 68: xas.server.v1alpha.IngestMetricsRequest.policies:type_name -> xas.server.v1alpha.PolicyBatch
-	41, // 69: xas.server.v1alpha.PolicyBatch.batches:type_name -> xas.server.v1alpha.MetricBatch
+	40, // 68: xas.server.v1alpha.IngestMetricsRequest.policy_metrics:type_name -> xas.server.v1alpha.PolicyMetricBatch
+	41, // 69: xas.server.v1alpha.PolicyMetricBatch.batches:type_name -> xas.server.v1alpha.MetricBatch
 	42, // 70: xas.server.v1alpha.MetricBatch.samples:type_name -> xas.server.v1alpha.MetricSample
 	62, // 71: xas.server.v1alpha.MetricSample.labels:type_name -> xas.server.v1alpha.MetricSample.LabelsEntry
 	65, // 72: xas.server.v1alpha.MetricSample.timestamp:type_name -> google.protobuf.Timestamp

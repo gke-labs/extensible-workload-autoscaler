@@ -544,11 +544,11 @@ message IngestMetricsRequest {
   // that the metric sources (or the scraping) are falling behind.
   google.protobuf.Timestamp timestamp = 2;
   // Group metrics by policy.
-  repeated PolicyBatch policies = 3;
+  repeated PolicyMetricBatch policy_metrics = 3;
 }
 
-// PolicyBatch groups metrics for a specific policy.
-message PolicyBatch {
+// PolicyMetricBatch groups metrics for a specific policy.
+message PolicyMetricBatch {
   // The namespace of the policy.
   string namespace = 1;
   // The name of the policy.
@@ -558,7 +558,8 @@ message PolicyBatch {
   repeated MetricBatch batches = 3;
 }
 
-// MetricBatch contains metrics for a specific pod.
+// MetricBatch contains metrics for a specific pod, for a given container in a
+// given pod, or for a whole policy.
 message MetricBatch {
   // Identifies the source pod.
   // Empty string means the metric applies to the Policy as a whole (Global).
