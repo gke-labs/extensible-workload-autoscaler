@@ -1441,9 +1441,10 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 	memStore.CalculateAll()
 	res = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
 
-	// Expectation: Histogram p100 sticks to the last maximum seen until new data arrives.
+	// Expectation: the control metrics are only calculated on ingestion, so
+	// they are still those of T0.
 	wantRes1 := pb.GetControlMetricsResponse_builder{
-		Timestamp:     timestamppb.New(time.Unix(1010, 0)),
+		Timestamp:     timestamppb.New(time.Unix(1000, 0)),
 		ReadyReplicas: proto.Int32(1),
 		ControlMetrics: pb.ControlMetrics_builder{
 			Values: map[string]float64{"load": 101.0},
@@ -1683,12 +1684,17 @@ func TestMetricGCGRPC(t *testing.T) {
 	// Advance past GC cutoff (600s = 10m)
 	clk.Advance(11 * time.Minute)
 
-	// Trigger calculation to run GC
-	memStore.CalculateAll()
+	// Trigger calculation to run GC: the control metrics are calculated on
+	// ingestion, so ingest an empty batch.
+	ts = clk.Now().Unix()
+	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
+		ClusterName: proto.String("default"), Timestamp: timestamppb.New(time.Unix(ts, 0)),
+		Policies: []*pb.PolicyBatch{pb.PolicyBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()},
+	}.Build())
 
 	// Verify gone.
 	// GetControlMetrics returns the last calculated state.
-	// If GC removed the series, CalculateAll should produce empty ControlMetrics.
+	// If GC removed the series, the calculation should produce empty ControlMetrics.
 	res = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
 	if len(res.GetControlMetrics().GetValues()) > 0 {
 		t.Errorf("Metric should be GC'd, found: %v", res.GetControlMetrics().GetValues())
@@ -2252,6 +2258,14 @@ func TestWatchRecommendationsGRPC(t *testing.T) {
 		}
 	}
 	push("act", pb.Recommendation_builder{IsActive: proto.Bool(true)}.Build())
+	// The control metrics, hence the metric statuses, are calculated on
+	// ingestion: ingest an empty batch so that they are reported.
+	if _, err := client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
+		ClusterName: proto.String("default"), Timestamp: timestamppb.New(clk.Now()),
+		Policies: []*pb.PolicyBatch{pb.PolicyBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()},
+	}.Build()); err != nil {
+		t.Fatalf("IngestMetrics: %v", err)
+	}
 	memStore.CalculateAll()
 
 	// 2. Watch, then recalculate.
@@ -2304,9 +2318,9 @@ func TestWatchRecommendationsGRPC(t *testing.T) {
 	if diff := cmp.Diff(wantResponse(nil), recv(), opts...); diff != "" {
 		t.Errorf("initial state mismatch (-want +got):\n%s", diff)
 	}
-	// Recalculating later changes nothing but the metric status timestamps:
-	// nothing is streamed, so the next message received must be the one
-	// with the scaling recommendation pushed below.
+	// Recalculating later changes nothing: nothing is streamed, so the next
+	// message received must be the one with the scaling recommendation
+	// pushed below.
 	clk.Advance(time.Second)
 	memStore.CalculateAll()
 

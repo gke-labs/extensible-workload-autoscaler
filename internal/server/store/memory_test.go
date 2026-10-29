@@ -496,7 +496,7 @@ func TestDump(t *testing.T) {
         }
       }
     },
-    "Recommendation": {
+    "ArbitratedRecommendation": {
       "replicas": 2
     },
     "Explanation": [

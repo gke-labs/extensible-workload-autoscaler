@@ -285,11 +285,11 @@ func filterInitializingCPU(series iter.Seq[*model.Series], workload map[string]*
 	}
 }
 
-// readyReplicas returns the number of pods of the workload whose metrics are
+// readyReplicasCount returns the number of pods of the workload whose metrics are
 // considered (see podutil.IsEligible), as reported to the recommenders. At
 // least 1 is reported, so that a recommender scaling the current replicas
 // proportionally (e.g. Linear) does not get stuck at 0.
-func readyReplicas(workload map[string]*pb.PodState) int32 {
+func readyReplicasCount(workload map[string]*pb.PodState) int32 {
 	n := 0
 	for _, p := range workload {
 		if podutil.IsEligible(podutil.FromPodState(p)) {

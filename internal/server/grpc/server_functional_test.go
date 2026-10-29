@@ -1433,21 +1433,13 @@ func TestGetControlMetrics_SlidingWindow(t *testing.T) {
 		t.Errorf("ControlMetrics mismatch at T1 (-want +got):\n%s", diff)
 	}
 
-	// T2 (90s after T0): 10 should be gone from window
+	// T2 (90s after T0): the T0 samples are out of the window, but the
+	// control metrics are only calculated on ingestion, so they are still
+	// those of T1.
 	clk.Advance(60 * time.Second)
-	ts = clk.Now().Unix()
 	memStore.CalculateAll()
 	res = getControlMetrics(t, ctx, client, id)
-	wantRes2 := pb.GetControlMetricsResponse_builder{
-		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
-		ReadyReplicas: proto.Int32(1),
-		ControlMetrics: pb.ControlMetrics_builder{
-			Values: map[string]float64{
-				"m_instant": 20.0,
-				"c_avg":     0.333,
-			},
-		}.Build(),
-	}.Build()
+	wantRes2 := wantRes1
 	if diff := cmp.Diff(wantRes2, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
 		t.Errorf("ControlMetrics mismatch at T2 (-want +got):\n%s", diff)
 	}

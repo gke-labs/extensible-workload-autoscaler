@@ -44,7 +44,7 @@ type ServerStore interface {
 	// GetControlMetrics returns the aggregated metrics of a policy: the
 	// policy-wide ones and, keyed by recommender name, those owned by each
 	// recommender, along with the state of the workload they were calculated
-	// against (see calculatePolicy). false is returned if the policy is
+	// against (see calculatePolicyControlMetrics). false is returned if the policy is
 	// unknown or has not been calculated yet.
 	GetControlMetrics(id *pb.PolicyId) (*pb.GetControlMetricsResponse, bool)
 	// GetWorkload returns the pods of a policy's workload, as last reported
@@ -65,14 +65,14 @@ type ServerStore interface {
 type PolicyState struct {
 	Policy *pb.Policy
 	// Workload maps a pod name to its state.
-	Workload            map[string]*pb.PodState
-	Metrics             *MetricStore
-	Recommendation      *pb.Recommendation
-	Explanation         []*pb.RecommenderStatus
-	LastActive          time.Time
-	RecommenderStatuses map[string]*pb.RecommenderStatus
+	Workload                 map[string]*pb.PodState
+	Metrics                  *MetricStore
+	ArbitratedRecommendation *pb.Recommendation
+	Explanation              []*pb.RecommenderStatus
+	LastActive               time.Time
+	RecommenderStatuses      map[string]*pb.RecommenderStatus
 	// ControlMetrics holds the control metrics of the policy as of its last
-	// calculation (see calculatePolicy), nil until then.
+	// calculation (see calculatePolicyControlMetrics), nil until then.
 	ControlMetrics *pb.GetControlMetricsResponse
 }
 
@@ -129,23 +129,23 @@ func (s *MemoryStore) WatchRecommendations(clusterName string) (<-chan Recommend
 func (s *MemoryStore) CreatePolicy(clusterName string, p *pb.Policy) (*pb.Policy, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	key, ps := s.fetchPolicy(clusterName, p)
+	key, ps := s.getPolicyState(clusterName, p)
 	if ps != nil {
 		return nil, ErrPolicyAlreadyExists
 	}
 	if p.GetEtag() != "" {
 		return nil, ErrUnknownEtag
 	}
-	return s.savePolicy(p, ps, key)
+	return s.setPolicyState(p, ps, key)
 }
 
-func (s *MemoryStore) fetchPolicy(clusterName string, p *pb.Policy) (policyID, *PolicyState) {
+func (s *MemoryStore) getPolicyState(clusterName string, p *pb.Policy) (policyID, *PolicyState) {
 	key := policyID{cluster: clusterName, ns: p.GetId().GetNamespace(), name: p.GetId().GetName()}
 	ps := s.state[key]
 	return key, ps
 }
 
-func (s *MemoryStore) savePolicy(p *pb.Policy, ps *PolicyState, key policyID) (*pb.Policy, error) {
+func (s *MemoryStore) setPolicyState(p *pb.Policy, ps *PolicyState, key policyID) (*pb.Policy, error) {
 	created := proto.Clone(p).(*pb.Policy)
 
 	// Drop the metrics of removed recommenders before computing the ETag, so
@@ -168,7 +168,7 @@ func (s *MemoryStore) savePolicy(p *pb.Policy, ps *PolicyState, key policyID) (*
 		s.state[key] = ps
 	}
 	ps.Policy = created
-	ps.Recommendation = nil
+	ps.ArbitratedRecommendation = nil
 	ps.Explanation = nil
 	ps.ControlMetrics = nil
 
@@ -181,7 +181,7 @@ func (s *MemoryStore) savePolicy(p *pb.Policy, ps *PolicyState, key policyID) (*
 func (s *MemoryStore) UpdatePolicy(clusterName string, allowMissing bool, p *pb.Policy) (*pb.Policy, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	key, ps := s.fetchPolicy(clusterName, p)
+	key, ps := s.getPolicyState(clusterName, p)
 	if ps != nil && ps.Policy != nil {
 		// A sent ETag must match the stored one; an empty ETag overwrites.
 		if p.GetEtag() != "" && p.GetEtag() != ps.Policy.GetEtag() {
@@ -197,7 +197,7 @@ func (s *MemoryStore) UpdatePolicy(clusterName string, allowMissing bool, p *pb.
 		}
 	}
 
-	return s.savePolicy(p, ps, key)
+	return s.setPolicyState(p, ps, key)
 }
 
 func (s *MemoryStore) DeletePolicy(id *pb.PolicyId) error {
@@ -287,9 +287,11 @@ func (s *MemoryStore) AddBatch(req *pb.IngestMetricsRequest) error {
 		if err := ps.Metrics.IngestMetrics(ps.Policy, ps.Workload, pBatch.GetBatches(), req.GetTimestamp().AsTime()); err != nil {
 			return err
 		}
+		ps.ControlMetrics = calculatePolicyControlMetrics(ps, s.clock.Now())
+
 		watchers, watchersOk := s.cmWatchers[key.cluster]
 		if watchersOk && !watchers.Throttled(key) {
-			res := calculatePolicy(ps, s.clock.Now())
+			res := ps.ControlMetrics
 			watchers.Notify(key, ControlMetricEvent{
 				ID:                        key.toProto(),
 				ReadyReplicas:             res.GetReadyReplicas(),
@@ -313,7 +315,8 @@ func (s *MemoryStore) UpdateRecommenderState(req *pb.UpdateRecommenderStateReque
 
 	if !req.HasRecommendation() {
 		delete(ps.RecommenderStatuses, req.GetRecommenderName())
-		s.publishRecommendation(key, ps)
+		s.calculateArbitratedRecommendation(ps, s.clock.Now())
+		s.notifyRecommendation(key, ps)
 		return nil
 	}
 
@@ -366,7 +369,8 @@ func (s *MemoryStore) UpdateRecommenderState(req *pb.UpdateRecommenderStateReque
 	if err := s.updateRecommenderStatus(ps, req.GetRecommenderName(), status); err != nil {
 		return err
 	}
-	s.publishRecommendation(key, ps)
+	s.calculateArbitratedRecommendation(ps, s.clock.Now())
+	s.notifyRecommendation(key, ps)
 	return nil
 }
 
@@ -376,20 +380,6 @@ func (s *MemoryStore) updateRecommenderStatus(ps *PolicyState, name string, stat
 	}
 	ps.RecommenderStatuses[name] = status
 	return nil
-}
-
-// publishRecommendation arbitrates the recommendation of a policy anew, after
-// the state of one of its recommenders changed, and notifies the
-// recommendation watchers of its cluster. Nothing is done if the cluster has
-// never been watched, or if the policy is throttled: the next CalculateAll
-// arbitrates it. The caller must hold mu.
-func (s *MemoryStore) publishRecommendation(key policyID, ps *PolicyState) {
-	watchers, ok := s.recWatchers[key.cluster]
-	if !ok || watchers.Throttled(key) {
-		return
-	}
-	s.processRecommendations(ps, s.clock.Now())
-	watchers.Notify(key, recommendationEvent(key, ps))
 }
 
 // notifyRecommendation notifies the recommendation watchers of a policy's
@@ -409,7 +399,7 @@ func (s *MemoryStore) notifyRecommendation(key policyID, ps *PolicyState) {
 func recommendationEvent(key policyID, ps *PolicyState) RecommendationEvent {
 	return RecommendationEvent{
 		ID:             key.toProto(),
-		Recommendation: ps.Recommendation,
+		Recommendation: ps.ArbitratedRecommendation,
 		Explanation:    ps.Explanation,
 		MetricStatuses: metricStatuses(ps),
 	}
@@ -425,7 +415,7 @@ func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationR
 	}
 
 	return pb.GetRecommendationResponse_builder{
-		Recommendation: ps.Recommendation,
+		Recommendation: ps.ArbitratedRecommendation,
 		MetricStatuses: metricStatuses(ps),
 		Explanation:    ps.Explanation,
 	}.Build(), true
@@ -520,22 +510,20 @@ func (s *MemoryStore) CalculateAll() {
 		if ps.Policy == nil {
 			continue
 		}
-		ps.ControlMetrics = calculatePolicy(ps, now)
-		s.processRecommendations(ps, now)
-		// The arbitration also depends on time (see the activation window):
-		// its result may change without any recommender update, so publish
-		// it from here too. Unchanged results are dropped as duplicates.
+		// Arbitration depends on time (see the activation window), so it's
+		// periodically refreshed.
+		s.calculateArbitratedRecommendation(ps, now)
 		s.notifyRecommendation(key, ps)
 	}
 }
 
-// calculatePolicy aggregates the metrics of a policy as of now. It returns the
+// calculatePolicyControlMetrics aggregates the metrics of a policy as of now. It returns the
 // policy-wide control metrics and, keyed by recommender name, the control
 // metrics owned by each recommender (none if the policy defines none), along
 // with the state of the workload they were calculated against: the
 // calculation time and the number of ready replicas. The policy state is not
 // modified. The caller must hold mu.
-func calculatePolicy(ps *PolicyState, now time.Time) *pb.GetControlMetricsResponse {
+func calculatePolicyControlMetrics(ps *PolicyState, now time.Time) *pb.GetControlMetricsResponse {
 	policy := ps.Policy
 	workload := ps.Workload
 	cm := ps.Metrics.calculate(policy.GetMetrics(), workload, now)
@@ -550,7 +538,7 @@ func calculatePolicy(ps *PolicyState, now time.Time) *pb.GetControlMetricsRespon
 	}
 	return pb.GetControlMetricsResponse_builder{
 		Timestamp:                 timestamppb.New(now),
-		ReadyReplicas:             proto.Int32(readyReplicas(workload)),
+		ReadyReplicas:             proto.Int32(readyReplicasCount(workload)),
 		ControlMetrics:            cm,
 		RecommenderControlMetrics: rcm,
 	}.Build()
@@ -590,7 +578,7 @@ func recommenderNames(p *pb.Policy) map[string]bool {
 	return names
 }
 
-func (s *MemoryStore) processRecommendations(ps *PolicyState, now time.Time) {
+func (s *MemoryStore) calculateArbitratedRecommendation(ps *PolicyState, now time.Time) {
 	policy := ps.Policy
 	isActive := false
 	var activationStatuses []*pb.RecommenderStatus
@@ -638,12 +626,12 @@ func (s *MemoryStore) processRecommendations(ps *PolicyState, now time.Time) {
 	workloadRes, podRes := s.calculateArbitratedResources(ps, isActive)
 
 	if replicas == nil && len(workloadRes) == 0 && len(podRes) == 0 && len(scalingStatuses) == 0 {
-		ps.Recommendation = nil
+		ps.ArbitratedRecommendation = nil
 		ps.Explanation = nil
 		return
 	}
 
-	ps.Recommendation = pb.Recommendation_builder{
+	ps.ArbitratedRecommendation = pb.Recommendation_builder{
 		Replicas:              replicas,
 		WorkloadResources:     workloadRes,
 		PodContainerResources: podRes,
