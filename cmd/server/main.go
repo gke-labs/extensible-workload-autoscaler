@@ -17,11 +17,11 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
+	servergrpc "github.com/gke-labs/extensible-workload-autoscaler/cmd/server/internal/grpc"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/server/internal/store"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/server/internal/ui"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/logging"
-	servergrpc "github.com/gke-labs/extensible-workload-autoscaler/internal/server/grpc"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/ui"
 )
 
 func main() {

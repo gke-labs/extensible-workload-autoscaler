@@ -16,7 +16,6 @@ import (
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store"
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 )
 
@@ -161,44 +160,56 @@ func TestPushPolicy(t *testing.T) {
 	}
 }
 
-// storeClient serves the policy calls of pushPolicy from a real MemoryStore.
+// storeClient serves the policy calls of pushPolicy from a single stored
+// policy, mimicking the Server's behavior of dropping the metrics owned by
+// recommenders that are no longer in the policy on UpdatePolicy.
 type storeClient struct {
 	pb.XASServerClient
-	store *store.MemoryStore
+	policy *pb.Policy
 }
 
 func (c *storeClient) GetPolicy(_ context.Context, req *pb.GetPolicyRequest, _ ...grpc.CallOption) (*pb.Policy, error) {
-	p := c.store.GetPolicy(req.GetId())
-	if p == nil {
+	if c.policy == nil || !proto.Equal(c.policy.GetId(), req.GetId()) {
 		return nil, status.Error(codes.NotFound, "policy not found")
 	}
-	return p, nil
+	return proto.Clone(c.policy).(*pb.Policy), nil
 }
 
 func (c *storeClient) UpdatePolicy(_ context.Context, req *pb.UpdatePolicyRequest, _ ...grpc.CallOption) (*pb.Policy, error) {
-	return c.store.UpdatePolicy(req.GetPolicy().GetId().GetClusterName(), req.GetAllowMissing(), req.GetPolicy())
+	p := proto.Clone(req.GetPolicy()).(*pb.Policy)
+	names := make(map[string]bool, len(p.GetScaling())+len(p.GetActivation()))
+	for _, r := range p.GetScaling() {
+		names[r.GetName()] = true
+	}
+	for _, r := range p.GetActivation() {
+		names[r.GetName()] = true
+	}
+	for rName := range p.GetRecommenderMetrics() {
+		if !names[rName] {
+			delete(p.GetRecommenderMetrics(), rName)
+		}
+	}
+	c.policy = p
+	return proto.Clone(p).(*pb.Policy), nil
 }
 
 // TestPushPolicyRemovedRecommenderOwnedMetrics checks that removing a
 // recommender from the ScalingPolicy drops the metrics it owns on the Server,
 // although pushPolicy copies all the owned metrics from the Server's copy.
 func TestPushPolicyRemovedRecommenderOwnedMetrics(t *testing.T) {
-	s := store.NewMemoryStore()
 	id := pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("web")}.Build()
 	owned := func(owner string) *pb.MetricDefinitionList {
 		return pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: proto.String("cpu-target"), RecommenderName: proto.String(owner)}.Build()}}.Build()
 	}
 	// The Server has the policy with a vpa recommender and the metrics it owns.
-	if _, err := s.UpdatePolicy("default", true, pb.Policy_builder{
+	s := &storeClient{policy: pb.Policy_builder{
 		Id:      id,
 		Scaling: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("linear")}.Build(), pb.RecommenderDefinition_builder{Name: proto.String("vpa-sizing")}.Build()},
 		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 			"linear":     owned("linear"),
 			"vpa-sizing": owned("vpa-sizing"),
 		},
-	}.Build()); err != nil {
-		t.Fatalf("UpdatePolicy() error = %v", err)
-	}
+	}.Build()}
 
 	// The user removes vpa-sizing from the ScalingPolicy.
 	sp := &xasv1.ScalingPolicy{
@@ -209,14 +220,14 @@ func TestPushPolicyRemovedRecommenderOwnedMetrics(t *testing.T) {
 			Scaling:        []xasv1.RecommenderDefinition{{Name: "linear", Recommender: "linear-class"}},
 		},
 	}
-	c := newPushPolicyController(t, &storeClient{store: s})
+	c := newPushPolicyController(t, s)
 	if err := c.pushPolicy(sp, "app=web"); err != nil {
 		t.Fatalf("pushPolicy() error = %v", err)
 	}
 
-	got := s.GetPolicy(id)
+	got := s.policy
 	if got == nil {
-		t.Fatal("GetPolicy() not found")
+		t.Fatal("policy not found")
 	}
 	want := map[string]*pb.MetricDefinitionList{"linear": owned("linear")}
 	if diff := cmp.Diff(want, got.GetRecommenderMetrics(), protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {

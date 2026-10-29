@@ -20,9 +20,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
+	servergrpc "github.com/gke-labs/extensible-workload-autoscaler/cmd/server/internal/grpc"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/server/internal/store"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
-	servergrpc "github.com/gke-labs/extensible-workload-autoscaler/internal/server/grpc"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store"
 )
 
 const bufSizeFunctional = 1024 * 1024

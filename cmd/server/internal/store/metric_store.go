@@ -9,9 +9,9 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/server/internal/store/aggregation"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/server/internal/store/model"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/podutil"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store/aggregation"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store/model"
 )
 
 // MetricSeries holds the state of a single metric: every series reported for

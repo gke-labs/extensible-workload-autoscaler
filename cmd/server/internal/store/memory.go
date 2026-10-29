@@ -14,9 +14,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/server/internal/metrics"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/policy"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/metrics"
 )
 
 var (

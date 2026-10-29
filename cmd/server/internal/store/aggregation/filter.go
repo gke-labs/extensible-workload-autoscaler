@@ -4,8 +4,8 @@ import (
 	"time"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/server/internal/store/model"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/podutil"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store/model"
 )
 
 // SeriesFilter checks if an aggregate should be filtered out as of time now,

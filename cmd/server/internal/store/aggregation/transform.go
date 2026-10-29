@@ -4,7 +4,7 @@ import (
 	"strconv"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store/model"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/server/internal/store/model"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 

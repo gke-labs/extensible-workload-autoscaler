@@ -5,7 +5,7 @@ import (
 	"time"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store/model"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/server/internal/store/model"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/proto"

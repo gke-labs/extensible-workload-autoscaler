@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/server/internal/store"
 )
 
 // RegisterHandlers registers the UI handlers on the provided mux.
