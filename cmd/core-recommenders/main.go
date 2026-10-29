@@ -14,8 +14,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/core-recommenders/internal/engine"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/logging"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/engine"
 	clientset "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/clientset/versioned"
 	informers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/informers/externalversions"
 )

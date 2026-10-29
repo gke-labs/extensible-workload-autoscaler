@@ -15,11 +15,11 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/cron"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/engine/watchclient"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/linear"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/perpodvertical"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/vpa"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/core-recommenders/internal/cron"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/core-recommenders/internal/engine/watchclient"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/core-recommenders/internal/linear"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/core-recommenders/internal/perpodvertical"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/core-recommenders/internal/vpa"
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 )
 

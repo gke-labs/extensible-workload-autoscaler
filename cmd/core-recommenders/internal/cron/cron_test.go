@@ -9,8 +9,8 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/core-recommenders/internal/cron"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/cron"
 )
 
 func TestCronRecommend(t *testing.T) {
