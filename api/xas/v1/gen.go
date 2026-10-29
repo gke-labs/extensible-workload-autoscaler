@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 //go:generate bash ../../../hack/run-tool.sh deepcopy-gen --output-file deepcopy_generated.go --go-header-file ../../../hack/boilerplate.go.txt github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1
-//go:generate bash ../../../hack/run-tool.sh controller-gen crd paths="./..." output:crd:dir="../../../deploy/crd"
+//go:generate bash ../../../hack/run-tool.sh controller-gen crd paths="./..." output:crd:dir="../../../manifests/crd"
 //go:generate bash ../../../hack/run-tool.sh client-gen --clientset-name versioned --input-base "" --input github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1 --output-pkg github.com/gke-labs/extensible-workload-autoscaler/pkg/client/clientset --output-dir ../../../pkg/client/clientset --go-header-file ../../../hack/boilerplate.go.txt
 //go:generate bash ../../../hack/run-tool.sh lister-gen --output-pkg github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers --output-dir ../../../pkg/client/listers --go-header-file ../../../hack/boilerplate.go.txt github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1
 //go:generate bash ../../../hack/run-tool.sh informer-gen --versioned-clientset-package github.com/gke-labs/extensible-workload-autoscaler/pkg/client/clientset/versioned --listers-package github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers --output-pkg github.com/gke-labs/extensible-workload-autoscaler/pkg/client/informers --output-dir ../../../pkg/client/informers --go-header-file ../../../hack/boilerplate.go.txt github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1

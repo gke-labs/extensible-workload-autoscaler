@@ -33,16 +33,16 @@ echo "=========================================================="
 echo "Deploying xAS manifests to kind cluster '${KIND_CLUSTER_NAME}' using ko"
 echo "=========================================================="
 
-kubectl apply -f "${ROOT}"/deploy/crd/
+kubectl apply -f "${ROOT}"/manifests/crd/
 
 export KIND_CLUSTER_NAME # For ko resolve to push images to the KinD image cache.
 
 # Build system binaries and resolve manifest references using ko in one unified step.
 # A single yaml file must not contain more than 4 ko:// images. Otherwise it will hang.
-"${ROOT}"/hack/run-tool.sh ko resolve -f "${ROOT}"/deploy/xas-control-plane.yaml | kubectl apply -f -
-"${ROOT}"/hack/run-tool.sh ko resolve -f "${ROOT}"/deploy/xas-core-node-metrics-provider.yaml | kubectl apply -f -
-"${ROOT}"/hack/run-tool.sh ko resolve -f "${ROOT}"/deploy/xas-core-recommenders.yaml | kubectl apply -f -
-"${ROOT}"/hack/run-tool.sh ko resolve -f "${ROOT}"/deploy/xas-core-cluster-metrics-provider.yaml | kubectl apply -f -
+"${ROOT}"/hack/run-tool.sh ko resolve -f "${ROOT}"/manifests/xas-server.yaml | kubectl apply -f -
+"${ROOT}"/hack/run-tool.sh ko resolve -f "${ROOT}"/manifests/xas-core-node-metrics-provider.yaml | kubectl apply -f -
+"${ROOT}"/hack/run-tool.sh ko resolve -f "${ROOT}"/manifests/xas-core-recommenders.yaml | kubectl apply -f -
+"${ROOT}"/hack/run-tool.sh ko resolve -f "${ROOT}"/manifests/xas-core-cluster-metrics-provider.yaml | kubectl apply -f -
 
 echo "=========================================================="
 echo "Restarting xAS workloads..."

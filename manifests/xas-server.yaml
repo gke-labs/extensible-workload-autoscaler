@@ -54,9 +54,7 @@ kind: ClusterRole
 metadata:
   name: xas-controller
 rules:
-  # Read and update replica count via the /scale subresource of any scalable
-  # workload referenced by a ScalingPolicy (Deployments, StatefulSets,
-  # ReplicaSets, and CRDs that implement the scale subresource).
+  # Read and update replica count via the /scale subresource
   - apiGroups: ["apps"]
     resources: ["deployments/scale", "statefulsets/scale", "replicasets/scale"]
     verbs: ["get", "update", "patch"]

@@ -84,7 +84,7 @@ Defines a reusable scaling strategy.
 
 *   `api/server`: gRPC service definitions.
 *   `cmd/`: Main entrypoints for each component.
-*   `deploy/`: Kubernetes manifests (CRDs, RBAC, Install).
+*   `manifests/`: Kubernetes manifests (CRDs, RBAC, Install).
 *   `internal/`: Private implementation code.
     *   `server/`: Server logic.
     *   `controller/`: K8s Operator logic.
