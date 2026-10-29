@@ -8,7 +8,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/podutil"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store/aggregation"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store/model"

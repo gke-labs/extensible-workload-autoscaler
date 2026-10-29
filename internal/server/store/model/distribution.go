@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strconv"
 
-	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 )
 
 // Distribution is a cumulative histogram with floating point bucket counts,

@@ -9,7 +9,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 )
 
 // significantChangeRatio is the relative change of a request, compared to the

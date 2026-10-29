@@ -14,7 +14,7 @@ import (
 	externalv1beta1 "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
 
-	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
 )
 

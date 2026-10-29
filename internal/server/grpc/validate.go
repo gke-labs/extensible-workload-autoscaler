@@ -4,7 +4,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 )
 
 func validateGetPolicyRequest(req *pb.GetPolicyRequest) error {

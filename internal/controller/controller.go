@@ -32,7 +32,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/controller/watchclient"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/podutil"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"

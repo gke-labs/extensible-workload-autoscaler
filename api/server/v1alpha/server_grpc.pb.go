@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.0
 // - protoc             v7.36.1
-// source: xas.proto
+// source: server.proto
 
 package v1alpha
 
@@ -20,19 +20,19 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	XASServer_GetPolicy_FullMethodName              = "/xas.v1alpha.XASServer/GetPolicy"
-	XASServer_CreatePolicy_FullMethodName           = "/xas.v1alpha.XASServer/CreatePolicy"
-	XASServer_UpdatePolicy_FullMethodName           = "/xas.v1alpha.XASServer/UpdatePolicy"
-	XASServer_DeletePolicy_FullMethodName           = "/xas.v1alpha.XASServer/DeletePolicy"
-	XASServer_ListPolicies_FullMethodName           = "/xas.v1alpha.XASServer/ListPolicies"
-	XASServer_UpdateWorkload_FullMethodName         = "/xas.v1alpha.XASServer/UpdateWorkload"
-	XASServer_GetControlMetrics_FullMethodName      = "/xas.v1alpha.XASServer/GetControlMetrics"
-	XASServer_WatchControlMetrics_FullMethodName    = "/xas.v1alpha.XASServer/WatchControlMetrics"
-	XASServer_GetWorkload_FullMethodName            = "/xas.v1alpha.XASServer/GetWorkload"
-	XASServer_UpdateRecommenderState_FullMethodName = "/xas.v1alpha.XASServer/UpdateRecommenderState"
-	XASServer_GetRecommendation_FullMethodName      = "/xas.v1alpha.XASServer/GetRecommendation"
-	XASServer_WatchRecommendations_FullMethodName   = "/xas.v1alpha.XASServer/WatchRecommendations"
-	XASServer_IngestMetrics_FullMethodName          = "/xas.v1alpha.XASServer/IngestMetrics"
+	XASServer_GetPolicy_FullMethodName              = "/xas.server.v1alpha.XASServer/GetPolicy"
+	XASServer_CreatePolicy_FullMethodName           = "/xas.server.v1alpha.XASServer/CreatePolicy"
+	XASServer_UpdatePolicy_FullMethodName           = "/xas.server.v1alpha.XASServer/UpdatePolicy"
+	XASServer_DeletePolicy_FullMethodName           = "/xas.server.v1alpha.XASServer/DeletePolicy"
+	XASServer_ListPolicies_FullMethodName           = "/xas.server.v1alpha.XASServer/ListPolicies"
+	XASServer_UpdateWorkload_FullMethodName         = "/xas.server.v1alpha.XASServer/UpdateWorkload"
+	XASServer_GetControlMetrics_FullMethodName      = "/xas.server.v1alpha.XASServer/GetControlMetrics"
+	XASServer_WatchControlMetrics_FullMethodName    = "/xas.server.v1alpha.XASServer/WatchControlMetrics"
+	XASServer_GetWorkload_FullMethodName            = "/xas.server.v1alpha.XASServer/GetWorkload"
+	XASServer_UpdateRecommenderState_FullMethodName = "/xas.server.v1alpha.XASServer/UpdateRecommenderState"
+	XASServer_GetRecommendation_FullMethodName      = "/xas.server.v1alpha.XASServer/GetRecommendation"
+	XASServer_WatchRecommendations_FullMethodName   = "/xas.server.v1alpha.XASServer/WatchRecommendations"
+	XASServer_IngestMetrics_FullMethodName          = "/xas.server.v1alpha.XASServer/IngestMetrics"
 )
 
 // XASServerClient is the client API for XASServer service.
@@ -583,7 +583,7 @@ func _XASServer_IngestMetrics_Handler(srv interface{}, ctx context.Context, dec 
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var XASServer_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "xas.v1alpha.XASServer",
+	ServiceName: "xas.server.v1alpha.XASServer",
 	HandlerType: (*XASServerServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -643,5 +643,5 @@ var XASServer_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "xas.proto",
+	Metadata: "server.proto",
 }

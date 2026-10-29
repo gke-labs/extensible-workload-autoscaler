@@ -82,7 +82,7 @@ Defines a reusable scaling strategy.
 
 ## Directory Structure
 
-*   `api/proto`: gRPC service definitions.
+*   `api/server`: gRPC service definitions.
 *   `cmd/`: Main entrypoints for each component.
 *   `deploy/`: Kubernetes manifests (CRDs, RBAC, Install).
 *   `internal/`: Private implementation code.

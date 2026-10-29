@@ -1,12 +1,12 @@
 edition = "2024";
 
-package xas.v1alpha;
+package xas.server.v1alpha;
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
-option go_package = "github.com/gke-labs/extensible-workload-autoscaler/api/v1alpha";
+option go_package = "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha";
 
 // XASServer defines the gRPC interface for the xAS Server.
 // It acts as the central state manager for autoscaling policies, workload state,

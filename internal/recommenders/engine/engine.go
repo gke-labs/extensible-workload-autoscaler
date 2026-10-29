@@ -14,7 +14,7 @@ import (
 
 	corelisters "k8s.io/client-go/listers/core/v1"
 
-	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/cron"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/engine/watchclient"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/recommenders/linear"

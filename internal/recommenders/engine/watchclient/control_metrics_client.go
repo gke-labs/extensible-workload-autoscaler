@@ -5,7 +5,7 @@ import (
 
 	"log/slog"
 
-	pb "github.com/gke-labs/extensible-workload-autoscaler/api/proto/v1alpha"
+	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/pkg/client/watch"
 	"google.golang.org/grpc"
 )
