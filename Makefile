@@ -1,7 +1,7 @@
 IMAGE_TAG ?= latest
 IMAGE_NAME ?= xas
 GO_VERSION := $(shell awk '$$1 == "go" {print $$2}' "$$(go env GOMOD)")
-GEN_PATHS := pkg/client deploy/crd pkg/apis/xas/v1/deepcopy_generated.go api/server/v1alpha
+GEN_PATHS := pkg/client deploy/crd api/xas/v1/deepcopy_generated.go api/server/v1alpha
 
 .PHONY: build
 build:

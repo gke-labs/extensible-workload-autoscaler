@@ -33,9 +33,9 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
+	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/controller/watchclient"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/podutil"
-	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
 	clientset "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/clientset/versioned"
 	informers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/informers/externalversions/xas/v1"
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"

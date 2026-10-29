@@ -22,7 +22,7 @@ import (
 	context "context"
 	time "time"
 
-	apisxasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
+	apixasv1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
 	versioned "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/informers/externalversions/internalinterfaces"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
@@ -93,7 +93,7 @@ func NewMetricProviderClassInformerWithOptions(client versioned.Interface, optio
 				return client.XASV1().MetricProviderClasses().Watch(ctx, opts)
 			},
 		}, client),
-		&apisxasv1.MetricProviderClass{},
+		&apixasv1.MetricProviderClass{},
 		cache.SharedIndexInformerOptions{
 			ResyncPeriod: options.ResyncPeriod,
 			Indexers:     options.Indexers,
@@ -107,7 +107,7 @@ func (f *metricProviderClassInformer) defaultInformer(client versioned.Interface
 }
 
 func (f *metricProviderClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apisxasv1.MetricProviderClass{}, f.defaultInformer)
+	return f.factory.InformerFor(&apixasv1.MetricProviderClass{}, f.defaultInformer)
 }
 
 func (f *metricProviderClassInformer) Lister() xasv1.MetricProviderClassLister {

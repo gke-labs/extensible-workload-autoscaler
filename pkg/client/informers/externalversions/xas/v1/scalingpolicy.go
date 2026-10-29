@@ -22,7 +22,7 @@ import (
 	context "context"
 	time "time"
 
-	apisxasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
+	apixasv1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
 	versioned "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/informers/externalversions/internalinterfaces"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
@@ -94,7 +94,7 @@ func NewScalingPolicyInformerWithOptions(client versioned.Interface, namespace s
 				return client.XASV1().ScalingPolicies(namespace).Watch(ctx, opts)
 			},
 		}, client),
-		&apisxasv1.ScalingPolicy{},
+		&apixasv1.ScalingPolicy{},
 		cache.SharedIndexInformerOptions{
 			ResyncPeriod: options.ResyncPeriod,
 			Indexers:     options.Indexers,
@@ -108,7 +108,7 @@ func (f *scalingPolicyInformer) defaultInformer(client versioned.Interface, resy
 }
 
 func (f *scalingPolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apisxasv1.ScalingPolicy{}, f.defaultInformer)
+	return f.factory.InformerFor(&apixasv1.ScalingPolicy{}, f.defaultInformer)
 }
 
 func (f *scalingPolicyInformer) Lister() xasv1.ScalingPolicyLister {

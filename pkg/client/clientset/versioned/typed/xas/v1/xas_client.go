@@ -21,7 +21,7 @@ package v1
 import (
 	http "net/http"
 
-	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
+	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
 	scheme "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
 )

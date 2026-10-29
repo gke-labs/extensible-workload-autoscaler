@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	v1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
+	v1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/clientset/versioned/typed/xas/v1"
 	gentype "k8s.io/client-go/gentype"
 )

@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
-	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
+	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
 )
 
 func (p *CoreClusterMetricsProvider) processCustomMetric(

@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
+	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

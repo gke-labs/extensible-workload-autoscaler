@@ -21,7 +21,7 @@ package v1
 import (
 	context "context"
 
-	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
+	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
 	scheme "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"

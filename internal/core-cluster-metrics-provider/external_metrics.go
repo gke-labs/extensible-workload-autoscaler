@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
-	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
+	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
 )
 
 func (p *CoreClusterMetricsProvider) processExternalMetric(namespace string, m *pb.MetricDefinition, class *xasv1.MetricProviderClass) []*pb.MetricBatch {

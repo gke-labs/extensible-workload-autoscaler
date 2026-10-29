@@ -16,7 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
-	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
+	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
 )
 
 type KubeletPodMetrics struct {

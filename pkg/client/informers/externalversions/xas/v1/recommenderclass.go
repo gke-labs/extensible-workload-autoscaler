@@ -22,7 +22,7 @@ import (
 	context "context"
 	time "time"
 
-	apisxasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
+	apixasv1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
 	versioned "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/informers/externalversions/internalinterfaces"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
@@ -93,7 +93,7 @@ func NewRecommenderClassInformerWithOptions(client versioned.Interface, options 
 				return client.XASV1().RecommenderClasses().Watch(ctx, opts)
 			},
 		}, client),
-		&apisxasv1.RecommenderClass{},
+		&apixasv1.RecommenderClass{},
 		cache.SharedIndexInformerOptions{
 			ResyncPeriod: options.ResyncPeriod,
 			Indexers:     options.Indexers,
@@ -107,7 +107,7 @@ func (f *recommenderClassInformer) defaultInformer(client versioned.Interface, r
 }
 
 func (f *recommenderClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apisxasv1.RecommenderClass{}, f.defaultInformer)
+	return f.factory.InformerFor(&apixasv1.RecommenderClass{}, f.defaultInformer)
 }
 
 func (f *recommenderClassInformer) Lister() xasv1.RecommenderClassLister {

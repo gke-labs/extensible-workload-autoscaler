@@ -15,7 +15,7 @@ import (
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
-	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
+	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
 )
 
 type fakeExternalClient struct {

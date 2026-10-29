@@ -15,8 +15,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
+	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/server/store"
-	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/pkg/apis/xas/v1"
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 )
 
