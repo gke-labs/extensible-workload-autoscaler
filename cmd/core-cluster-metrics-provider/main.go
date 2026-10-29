@@ -19,7 +19,7 @@ import (
 	customclient "k8s.io/metrics/pkg/client/custom_metrics"
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
 
-	provider "github.com/gke-labs/extensible-workload-autoscaler/internal/core-cluster-metrics-provider"
+	provider "github.com/gke-labs/extensible-workload-autoscaler/cmd/core-cluster-metrics-provider/internal"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/logging"
 	clientset "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/clientset/versioned"
 	informers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/informers/externalversions"
