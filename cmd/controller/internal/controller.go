@@ -1,4 +1,4 @@
-package controller
+package internal
 
 import (
 	"context"
@@ -34,7 +34,7 @@ import (
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
-	"github.com/gke-labs/extensible-workload-autoscaler/internal/controller/watchclient"
+	"github.com/gke-labs/extensible-workload-autoscaler/cmd/controller/internal/watchclient"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/podutil"
 	clientset "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/clientset/versioned"
 	informers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/informers/externalversions/xas/v1"
