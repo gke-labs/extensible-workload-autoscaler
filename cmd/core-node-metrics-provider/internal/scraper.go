@@ -1,4 +1,4 @@
-package core_node_metrics_provider
+package internal
 
 import (
 	"context"

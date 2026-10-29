@@ -13,7 +13,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	provider "github.com/gke-labs/extensible-workload-autoscaler/internal/core-node-metrics-provider"
+	provider "github.com/gke-labs/extensible-workload-autoscaler/cmd/core-node-metrics-provider/internal"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/logging"
 	clientset "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/clientset/versioned"
 	informers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/informers/externalversions"
