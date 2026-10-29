@@ -149,7 +149,7 @@ func (c *Controller) Run(workers int, ctx context.Context) error {
 	}
 
 	// Start the recommendation stream and its consumer.
-	recChan := make(chan *pb.WatchRecommendationsResponse, recChanCapacity)
+	recChan := make(chan *pb.ArbitratedRecommendationsEvent, recChanCapacity)
 	recClient := watchclient.NewRecommendationsClient(c.grpcConn, c.clusterName)
 	go recClient.Run(ctx, recChan)
 	go c.handleRecommendations(ctx, recChan)
@@ -165,7 +165,7 @@ func (c *Controller) Run(workers int, ctx context.Context) error {
 
 // handleRecommendations consumes streamed recommendations and, for each one,
 // actuates it on the target workload and updates the policy status.
-func (c *Controller) handleRecommendations(ctx context.Context, ch <-chan *pb.WatchRecommendationsResponse) {
+func (c *Controller) handleRecommendations(ctx context.Context, ch <-chan *pb.ArbitratedRecommendationsEvent) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -181,7 +181,7 @@ func (c *Controller) handleRecommendations(ctx context.Context, ch <-chan *pb.Wa
 
 // handleRecommendation applies a single streamed recommendation: it resolves
 // the policy and its target deployment, then runs actuate and updateStatus.
-func (c *Controller) handleRecommendation(resp *pb.WatchRecommendationsResponse) error {
+func (c *Controller) handleRecommendation(resp *pb.ArbitratedRecommendationsEvent) error {
 	id := policyID{namespace: resp.GetId().GetNamespace(), name: resp.GetId().GetName()}
 
 	policy, err := c.policiesLister.ScalingPolicies(id.namespace).Get(id.name)
@@ -210,9 +210,9 @@ func (c *Controller) handleRecommendation(resp *pb.WatchRecommendationsResponse)
 		return fmt.Errorf("getting scale for %s %s: %w", targetResource, policy.Spec.ScaleTargetRef.Name, err)
 	}
 
-	// actuate and updateStatus operate on a GetRecommendationResponse, which
+	// actuate and updateStatus operate on a ArbitratedRecommendation, which
 	// carries the same payload as the streamed message minus the policy id.
-	recResp := pb.GetRecommendationResponse_builder{
+	recResp := pb.ArbitratedRecommendation_builder{
 		Recommendation: resp.GetRecommendation(),
 		Explanation:    resp.GetExplanation(),
 		MetricStatuses: resp.GetMetricStatuses(),
@@ -465,7 +465,7 @@ func (c *Controller) actuate(policy *xasv1.ScalingPolicy, targetResource schema.
 // updateStatus populates the ScalingPolicy status from the target workload's
 // scale and the server's recommendation response, then persists it via
 // UpdateStatus.
-func (c *Controller) updateStatus(policy *xasv1.ScalingPolicy, scale *autoscalingv1.Scale, selector string, resp *pb.GetRecommendationResponse) error {
+func (c *Controller) updateStatus(policy *xasv1.ScalingPolicy, scale *autoscalingv1.Scale, selector string, resp *pb.ArbitratedRecommendation) error {
 	rec := resp.GetRecommendation()
 	policyCopy := policy.DeepCopy()
 	policyCopy.Status.CurrentReplicas = scale.Spec.Replicas

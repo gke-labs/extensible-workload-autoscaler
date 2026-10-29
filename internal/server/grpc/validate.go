@@ -164,7 +164,7 @@ func validateWatchControlMetricsRequest(req *pb.WatchControlMetricsRequest) erro
 	return validateClusterName(req.GetClusterName())
 }
 
-func validateWatchRecommendationsRequest(req *pb.WatchRecommendationsRequest) error {
+func validateWatchArbitratedRecommendationsRequest(req *pb.WatchArbitratedRecommendationsRequest) error {
 	if req == nil {
 		return status.Errorf(codes.InvalidArgument, "request is nil")
 	}
@@ -185,7 +185,7 @@ func validateUpdateRecommenderStateRequest(req *pb.UpdateRecommenderStateRequest
 	return validatePolicyId(req.GetId())
 }
 
-func validateGetRecommendationRequest(req *pb.GetRecommendationRequest) error {
+func validateGetArbitratedRecommendationRequest(req *pb.GetArbitratedRecommendationRequest) error {
 	if req == nil {
 		return status.Errorf(codes.InvalidArgument, "request is nil")
 	}

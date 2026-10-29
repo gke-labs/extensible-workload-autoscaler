@@ -126,7 +126,7 @@ func (s *Server) GetControlMetrics(ctx context.Context, req *pb.GetControlMetric
 // calculated against. The stream stays open until the client cancels it, or
 // until the client falls too far behind, in which case it is terminated with
 // ResourceExhausted and must be reopened.
-func (s *Server) WatchControlMetrics(req *pb.WatchControlMetricsRequest, stream grpc.ServerStreamingServer[pb.WatchControlMetricsResponse]) error {
+func (s *Server) WatchControlMetrics(req *pb.WatchControlMetricsRequest, stream grpc.ServerStreamingServer[pb.ControlMetricsEvent]) error {
 	if err := validateWatchControlMetricsRequest(req); err != nil {
 		return err
 	}
@@ -136,8 +136,8 @@ func (s *Server) WatchControlMetrics(req *pb.WatchControlMetricsRequest, stream 
 	events, unwatch := s.store.WatchControlMetrics(req.GetClusterName())
 	defer unwatch()
 
-	return serveWatch(stream, events, func(evt store.ControlMetricEvent) *pb.WatchControlMetricsResponse {
-		return pb.WatchControlMetricsResponse_builder{
+	return serveWatch(stream, events, func(evt store.ControlMetricEvent) *pb.ControlMetricsEvent {
+		return pb.ControlMetricsEvent_builder{
 			Id:                        evt.ID,
 			ControlMetrics:            evt.ControlMetrics,
 			RecommenderControlMetrics: evt.RecommenderControlMetrics,
@@ -146,24 +146,24 @@ func (s *Server) WatchControlMetrics(req *pb.WatchControlMetricsRequest, stream 
 	})
 }
 
-// WatchRecommendations streams the arbitrated recommendation of every policy
+// WatchArbitratedRecommendations streams the arbitrated recommendation of every policy
 // in the requested cluster each time it changes, together with its
 // explanation and the status of the metrics it was calculated from. The
 // stream stays open until the client cancels it, or until the client falls
 // too far behind, in which case it is terminated with ResourceExhausted and
 // must be reopened.
-func (s *Server) WatchRecommendations(req *pb.WatchRecommendationsRequest, stream grpc.ServerStreamingServer[pb.WatchRecommendationsResponse]) error {
-	if err := validateWatchRecommendationsRequest(req); err != nil {
+func (s *Server) WatchArbitratedRecommendations(req *pb.WatchArbitratedRecommendationsRequest, stream grpc.ServerStreamingServer[pb.ArbitratedRecommendationsEvent]) error {
+	if err := validateWatchArbitratedRecommendationsRequest(req); err != nil {
 		return err
 	}
-	slog.Debug("WatchRecommendations: Started", "cluster", req.GetClusterName())
-	defer slog.Debug("WatchRecommendations: Stopped", "cluster", req.GetClusterName())
+	slog.Debug("WatchArbitratedRecommendations: Started", "cluster", req.GetClusterName())
+	defer slog.Debug("WatchArbitratedRecommendations: Stopped", "cluster", req.GetClusterName())
 
-	events, unwatch := s.store.WatchRecommendations(req.GetClusterName())
+	events, unwatch := s.store.WatchArbitratedRecommendations(req.GetClusterName())
 	defer unwatch()
 
-	return serveWatch(stream, events, func(evt store.RecommendationEvent) *pb.WatchRecommendationsResponse {
-		return pb.WatchRecommendationsResponse_builder{
+	return serveWatch(stream, events, func(evt store.RecommendationEvent) *pb.ArbitratedRecommendationsEvent {
+		return pb.ArbitratedRecommendationsEvent_builder{
 			Id:             evt.ID,
 			Recommendation: evt.Recommendation,
 			Explanation:    evt.Explanation,
@@ -236,16 +236,16 @@ func (s *Server) UpdateRecommenderState(ctx context.Context, req *pb.UpdateRecom
 	return res, nil
 }
 
-func (s *Server) GetRecommendation(ctx context.Context, req *pb.GetRecommendationRequest) (*pb.GetRecommendationResponse, error) {
-	if err := validateGetRecommendationRequest(req); err != nil {
+func (s *Server) GetArbitratedRecommendation(ctx context.Context, req *pb.GetArbitratedRecommendationRequest) (*pb.ArbitratedRecommendation, error) {
+	if err := validateGetArbitratedRecommendationRequest(req); err != nil {
 		return nil, err
 	}
-	rec, ok := s.store.GetRecommendation(req.GetId())
+	rec, ok := s.store.GetArbitratedRecommendation(req.GetId())
 	if !ok {
-		slog.Debug("GetRecommendation: Not Found", "cluster", req.GetId().GetClusterName(), "policy", req.GetId().GetName())
+		slog.Debug("GetArbitratedRecommendation: Not Found", "cluster", req.GetId().GetClusterName(), "policy", req.GetId().GetName())
 		return nil, status.Errorf(codes.NotFound, "policy not found")
 	}
-	slog.Debug("GetRecommendation: Serving", "cluster", req.GetId().GetClusterName(), "policy", req.GetId().GetName())
+	slog.Debug("GetArbitratedRecommendation: Serving", "cluster", req.GetId().GetClusterName(), "policy", req.GetId().GetName())
 	return rec, nil
 }
 

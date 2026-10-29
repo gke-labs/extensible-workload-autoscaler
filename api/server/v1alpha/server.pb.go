@@ -3134,7 +3134,7 @@ func (x *ContainerMetrics) SetContainerMetrics(v map[string]*MetricValues) {
 type ContainerMetrics_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// Metrics sourced from specific containers, keyed by metric name.
+	// Per container metric values, keyed by container name.
 	ContainerMetrics map[string]*MetricValues
 }
 
@@ -3341,10 +3341,10 @@ func (b0 WatchControlMetricsRequest_builder) Build() *WatchControlMetricsRequest
 	return m0
 }
 
-// WatchControlMetricsResponse is the response sent on the WatchControlMetrics
+// ControlMetricsEvent is the response sent on the WatchControlMetrics
 // streaming RPC. Unless throttled, such an object is sent every time a metric
 // or the number of ready replicas changes.
-type WatchControlMetricsResponse struct {
+type ControlMetricsEvent struct {
 	state                                protoimpl.MessageState     `protogen:"opaque.v1"`
 	xxx_hidden_Id                        *PolicyId                  `protobuf:"bytes,1,opt,name=id"`
 	xxx_hidden_ControlMetrics            *ControlMetrics            `protobuf:"bytes,2,opt,name=control_metrics,json=controlMetrics"`
@@ -3356,20 +3356,20 @@ type WatchControlMetricsResponse struct {
 	sizeCache                            protoimpl.SizeCache
 }
 
-func (x *WatchControlMetricsResponse) Reset() {
-	*x = WatchControlMetricsResponse{}
+func (x *ControlMetricsEvent) Reset() {
+	*x = ControlMetricsEvent{}
 	mi := &file_server_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *WatchControlMetricsResponse) String() string {
+func (x *ControlMetricsEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*WatchControlMetricsResponse) ProtoMessage() {}
+func (*ControlMetricsEvent) ProtoMessage() {}
 
-func (x *WatchControlMetricsResponse) ProtoReflect() protoreflect.Message {
+func (x *ControlMetricsEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_server_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -3381,86 +3381,86 @@ func (x *WatchControlMetricsResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *WatchControlMetricsResponse) GetId() *PolicyId {
+func (x *ControlMetricsEvent) GetId() *PolicyId {
 	if x != nil {
 		return x.xxx_hidden_Id
 	}
 	return nil
 }
 
-func (x *WatchControlMetricsResponse) GetControlMetrics() *ControlMetrics {
+func (x *ControlMetricsEvent) GetControlMetrics() *ControlMetrics {
 	if x != nil {
 		return x.xxx_hidden_ControlMetrics
 	}
 	return nil
 }
 
-func (x *WatchControlMetricsResponse) GetRecommenderControlMetrics() map[string]*ControlMetrics {
+func (x *ControlMetricsEvent) GetRecommenderControlMetrics() map[string]*ControlMetrics {
 	if x != nil {
 		return x.xxx_hidden_RecommenderControlMetrics
 	}
 	return nil
 }
 
-func (x *WatchControlMetricsResponse) GetReadyReplicas() int32 {
+func (x *ControlMetricsEvent) GetReadyReplicas() int32 {
 	if x != nil {
 		return x.xxx_hidden_ReadyReplicas
 	}
 	return 0
 }
 
-func (x *WatchControlMetricsResponse) SetId(v *PolicyId) {
+func (x *ControlMetricsEvent) SetId(v *PolicyId) {
 	x.xxx_hidden_Id = v
 }
 
-func (x *WatchControlMetricsResponse) SetControlMetrics(v *ControlMetrics) {
+func (x *ControlMetricsEvent) SetControlMetrics(v *ControlMetrics) {
 	x.xxx_hidden_ControlMetrics = v
 }
 
-func (x *WatchControlMetricsResponse) SetRecommenderControlMetrics(v map[string]*ControlMetrics) {
+func (x *ControlMetricsEvent) SetRecommenderControlMetrics(v map[string]*ControlMetrics) {
 	x.xxx_hidden_RecommenderControlMetrics = v
 }
 
-func (x *WatchControlMetricsResponse) SetReadyReplicas(v int32) {
+func (x *ControlMetricsEvent) SetReadyReplicas(v int32) {
 	x.xxx_hidden_ReadyReplicas = v
 	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 4)
 }
 
-func (x *WatchControlMetricsResponse) HasId() bool {
+func (x *ControlMetricsEvent) HasId() bool {
 	if x == nil {
 		return false
 	}
 	return x.xxx_hidden_Id != nil
 }
 
-func (x *WatchControlMetricsResponse) HasControlMetrics() bool {
+func (x *ControlMetricsEvent) HasControlMetrics() bool {
 	if x == nil {
 		return false
 	}
 	return x.xxx_hidden_ControlMetrics != nil
 }
 
-func (x *WatchControlMetricsResponse) HasReadyReplicas() bool {
+func (x *ControlMetricsEvent) HasReadyReplicas() bool {
 	if x == nil {
 		return false
 	}
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 3)
 }
 
-func (x *WatchControlMetricsResponse) ClearId() {
+func (x *ControlMetricsEvent) ClearId() {
 	x.xxx_hidden_Id = nil
 }
 
-func (x *WatchControlMetricsResponse) ClearControlMetrics() {
+func (x *ControlMetricsEvent) ClearControlMetrics() {
 	x.xxx_hidden_ControlMetrics = nil
 }
 
-func (x *WatchControlMetricsResponse) ClearReadyReplicas() {
+func (x *ControlMetricsEvent) ClearReadyReplicas() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 3)
 	x.xxx_hidden_ReadyReplicas = 0
 }
 
-type WatchControlMetricsResponse_builder struct {
+type ControlMetricsEvent_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	Id *PolicyId
@@ -3472,8 +3472,8 @@ type WatchControlMetricsResponse_builder struct {
 	ReadyReplicas *int32
 }
 
-func (b0 WatchControlMetricsResponse_builder) Build() *WatchControlMetricsResponse {
-	m0 := &WatchControlMetricsResponse{}
+func (b0 ControlMetricsEvent_builder) Build() *ControlMetricsEvent {
+	m0 := &ControlMetricsEvent{}
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_Id = b.Id
@@ -4475,28 +4475,28 @@ func (b0 RecommenderStatus_builder) Build() *RecommenderStatus {
 	return m0
 }
 
-// GetRecommendationRequest retrieves the final recommendation for a policy.
-type GetRecommendationRequest struct {
+// GetArbitratedRecommendationRequest retrieves the final recommendation for a policy.
+type GetArbitratedRecommendationRequest struct {
 	state         protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_Id *PolicyId              `protobuf:"bytes,1,opt,name=id"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetRecommendationRequest) Reset() {
-	*x = GetRecommendationRequest{}
+func (x *GetArbitratedRecommendationRequest) Reset() {
+	*x = GetArbitratedRecommendationRequest{}
 	mi := &file_server_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetRecommendationRequest) String() string {
+func (x *GetArbitratedRecommendationRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetRecommendationRequest) ProtoMessage() {}
+func (*GetArbitratedRecommendationRequest) ProtoMessage() {}
 
-func (x *GetRecommendationRequest) ProtoReflect() protoreflect.Message {
+func (x *GetArbitratedRecommendationRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_server_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -4508,46 +4508,46 @@ func (x *GetRecommendationRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *GetRecommendationRequest) GetId() *PolicyId {
+func (x *GetArbitratedRecommendationRequest) GetId() *PolicyId {
 	if x != nil {
 		return x.xxx_hidden_Id
 	}
 	return nil
 }
 
-func (x *GetRecommendationRequest) SetId(v *PolicyId) {
+func (x *GetArbitratedRecommendationRequest) SetId(v *PolicyId) {
 	x.xxx_hidden_Id = v
 }
 
-func (x *GetRecommendationRequest) HasId() bool {
+func (x *GetArbitratedRecommendationRequest) HasId() bool {
 	if x == nil {
 		return false
 	}
 	return x.xxx_hidden_Id != nil
 }
 
-func (x *GetRecommendationRequest) ClearId() {
+func (x *GetArbitratedRecommendationRequest) ClearId() {
 	x.xxx_hidden_Id = nil
 }
 
-type GetRecommendationRequest_builder struct {
+type GetArbitratedRecommendationRequest_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	// The policy ID.
 	Id *PolicyId
 }
 
-func (b0 GetRecommendationRequest_builder) Build() *GetRecommendationRequest {
-	m0 := &GetRecommendationRequest{}
+func (b0 GetArbitratedRecommendationRequest_builder) Build() *GetArbitratedRecommendationRequest {
+	m0 := &GetArbitratedRecommendationRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_Id = b.Id
 	return m0
 }
 
-// GetRecommendationResponse wraps the arbitrated recommendation.
-// If recommendation is not set, it means no arbitrated recommendation is available yet.
-type GetRecommendationResponse struct {
+// ArbitratedRecommendation wraps the arbitrated recommendation and information
+// about how it was derived (e.g. the recommender and control metric statuses).
+type ArbitratedRecommendation struct {
 	state                     protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_Recommendation *Recommendation        `protobuf:"bytes,1,opt,name=recommendation"`
 	xxx_hidden_Explanation    *[]*RecommenderStatus  `protobuf:"bytes,3,rep,name=explanation"`
@@ -4556,20 +4556,20 @@ type GetRecommendationResponse struct {
 	sizeCache                 protoimpl.SizeCache
 }
 
-func (x *GetRecommendationResponse) Reset() {
-	*x = GetRecommendationResponse{}
+func (x *ArbitratedRecommendation) Reset() {
+	*x = ArbitratedRecommendation{}
 	mi := &file_server_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetRecommendationResponse) String() string {
+func (x *ArbitratedRecommendation) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetRecommendationResponse) ProtoMessage() {}
+func (*ArbitratedRecommendation) ProtoMessage() {}
 
-func (x *GetRecommendationResponse) ProtoReflect() protoreflect.Message {
+func (x *ArbitratedRecommendation) ProtoReflect() protoreflect.Message {
 	mi := &file_server_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -4581,14 +4581,14 @@ func (x *GetRecommendationResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *GetRecommendationResponse) GetRecommendation() *Recommendation {
+func (x *ArbitratedRecommendation) GetRecommendation() *Recommendation {
 	if x != nil {
 		return x.xxx_hidden_Recommendation
 	}
 	return nil
 }
 
-func (x *GetRecommendationResponse) GetExplanation() []*RecommenderStatus {
+func (x *ArbitratedRecommendation) GetExplanation() []*RecommenderStatus {
 	if x != nil {
 		if x.xxx_hidden_Explanation != nil {
 			return *x.xxx_hidden_Explanation
@@ -4597,7 +4597,7 @@ func (x *GetRecommendationResponse) GetExplanation() []*RecommenderStatus {
 	return nil
 }
 
-func (x *GetRecommendationResponse) GetMetricStatuses() []*MetricStatus {
+func (x *ArbitratedRecommendation) GetMetricStatuses() []*MetricStatus {
 	if x != nil {
 		if x.xxx_hidden_MetricStatuses != nil {
 			return *x.xxx_hidden_MetricStatuses
@@ -4606,30 +4606,30 @@ func (x *GetRecommendationResponse) GetMetricStatuses() []*MetricStatus {
 	return nil
 }
 
-func (x *GetRecommendationResponse) SetRecommendation(v *Recommendation) {
+func (x *ArbitratedRecommendation) SetRecommendation(v *Recommendation) {
 	x.xxx_hidden_Recommendation = v
 }
 
-func (x *GetRecommendationResponse) SetExplanation(v []*RecommenderStatus) {
+func (x *ArbitratedRecommendation) SetExplanation(v []*RecommenderStatus) {
 	x.xxx_hidden_Explanation = &v
 }
 
-func (x *GetRecommendationResponse) SetMetricStatuses(v []*MetricStatus) {
+func (x *ArbitratedRecommendation) SetMetricStatuses(v []*MetricStatus) {
 	x.xxx_hidden_MetricStatuses = &v
 }
 
-func (x *GetRecommendationResponse) HasRecommendation() bool {
+func (x *ArbitratedRecommendation) HasRecommendation() bool {
 	if x == nil {
 		return false
 	}
 	return x.xxx_hidden_Recommendation != nil
 }
 
-func (x *GetRecommendationResponse) ClearRecommendation() {
+func (x *ArbitratedRecommendation) ClearRecommendation() {
 	x.xxx_hidden_Recommendation = nil
 }
 
-type GetRecommendationResponse_builder struct {
+type ArbitratedRecommendation_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	Recommendation *Recommendation
@@ -4640,8 +4640,8 @@ type GetRecommendationResponse_builder struct {
 	MetricStatuses []*MetricStatus
 }
 
-func (b0 GetRecommendationResponse_builder) Build() *GetRecommendationResponse {
-	m0 := &GetRecommendationResponse{}
+func (b0 ArbitratedRecommendation_builder) Build() *ArbitratedRecommendation {
+	m0 := &ArbitratedRecommendation{}
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_Recommendation = b.Recommendation
@@ -4650,9 +4650,9 @@ func (b0 GetRecommendationResponse_builder) Build() *GetRecommendationResponse {
 	return m0
 }
 
-// WatchRecommendationsRequest retrieves all arbitrated recommendations for all
+// WatchArbitratedRecommendationsRequest retrieves all arbitrated recommendations for all
 // policies in the given cluster.
-type WatchRecommendationsRequest struct {
+type WatchArbitratedRecommendationsRequest struct {
 	state                  protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_ClusterName *string                `protobuf:"bytes,1,opt,name=cluster_name,json=clusterName"`
 	XXX_raceDetectHookData protoimpl.RaceDetectHookData
@@ -4661,20 +4661,20 @@ type WatchRecommendationsRequest struct {
 	sizeCache              protoimpl.SizeCache
 }
 
-func (x *WatchRecommendationsRequest) Reset() {
-	*x = WatchRecommendationsRequest{}
+func (x *WatchArbitratedRecommendationsRequest) Reset() {
+	*x = WatchArbitratedRecommendationsRequest{}
 	mi := &file_server_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *WatchRecommendationsRequest) String() string {
+func (x *WatchArbitratedRecommendationsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*WatchRecommendationsRequest) ProtoMessage() {}
+func (*WatchArbitratedRecommendationsRequest) ProtoMessage() {}
 
-func (x *WatchRecommendationsRequest) ProtoReflect() protoreflect.Message {
+func (x *WatchArbitratedRecommendationsRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_server_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -4686,7 +4686,7 @@ func (x *WatchRecommendationsRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *WatchRecommendationsRequest) GetClusterName() string {
+func (x *WatchArbitratedRecommendationsRequest) GetClusterName() string {
 	if x != nil {
 		if x.xxx_hidden_ClusterName != nil {
 			return *x.xxx_hidden_ClusterName
@@ -4696,31 +4696,31 @@ func (x *WatchRecommendationsRequest) GetClusterName() string {
 	return ""
 }
 
-func (x *WatchRecommendationsRequest) SetClusterName(v string) {
+func (x *WatchArbitratedRecommendationsRequest) SetClusterName(v string) {
 	x.xxx_hidden_ClusterName = &v
 	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 1)
 }
 
-func (x *WatchRecommendationsRequest) HasClusterName() bool {
+func (x *WatchArbitratedRecommendationsRequest) HasClusterName() bool {
 	if x == nil {
 		return false
 	}
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
 }
 
-func (x *WatchRecommendationsRequest) ClearClusterName() {
+func (x *WatchArbitratedRecommendationsRequest) ClearClusterName() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
 	x.xxx_hidden_ClusterName = nil
 }
 
-type WatchRecommendationsRequest_builder struct {
+type WatchArbitratedRecommendationsRequest_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	ClusterName *string
 }
 
-func (b0 WatchRecommendationsRequest_builder) Build() *WatchRecommendationsRequest {
-	m0 := &WatchRecommendationsRequest{}
+func (b0 WatchArbitratedRecommendationsRequest_builder) Build() *WatchArbitratedRecommendationsRequest {
+	m0 := &WatchArbitratedRecommendationsRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.ClusterName != nil {
@@ -4730,12 +4730,12 @@ func (b0 WatchRecommendationsRequest_builder) Build() *WatchRecommendationsReque
 	return m0
 }
 
-// WatchRecommendationsResponse is the response sent on the WatchRecommendations
+// ArbitratedRecommendationsEvent is the response sent on the WatchArbitratedRecommendations
 // streaming RPC. Unless throttled, such an object is sent every time a new
 // arbitrated recommendation is emitted: when the recommendation, its
 // explanation or the status of its metrics change. Timestamps alone do not
 // count as a change.
-type WatchRecommendationsResponse struct {
+type ArbitratedRecommendationsEvent struct {
 	state                     protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_Id             *PolicyId              `protobuf:"bytes,1,opt,name=id"`
 	xxx_hidden_Recommendation *Recommendation        `protobuf:"bytes,2,opt,name=recommendation"`
@@ -4745,20 +4745,20 @@ type WatchRecommendationsResponse struct {
 	sizeCache                 protoimpl.SizeCache
 }
 
-func (x *WatchRecommendationsResponse) Reset() {
-	*x = WatchRecommendationsResponse{}
+func (x *ArbitratedRecommendationsEvent) Reset() {
+	*x = ArbitratedRecommendationsEvent{}
 	mi := &file_server_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *WatchRecommendationsResponse) String() string {
+func (x *ArbitratedRecommendationsEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*WatchRecommendationsResponse) ProtoMessage() {}
+func (*ArbitratedRecommendationsEvent) ProtoMessage() {}
 
-func (x *WatchRecommendationsResponse) ProtoReflect() protoreflect.Message {
+func (x *ArbitratedRecommendationsEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_server_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -4770,21 +4770,21 @@ func (x *WatchRecommendationsResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *WatchRecommendationsResponse) GetId() *PolicyId {
+func (x *ArbitratedRecommendationsEvent) GetId() *PolicyId {
 	if x != nil {
 		return x.xxx_hidden_Id
 	}
 	return nil
 }
 
-func (x *WatchRecommendationsResponse) GetRecommendation() *Recommendation {
+func (x *ArbitratedRecommendationsEvent) GetRecommendation() *Recommendation {
 	if x != nil {
 		return x.xxx_hidden_Recommendation
 	}
 	return nil
 }
 
-func (x *WatchRecommendationsResponse) GetExplanation() []*RecommenderStatus {
+func (x *ArbitratedRecommendationsEvent) GetExplanation() []*RecommenderStatus {
 	if x != nil {
 		if x.xxx_hidden_Explanation != nil {
 			return *x.xxx_hidden_Explanation
@@ -4793,7 +4793,7 @@ func (x *WatchRecommendationsResponse) GetExplanation() []*RecommenderStatus {
 	return nil
 }
 
-func (x *WatchRecommendationsResponse) GetMetricStatuses() []*MetricStatus {
+func (x *ArbitratedRecommendationsEvent) GetMetricStatuses() []*MetricStatus {
 	if x != nil {
 		if x.xxx_hidden_MetricStatuses != nil {
 			return *x.xxx_hidden_MetricStatuses
@@ -4802,45 +4802,45 @@ func (x *WatchRecommendationsResponse) GetMetricStatuses() []*MetricStatus {
 	return nil
 }
 
-func (x *WatchRecommendationsResponse) SetId(v *PolicyId) {
+func (x *ArbitratedRecommendationsEvent) SetId(v *PolicyId) {
 	x.xxx_hidden_Id = v
 }
 
-func (x *WatchRecommendationsResponse) SetRecommendation(v *Recommendation) {
+func (x *ArbitratedRecommendationsEvent) SetRecommendation(v *Recommendation) {
 	x.xxx_hidden_Recommendation = v
 }
 
-func (x *WatchRecommendationsResponse) SetExplanation(v []*RecommenderStatus) {
+func (x *ArbitratedRecommendationsEvent) SetExplanation(v []*RecommenderStatus) {
 	x.xxx_hidden_Explanation = &v
 }
 
-func (x *WatchRecommendationsResponse) SetMetricStatuses(v []*MetricStatus) {
+func (x *ArbitratedRecommendationsEvent) SetMetricStatuses(v []*MetricStatus) {
 	x.xxx_hidden_MetricStatuses = &v
 }
 
-func (x *WatchRecommendationsResponse) HasId() bool {
+func (x *ArbitratedRecommendationsEvent) HasId() bool {
 	if x == nil {
 		return false
 	}
 	return x.xxx_hidden_Id != nil
 }
 
-func (x *WatchRecommendationsResponse) HasRecommendation() bool {
+func (x *ArbitratedRecommendationsEvent) HasRecommendation() bool {
 	if x == nil {
 		return false
 	}
 	return x.xxx_hidden_Recommendation != nil
 }
 
-func (x *WatchRecommendationsResponse) ClearId() {
+func (x *ArbitratedRecommendationsEvent) ClearId() {
 	x.xxx_hidden_Id = nil
 }
 
-func (x *WatchRecommendationsResponse) ClearRecommendation() {
+func (x *ArbitratedRecommendationsEvent) ClearRecommendation() {
 	x.xxx_hidden_Recommendation = nil
 }
 
-type WatchRecommendationsResponse_builder struct {
+type ArbitratedRecommendationsEvent_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	Id *PolicyId
@@ -4853,8 +4853,8 @@ type WatchRecommendationsResponse_builder struct {
 	MetricStatuses []*MetricStatus
 }
 
-func (b0 WatchRecommendationsResponse_builder) Build() *WatchRecommendationsResponse {
-	m0 := &WatchRecommendationsResponse{}
+func (b0 ArbitratedRecommendationsEvent_builder) Build() *ArbitratedRecommendationsEvent {
+	m0 := &ArbitratedRecommendationsEvent{}
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_Id = b.Id
@@ -6154,11 +6154,11 @@ const file_server_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12:\n" +
 	"\x05value\x18\x02 \x01(\v2$.xas.server.v1alpha.ContainerMetricsR\x05value:\x028\x01\"?\n" +
 	"\x1aWatchControlMetricsRequest\x12!\n" +
-	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\"\xc2\x03\n" +
-	"\x1bWatchControlMetricsResponse\x12,\n" +
+	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\"\xb2\x03\n" +
+	"\x13ControlMetricsEvent\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdR\x02id\x12K\n" +
-	"\x0fcontrol_metrics\x18\x02 \x01(\v2\".xas.server.v1alpha.ControlMetricsR\x0econtrolMetrics\x12\x8e\x01\n" +
-	"\x1brecommender_control_metrics\x18\x03 \x03(\v2N.xas.server.v1alpha.WatchControlMetricsResponse.RecommenderControlMetricsEntryR\x19recommenderControlMetrics\x12%\n" +
+	"\x0fcontrol_metrics\x18\x02 \x01(\v2\".xas.server.v1alpha.ControlMetricsR\x0econtrolMetrics\x12\x86\x01\n" +
+	"\x1brecommender_control_metrics\x18\x03 \x03(\v2F.xas.server.v1alpha.ControlMetricsEvent.RecommenderControlMetricsEntryR\x19recommenderControlMetrics\x12%\n" +
 	"\x0eready_replicas\x18\x04 \x01(\x05R\rreadyReplicas\x1ap\n" +
 	"\x1eRecommenderControlMetricsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x128\n" +
@@ -6204,16 +6204,16 @@ const file_server_proto_rawDesc = "" +
 	"\breplicas\x18\x01 \x01(\x05R\breplicas\x12T\n" +
 	"\x12workload_resources\x18\t \x03(\v2%.xas.server.v1alpha.ContainerResourceR\x11workloadResources\x12M\n" +
 	"\rpod_resources\x18\n" +
-	" \x03(\v2(.xas.server.v1alpha.PodContainerResourceR\fpodResources\"H\n" +
-	"\x18GetRecommendationRequest\x12,\n" +
-	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdR\x02id\"\xfb\x01\n" +
-	"\x19GetRecommendationResponse\x12J\n" +
+	" \x03(\v2(.xas.server.v1alpha.PodContainerResourceR\fpodResources\"R\n" +
+	"\"GetArbitratedRecommendationRequest\x12,\n" +
+	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdR\x02id\"\xfa\x01\n" +
+	"\x18ArbitratedRecommendation\x12J\n" +
 	"\x0erecommendation\x18\x01 \x01(\v2\".xas.server.v1alpha.RecommendationR\x0erecommendation\x12G\n" +
 	"\vexplanation\x18\x03 \x03(\v2%.xas.server.v1alpha.RecommenderStatusR\vexplanation\x12I\n" +
-	"\x0fmetric_statuses\x18\x02 \x03(\v2 .xas.server.v1alpha.MetricStatusR\x0emetricStatuses\"@\n" +
-	"\x1bWatchRecommendationsRequest\x12!\n" +
-	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\"\xac\x02\n" +
-	"\x1cWatchRecommendationsResponse\x12,\n" +
+	"\x0fmetric_statuses\x18\x02 \x03(\v2 .xas.server.v1alpha.MetricStatusR\x0emetricStatuses\"J\n" +
+	"%WatchArbitratedRecommendationsRequest\x12!\n" +
+	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\"\xae\x02\n" +
+	"\x1eArbitratedRecommendationsEvent\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdR\x02id\x12J\n" +
 	"\x0erecommendation\x18\x02 \x01(\v2\".xas.server.v1alpha.RecommendationR\x0erecommendation\x12G\n" +
 	"\vexplanation\x18\x03 \x03(\v2%.xas.server.v1alpha.RecommenderStatusR\vexplanation\x12I\n" +
@@ -6254,7 +6254,7 @@ const file_server_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x04R\x05value:\x028\x01\"1\n" +
 	"\x15IngestMetricsResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess2\x9c\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess2\xbf\n" +
 	"\n" +
 	"\tXASServer\x12M\n" +
 	"\tGetPolicy\x12$.xas.server.v1alpha.GetPolicyRequest\x1a\x1a.xas.server.v1alpha.Policy\x12S\n" +
@@ -6263,83 +6263,83 @@ const file_server_proto_rawDesc = "" +
 	"\fDeletePolicy\x12'.xas.server.v1alpha.DeletePolicyRequest\x1a\x16.google.protobuf.Empty\x12a\n" +
 	"\fListPolicies\x12'.xas.server.v1alpha.ListPoliciesRequest\x1a(.xas.server.v1alpha.ListPoliciesResponse\x12Y\n" +
 	"\x0eUpdateWorkload\x12).xas.server.v1alpha.UpdateWorkloadRequest\x1a\x1c.xas.server.v1alpha.Workload\x12p\n" +
-	"\x11GetControlMetrics\x12,.xas.server.v1alpha.GetControlMetricsRequest\x1a-.xas.server.v1alpha.GetControlMetricsResponse\x12x\n" +
-	"\x13WatchControlMetrics\x12..xas.server.v1alpha.WatchControlMetricsRequest\x1a/.xas.server.v1alpha.WatchControlMetricsResponse0\x01\x12S\n" +
+	"\x11GetControlMetrics\x12,.xas.server.v1alpha.GetControlMetricsRequest\x1a-.xas.server.v1alpha.GetControlMetricsResponse\x12p\n" +
+	"\x13WatchControlMetrics\x12..xas.server.v1alpha.WatchControlMetricsRequest\x1a'.xas.server.v1alpha.ControlMetricsEvent0\x01\x12S\n" +
 	"\vGetWorkload\x12&.xas.server.v1alpha.GetWorkloadRequest\x1a\x1c.xas.server.v1alpha.Workload\x12q\n" +
-	"\x16UpdateRecommenderState\x121.xas.server.v1alpha.UpdateRecommenderStateRequest\x1a$.xas.server.v1alpha.RecommenderState\x12p\n" +
-	"\x11GetRecommendation\x12,.xas.server.v1alpha.GetRecommendationRequest\x1a-.xas.server.v1alpha.GetRecommendationResponse\x12{\n" +
-	"\x14WatchRecommendations\x12/.xas.server.v1alpha.WatchRecommendationsRequest\x1a0.xas.server.v1alpha.WatchRecommendationsResponse0\x01\x12d\n" +
+	"\x16UpdateRecommenderState\x121.xas.server.v1alpha.UpdateRecommenderStateRequest\x1a$.xas.server.v1alpha.RecommenderState\x12\x83\x01\n" +
+	"\x1bGetArbitratedRecommendation\x126.xas.server.v1alpha.GetArbitratedRecommendationRequest\x1a,.xas.server.v1alpha.ArbitratedRecommendation\x12\x91\x01\n" +
+	"\x1eWatchArbitratedRecommendations\x129.xas.server.v1alpha.WatchArbitratedRecommendationsRequest\x1a2.xas.server.v1alpha.ArbitratedRecommendationsEvent0\x01\x12d\n" +
 	"\rIngestMetrics\x12(.xas.server.v1alpha.IngestMetricsRequest\x1a).xas.server.v1alpha.IngestMetricsResponseBGZEgithub.com/gke-labs/extensible-workload-autoscaler/api/server/v1alphab\beditionsp\xe9\a"
 
 var file_server_proto_msgTypes = make([]protoimpl.MessageInfo, 64)
 var file_server_proto_goTypes = []any{
-	(*PolicyId)(nil),                      // 0: xas.server.v1alpha.PolicyId
-	(*CreatePolicyRequest)(nil),           // 1: xas.server.v1alpha.CreatePolicyRequest
-	(*UpdatePolicyRequest)(nil),           // 2: xas.server.v1alpha.UpdatePolicyRequest
-	(*GetPolicyRequest)(nil),              // 3: xas.server.v1alpha.GetPolicyRequest
-	(*DeletePolicyRequest)(nil),           // 4: xas.server.v1alpha.DeletePolicyRequest
-	(*ListPoliciesRequest)(nil),           // 5: xas.server.v1alpha.ListPoliciesRequest
-	(*ListPoliciesResponse)(nil),          // 6: xas.server.v1alpha.ListPoliciesResponse
-	(*Policy)(nil),                        // 7: xas.server.v1alpha.Policy
-	(*MetricDefinitionList)(nil),          // 8: xas.server.v1alpha.MetricDefinitionList
-	(*WorkloadRef)(nil),                   // 9: xas.server.v1alpha.WorkloadRef
-	(*MetricDefinition)(nil),              // 10: xas.server.v1alpha.MetricDefinition
-	(*Gauge)(nil),                         // 11: xas.server.v1alpha.Gauge
-	(*Rate)(nil),                          // 12: xas.server.v1alpha.Rate
-	(*Distribution)(nil),                  // 13: xas.server.v1alpha.Distribution
-	(*DecayingDistribution)(nil),          // 14: xas.server.v1alpha.DecayingDistribution
-	(*RecommenderDefinition)(nil),         // 15: xas.server.v1alpha.RecommenderDefinition
-	(*UpdateWorkloadRequest)(nil),         // 16: xas.server.v1alpha.UpdateWorkloadRequest
-	(*GetWorkloadRequest)(nil),            // 17: xas.server.v1alpha.GetWorkloadRequest
-	(*Workload)(nil),                      // 18: xas.server.v1alpha.Workload
-	(*PodState)(nil),                      // 19: xas.server.v1alpha.PodState
-	(*ContainerState)(nil),                // 20: xas.server.v1alpha.ContainerState
-	(*GetControlMetricsRequest)(nil),      // 21: xas.server.v1alpha.GetControlMetricsRequest
-	(*GetControlMetricsResponse)(nil),     // 22: xas.server.v1alpha.GetControlMetricsResponse
-	(*MetricValues)(nil),                  // 23: xas.server.v1alpha.MetricValues
-	(*ContainerMetrics)(nil),              // 24: xas.server.v1alpha.ContainerMetrics
-	(*ControlMetrics)(nil),                // 25: xas.server.v1alpha.ControlMetrics
-	(*WatchControlMetricsRequest)(nil),    // 26: xas.server.v1alpha.WatchControlMetricsRequest
-	(*WatchControlMetricsResponse)(nil),   // 27: xas.server.v1alpha.WatchControlMetricsResponse
-	(*UpdateRecommenderStateRequest)(nil), // 28: xas.server.v1alpha.UpdateRecommenderStateRequest
-	(*ContainerResource)(nil),             // 29: xas.server.v1alpha.ContainerResource
-	(*PodContainerResource)(nil),          // 30: xas.server.v1alpha.PodContainerResource
-	(*Recommendation)(nil),                // 31: xas.server.v1alpha.Recommendation
-	(*RecommenderState)(nil),              // 32: xas.server.v1alpha.RecommenderState
-	(*RecommenderStatus)(nil),             // 33: xas.server.v1alpha.RecommenderStatus
-	(*GetRecommendationRequest)(nil),      // 34: xas.server.v1alpha.GetRecommendationRequest
-	(*GetRecommendationResponse)(nil),     // 35: xas.server.v1alpha.GetRecommendationResponse
-	(*WatchRecommendationsRequest)(nil),   // 36: xas.server.v1alpha.WatchRecommendationsRequest
-	(*WatchRecommendationsResponse)(nil),  // 37: xas.server.v1alpha.WatchRecommendationsResponse
-	(*MetricStatus)(nil),                  // 38: xas.server.v1alpha.MetricStatus
-	(*IngestMetricsRequest)(nil),          // 39: xas.server.v1alpha.IngestMetricsRequest
-	(*PolicyBatch)(nil),                   // 40: xas.server.v1alpha.PolicyBatch
-	(*MetricBatch)(nil),                   // 41: xas.server.v1alpha.MetricBatch
-	(*MetricSample)(nil),                  // 42: xas.server.v1alpha.MetricSample
-	(*Histogram)(nil),                     // 43: xas.server.v1alpha.Histogram
-	(*IngestMetricsResponse)(nil),         // 44: xas.server.v1alpha.IngestMetricsResponse
-	nil,                                   // 45: xas.server.v1alpha.Policy.RecommenderMetricsEntry
-	nil,                                   // 46: xas.server.v1alpha.MetricDefinition.ParamsEntry
-	nil,                                   // 47: xas.server.v1alpha.MetricDefinition.FilterEntry
-	(*MetricDefinition_Eligibility)(nil),  // 48: xas.server.v1alpha.MetricDefinition.Eligibility
-	nil,                                   // 49: xas.server.v1alpha.RecommenderDefinition.ParamsEntry
-	nil,                                   // 50: xas.server.v1alpha.ContainerState.RequestsEntry
-	nil,                                   // 51: xas.server.v1alpha.ContainerState.LimitsEntry
-	nil,                                   // 52: xas.server.v1alpha.GetControlMetricsResponse.RecommenderControlMetricsEntry
-	nil,                                   // 53: xas.server.v1alpha.MetricValues.ValuesEntry
-	nil,                                   // 54: xas.server.v1alpha.ContainerMetrics.ContainerMetricsEntry
-	nil,                                   // 55: xas.server.v1alpha.ControlMetrics.ValuesEntry
-	nil,                                   // 56: xas.server.v1alpha.ControlMetrics.PodMetricsEntry
-	nil,                                   // 57: xas.server.v1alpha.ControlMetrics.PodContainerMetricsEntry
-	nil,                                   // 58: xas.server.v1alpha.WatchControlMetricsResponse.RecommenderControlMetricsEntry
-	nil,                                   // 59: xas.server.v1alpha.ContainerResource.RequestsEntry
-	nil,                                   // 60: xas.server.v1alpha.ContainerResource.LimitsEntry
-	nil,                                   // 61: xas.server.v1alpha.RecommenderState.ConfigEntry
-	nil,                                   // 62: xas.server.v1alpha.MetricSample.LabelsEntry
-	nil,                                   // 63: xas.server.v1alpha.Histogram.BucketsEntry
-	(*durationpb.Duration)(nil),           // 64: google.protobuf.Duration
-	(*timestamppb.Timestamp)(nil),         // 65: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),                 // 66: google.protobuf.Empty
+	(*PolicyId)(nil),                              // 0: xas.server.v1alpha.PolicyId
+	(*CreatePolicyRequest)(nil),                   // 1: xas.server.v1alpha.CreatePolicyRequest
+	(*UpdatePolicyRequest)(nil),                   // 2: xas.server.v1alpha.UpdatePolicyRequest
+	(*GetPolicyRequest)(nil),                      // 3: xas.server.v1alpha.GetPolicyRequest
+	(*DeletePolicyRequest)(nil),                   // 4: xas.server.v1alpha.DeletePolicyRequest
+	(*ListPoliciesRequest)(nil),                   // 5: xas.server.v1alpha.ListPoliciesRequest
+	(*ListPoliciesResponse)(nil),                  // 6: xas.server.v1alpha.ListPoliciesResponse
+	(*Policy)(nil),                                // 7: xas.server.v1alpha.Policy
+	(*MetricDefinitionList)(nil),                  // 8: xas.server.v1alpha.MetricDefinitionList
+	(*WorkloadRef)(nil),                           // 9: xas.server.v1alpha.WorkloadRef
+	(*MetricDefinition)(nil),                      // 10: xas.server.v1alpha.MetricDefinition
+	(*Gauge)(nil),                                 // 11: xas.server.v1alpha.Gauge
+	(*Rate)(nil),                                  // 12: xas.server.v1alpha.Rate
+	(*Distribution)(nil),                          // 13: xas.server.v1alpha.Distribution
+	(*DecayingDistribution)(nil),                  // 14: xas.server.v1alpha.DecayingDistribution
+	(*RecommenderDefinition)(nil),                 // 15: xas.server.v1alpha.RecommenderDefinition
+	(*UpdateWorkloadRequest)(nil),                 // 16: xas.server.v1alpha.UpdateWorkloadRequest
+	(*GetWorkloadRequest)(nil),                    // 17: xas.server.v1alpha.GetWorkloadRequest
+	(*Workload)(nil),                              // 18: xas.server.v1alpha.Workload
+	(*PodState)(nil),                              // 19: xas.server.v1alpha.PodState
+	(*ContainerState)(nil),                        // 20: xas.server.v1alpha.ContainerState
+	(*GetControlMetricsRequest)(nil),              // 21: xas.server.v1alpha.GetControlMetricsRequest
+	(*GetControlMetricsResponse)(nil),             // 22: xas.server.v1alpha.GetControlMetricsResponse
+	(*MetricValues)(nil),                          // 23: xas.server.v1alpha.MetricValues
+	(*ContainerMetrics)(nil),                      // 24: xas.server.v1alpha.ContainerMetrics
+	(*ControlMetrics)(nil),                        // 25: xas.server.v1alpha.ControlMetrics
+	(*WatchControlMetricsRequest)(nil),            // 26: xas.server.v1alpha.WatchControlMetricsRequest
+	(*ControlMetricsEvent)(nil),                   // 27: xas.server.v1alpha.ControlMetricsEvent
+	(*UpdateRecommenderStateRequest)(nil),         // 28: xas.server.v1alpha.UpdateRecommenderStateRequest
+	(*ContainerResource)(nil),                     // 29: xas.server.v1alpha.ContainerResource
+	(*PodContainerResource)(nil),                  // 30: xas.server.v1alpha.PodContainerResource
+	(*Recommendation)(nil),                        // 31: xas.server.v1alpha.Recommendation
+	(*RecommenderState)(nil),                      // 32: xas.server.v1alpha.RecommenderState
+	(*RecommenderStatus)(nil),                     // 33: xas.server.v1alpha.RecommenderStatus
+	(*GetArbitratedRecommendationRequest)(nil),    // 34: xas.server.v1alpha.GetArbitratedRecommendationRequest
+	(*ArbitratedRecommendation)(nil),              // 35: xas.server.v1alpha.ArbitratedRecommendation
+	(*WatchArbitratedRecommendationsRequest)(nil), // 36: xas.server.v1alpha.WatchArbitratedRecommendationsRequest
+	(*ArbitratedRecommendationsEvent)(nil),        // 37: xas.server.v1alpha.ArbitratedRecommendationsEvent
+	(*MetricStatus)(nil),                          // 38: xas.server.v1alpha.MetricStatus
+	(*IngestMetricsRequest)(nil),                  // 39: xas.server.v1alpha.IngestMetricsRequest
+	(*PolicyBatch)(nil),                           // 40: xas.server.v1alpha.PolicyBatch
+	(*MetricBatch)(nil),                           // 41: xas.server.v1alpha.MetricBatch
+	(*MetricSample)(nil),                          // 42: xas.server.v1alpha.MetricSample
+	(*Histogram)(nil),                             // 43: xas.server.v1alpha.Histogram
+	(*IngestMetricsResponse)(nil),                 // 44: xas.server.v1alpha.IngestMetricsResponse
+	nil,                                           // 45: xas.server.v1alpha.Policy.RecommenderMetricsEntry
+	nil,                                           // 46: xas.server.v1alpha.MetricDefinition.ParamsEntry
+	nil,                                           // 47: xas.server.v1alpha.MetricDefinition.FilterEntry
+	(*MetricDefinition_Eligibility)(nil),          // 48: xas.server.v1alpha.MetricDefinition.Eligibility
+	nil,                                           // 49: xas.server.v1alpha.RecommenderDefinition.ParamsEntry
+	nil,                                           // 50: xas.server.v1alpha.ContainerState.RequestsEntry
+	nil,                                           // 51: xas.server.v1alpha.ContainerState.LimitsEntry
+	nil,                                           // 52: xas.server.v1alpha.GetControlMetricsResponse.RecommenderControlMetricsEntry
+	nil,                                           // 53: xas.server.v1alpha.MetricValues.ValuesEntry
+	nil,                                           // 54: xas.server.v1alpha.ContainerMetrics.ContainerMetricsEntry
+	nil,                                           // 55: xas.server.v1alpha.ControlMetrics.ValuesEntry
+	nil,                                           // 56: xas.server.v1alpha.ControlMetrics.PodMetricsEntry
+	nil,                                           // 57: xas.server.v1alpha.ControlMetrics.PodContainerMetricsEntry
+	nil,                                           // 58: xas.server.v1alpha.ControlMetricsEvent.RecommenderControlMetricsEntry
+	nil,                                           // 59: xas.server.v1alpha.ContainerResource.RequestsEntry
+	nil,                                           // 60: xas.server.v1alpha.ContainerResource.LimitsEntry
+	nil,                                           // 61: xas.server.v1alpha.RecommenderState.ConfigEntry
+	nil,                                           // 62: xas.server.v1alpha.MetricSample.LabelsEntry
+	nil,                                           // 63: xas.server.v1alpha.Histogram.BucketsEntry
+	(*durationpb.Duration)(nil),                   // 64: google.protobuf.Duration
+	(*timestamppb.Timestamp)(nil),                 // 65: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),                         // 66: google.protobuf.Empty
 }
 var file_server_proto_depIdxs = []int32{
 	7,  // 0: xas.server.v1alpha.CreatePolicyRequest.policy:type_name -> xas.server.v1alpha.Policy
@@ -6385,9 +6385,9 @@ var file_server_proto_depIdxs = []int32{
 	56, // 40: xas.server.v1alpha.ControlMetrics.pod_metrics:type_name -> xas.server.v1alpha.ControlMetrics.PodMetricsEntry
 	57, // 41: xas.server.v1alpha.ControlMetrics.pod_container_metrics:type_name -> xas.server.v1alpha.ControlMetrics.PodContainerMetricsEntry
 	24, // 42: xas.server.v1alpha.ControlMetrics.container_metrics:type_name -> xas.server.v1alpha.ContainerMetrics
-	0,  // 43: xas.server.v1alpha.WatchControlMetricsResponse.id:type_name -> xas.server.v1alpha.PolicyId
-	25, // 44: xas.server.v1alpha.WatchControlMetricsResponse.control_metrics:type_name -> xas.server.v1alpha.ControlMetrics
-	58, // 45: xas.server.v1alpha.WatchControlMetricsResponse.recommender_control_metrics:type_name -> xas.server.v1alpha.WatchControlMetricsResponse.RecommenderControlMetricsEntry
+	0,  // 43: xas.server.v1alpha.ControlMetricsEvent.id:type_name -> xas.server.v1alpha.PolicyId
+	25, // 44: xas.server.v1alpha.ControlMetricsEvent.control_metrics:type_name -> xas.server.v1alpha.ControlMetrics
+	58, // 45: xas.server.v1alpha.ControlMetricsEvent.recommender_control_metrics:type_name -> xas.server.v1alpha.ControlMetricsEvent.RecommenderControlMetricsEntry
 	0,  // 46: xas.server.v1alpha.UpdateRecommenderStateRequest.id:type_name -> xas.server.v1alpha.PolicyId
 	31, // 47: xas.server.v1alpha.UpdateRecommenderStateRequest.recommendation:type_name -> xas.server.v1alpha.Recommendation
 	59, // 48: xas.server.v1alpha.ContainerResource.requests:type_name -> xas.server.v1alpha.ContainerResource.RequestsEntry
@@ -6400,14 +6400,14 @@ var file_server_proto_depIdxs = []int32{
 	65, // 55: xas.server.v1alpha.RecommenderStatus.last_updated:type_name -> google.protobuf.Timestamp
 	29, // 56: xas.server.v1alpha.RecommenderStatus.workload_resources:type_name -> xas.server.v1alpha.ContainerResource
 	30, // 57: xas.server.v1alpha.RecommenderStatus.pod_resources:type_name -> xas.server.v1alpha.PodContainerResource
-	0,  // 58: xas.server.v1alpha.GetRecommendationRequest.id:type_name -> xas.server.v1alpha.PolicyId
-	31, // 59: xas.server.v1alpha.GetRecommendationResponse.recommendation:type_name -> xas.server.v1alpha.Recommendation
-	33, // 60: xas.server.v1alpha.GetRecommendationResponse.explanation:type_name -> xas.server.v1alpha.RecommenderStatus
-	38, // 61: xas.server.v1alpha.GetRecommendationResponse.metric_statuses:type_name -> xas.server.v1alpha.MetricStatus
-	0,  // 62: xas.server.v1alpha.WatchRecommendationsResponse.id:type_name -> xas.server.v1alpha.PolicyId
-	31, // 63: xas.server.v1alpha.WatchRecommendationsResponse.recommendation:type_name -> xas.server.v1alpha.Recommendation
-	33, // 64: xas.server.v1alpha.WatchRecommendationsResponse.explanation:type_name -> xas.server.v1alpha.RecommenderStatus
-	38, // 65: xas.server.v1alpha.WatchRecommendationsResponse.metric_statuses:type_name -> xas.server.v1alpha.MetricStatus
+	0,  // 58: xas.server.v1alpha.GetArbitratedRecommendationRequest.id:type_name -> xas.server.v1alpha.PolicyId
+	31, // 59: xas.server.v1alpha.ArbitratedRecommendation.recommendation:type_name -> xas.server.v1alpha.Recommendation
+	33, // 60: xas.server.v1alpha.ArbitratedRecommendation.explanation:type_name -> xas.server.v1alpha.RecommenderStatus
+	38, // 61: xas.server.v1alpha.ArbitratedRecommendation.metric_statuses:type_name -> xas.server.v1alpha.MetricStatus
+	0,  // 62: xas.server.v1alpha.ArbitratedRecommendationsEvent.id:type_name -> xas.server.v1alpha.PolicyId
+	31, // 63: xas.server.v1alpha.ArbitratedRecommendationsEvent.recommendation:type_name -> xas.server.v1alpha.Recommendation
+	33, // 64: xas.server.v1alpha.ArbitratedRecommendationsEvent.explanation:type_name -> xas.server.v1alpha.RecommenderStatus
+	38, // 65: xas.server.v1alpha.ArbitratedRecommendationsEvent.metric_statuses:type_name -> xas.server.v1alpha.MetricStatus
 	65, // 66: xas.server.v1alpha.MetricStatus.timestamp:type_name -> google.protobuf.Timestamp
 	65, // 67: xas.server.v1alpha.IngestMetricsRequest.timestamp:type_name -> google.protobuf.Timestamp
 	40, // 68: xas.server.v1alpha.IngestMetricsRequest.policies:type_name -> xas.server.v1alpha.PolicyBatch
@@ -6423,7 +6423,7 @@ var file_server_proto_depIdxs = []int32{
 	23, // 78: xas.server.v1alpha.ContainerMetrics.ContainerMetricsEntry.value:type_name -> xas.server.v1alpha.MetricValues
 	23, // 79: xas.server.v1alpha.ControlMetrics.PodMetricsEntry.value:type_name -> xas.server.v1alpha.MetricValues
 	24, // 80: xas.server.v1alpha.ControlMetrics.PodContainerMetricsEntry.value:type_name -> xas.server.v1alpha.ContainerMetrics
-	25, // 81: xas.server.v1alpha.WatchControlMetricsResponse.RecommenderControlMetricsEntry.value:type_name -> xas.server.v1alpha.ControlMetrics
+	25, // 81: xas.server.v1alpha.ControlMetricsEvent.RecommenderControlMetricsEntry.value:type_name -> xas.server.v1alpha.ControlMetrics
 	3,  // 82: xas.server.v1alpha.XASServer.GetPolicy:input_type -> xas.server.v1alpha.GetPolicyRequest
 	1,  // 83: xas.server.v1alpha.XASServer.CreatePolicy:input_type -> xas.server.v1alpha.CreatePolicyRequest
 	2,  // 84: xas.server.v1alpha.XASServer.UpdatePolicy:input_type -> xas.server.v1alpha.UpdatePolicyRequest
@@ -6434,8 +6434,8 @@ var file_server_proto_depIdxs = []int32{
 	26, // 89: xas.server.v1alpha.XASServer.WatchControlMetrics:input_type -> xas.server.v1alpha.WatchControlMetricsRequest
 	17, // 90: xas.server.v1alpha.XASServer.GetWorkload:input_type -> xas.server.v1alpha.GetWorkloadRequest
 	28, // 91: xas.server.v1alpha.XASServer.UpdateRecommenderState:input_type -> xas.server.v1alpha.UpdateRecommenderStateRequest
-	34, // 92: xas.server.v1alpha.XASServer.GetRecommendation:input_type -> xas.server.v1alpha.GetRecommendationRequest
-	36, // 93: xas.server.v1alpha.XASServer.WatchRecommendations:input_type -> xas.server.v1alpha.WatchRecommendationsRequest
+	34, // 92: xas.server.v1alpha.XASServer.GetArbitratedRecommendation:input_type -> xas.server.v1alpha.GetArbitratedRecommendationRequest
+	36, // 93: xas.server.v1alpha.XASServer.WatchArbitratedRecommendations:input_type -> xas.server.v1alpha.WatchArbitratedRecommendationsRequest
 	39, // 94: xas.server.v1alpha.XASServer.IngestMetrics:input_type -> xas.server.v1alpha.IngestMetricsRequest
 	7,  // 95: xas.server.v1alpha.XASServer.GetPolicy:output_type -> xas.server.v1alpha.Policy
 	7,  // 96: xas.server.v1alpha.XASServer.CreatePolicy:output_type -> xas.server.v1alpha.Policy
@@ -6444,11 +6444,11 @@ var file_server_proto_depIdxs = []int32{
 	6,  // 99: xas.server.v1alpha.XASServer.ListPolicies:output_type -> xas.server.v1alpha.ListPoliciesResponse
 	18, // 100: xas.server.v1alpha.XASServer.UpdateWorkload:output_type -> xas.server.v1alpha.Workload
 	22, // 101: xas.server.v1alpha.XASServer.GetControlMetrics:output_type -> xas.server.v1alpha.GetControlMetricsResponse
-	27, // 102: xas.server.v1alpha.XASServer.WatchControlMetrics:output_type -> xas.server.v1alpha.WatchControlMetricsResponse
+	27, // 102: xas.server.v1alpha.XASServer.WatchControlMetrics:output_type -> xas.server.v1alpha.ControlMetricsEvent
 	18, // 103: xas.server.v1alpha.XASServer.GetWorkload:output_type -> xas.server.v1alpha.Workload
 	32, // 104: xas.server.v1alpha.XASServer.UpdateRecommenderState:output_type -> xas.server.v1alpha.RecommenderState
-	35, // 105: xas.server.v1alpha.XASServer.GetRecommendation:output_type -> xas.server.v1alpha.GetRecommendationResponse
-	37, // 106: xas.server.v1alpha.XASServer.WatchRecommendations:output_type -> xas.server.v1alpha.WatchRecommendationsResponse
+	35, // 105: xas.server.v1alpha.XASServer.GetArbitratedRecommendation:output_type -> xas.server.v1alpha.ArbitratedRecommendation
+	37, // 106: xas.server.v1alpha.XASServer.WatchArbitratedRecommendations:output_type -> xas.server.v1alpha.ArbitratedRecommendationsEvent
 	44, // 107: xas.server.v1alpha.XASServer.IngestMetrics:output_type -> xas.server.v1alpha.IngestMetricsResponse
 	95, // [95:108] is the sub-list for method output_type
 	82, // [82:95] is the sub-list for method input_type

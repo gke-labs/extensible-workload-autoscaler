@@ -40,7 +40,7 @@ type ServerStore interface {
 	GetPolicy(id *pb.PolicyId) *pb.Policy
 	ListPolicies(clusterName string) []*pb.Policy
 	UpdateWorkload(req *pb.UpdateWorkloadRequest) error
-	GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationResponse, bool)
+	GetArbitratedRecommendation(id *pb.PolicyId) (*pb.ArbitratedRecommendation, bool)
 	// GetControlMetrics returns the aggregated metrics of a policy: the
 	// policy-wide ones and, keyed by recommender name, those owned by each
 	// recommender, along with the state of the workload they were calculated
@@ -55,10 +55,10 @@ type ServerStore interface {
 	// of the policies of a cluster each time they change. The returned
 	// function unwatches.
 	WatchControlMetrics(clusterName string) (<-chan ControlMetricEvent, func())
-	// WatchRecommendations returns a channel delivering the arbitrated
+	// WatchArbitratedRecommendations returns a channel delivering the arbitrated
 	// recommendation of the policies of a cluster each time it changes. The
 	// returned function unwatches.
-	WatchRecommendations(clusterName string) (<-chan RecommendationEvent, func())
+	WatchArbitratedRecommendations(clusterName string) (<-chan RecommendationEvent, func())
 	Dump() interface{}
 }
 
@@ -114,8 +114,8 @@ func (s *MemoryStore) WatchControlMetrics(clusterName string) (<-chan ControlMet
 	return watchers.Watch()
 }
 
-// WatchRecommendations implements ServerStore.
-func (s *MemoryStore) WatchRecommendations(clusterName string) (<-chan RecommendationEvent, func()) {
+// WatchArbitratedRecommendations implements ServerStore.
+func (s *MemoryStore) WatchArbitratedRecommendations(clusterName string) (<-chan RecommendationEvent, func()) {
 	s.mu.Lock()
 	watchers, ok := s.recWatchers[clusterName]
 	if !ok {
@@ -394,7 +394,7 @@ func (s *MemoryStore) notifyRecommendation(key policyID, ps *PolicyState) {
 }
 
 // recommendationEvent returns the event reporting the current arbitrated
-// recommendation of a policy: what GetRecommendation returns. The caller must
+// recommendation of a policy: what GetArbitratedRecommendation returns. The caller must
 // hold mu.
 func recommendationEvent(key policyID, ps *PolicyState) RecommendationEvent {
 	return RecommendationEvent{
@@ -405,7 +405,7 @@ func recommendationEvent(key policyID, ps *PolicyState) RecommendationEvent {
 	}
 }
 
-func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationResponse, bool) {
+func (s *MemoryStore) GetArbitratedRecommendation(id *pb.PolicyId) (*pb.ArbitratedRecommendation, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	key := newPolicyID(id)
@@ -414,7 +414,7 @@ func (s *MemoryStore) GetRecommendation(id *pb.PolicyId) (*pb.GetRecommendationR
 		return nil, false
 	}
 
-	return pb.GetRecommendationResponse_builder{
+	return pb.ArbitratedRecommendation_builder{
 		Recommendation: ps.ArbitratedRecommendation,
 		MetricStatuses: metricStatuses(ps),
 		Explanation:    ps.Explanation,

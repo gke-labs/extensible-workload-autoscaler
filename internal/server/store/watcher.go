@@ -38,7 +38,7 @@ func (e ControlMetricEvent) equal(o ControlMetricEvent) bool {
 
 // RecommendationEvent reports the arbitrated recommendation of a policy after
 // an arbitration, along with its explanation and the status of the metrics it
-// was calculated from: what GetRecommendation returns.
+// was calculated from: what GetArbitratedRecommendation returns.
 type RecommendationEvent struct {
 	// ID identifies the policy the event is about.
 	ID *pb.PolicyId

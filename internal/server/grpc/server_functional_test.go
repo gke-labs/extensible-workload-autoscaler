@@ -1572,8 +1572,8 @@ func TestUpdateRecommenderState_EmptyClears(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: id}.Build())
-	wantResp1 := pb.GetRecommendationResponse_builder{
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: id}.Build())
+	wantResp1 := pb.ArbitratedRecommendation_builder{
 		Recommendation: pb.Recommendation_builder{
 			Replicas: proto.Int32(5),
 		}.Build(),
@@ -1587,7 +1587,7 @@ func TestUpdateRecommenderState_EmptyClears(t *testing.T) {
 	}
 
 	if diff := cmp.Diff(wantResp1, resp, opts...); diff != "" {
-		t.Errorf("Initial GetRecommendation mismatch (-want +got):\n%s", diff)
+		t.Errorf("Initial GetArbitratedRecommendation mismatch (-want +got):\n%s", diff)
 	}
 
 	client.UpdateRecommenderState(ctx, pb.UpdateRecommenderStateRequest_builder{
@@ -1595,8 +1595,8 @@ func TestUpdateRecommenderState_EmptyClears(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ = client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: id}.Build())
-	if diff := cmp.Diff(&pb.GetRecommendationResponse{}, resp, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	resp, _ = client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: id}.Build())
+	if diff := cmp.Diff(&pb.ArbitratedRecommendation{}, resp, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("Expected empty response after clearing state (-want +got):\n%s", diff)
 	}
 }
@@ -1634,9 +1634,9 @@ func TestUpdateRecommenderState_VerticalResources(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: id}.Build())
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: id}.Build())
 
-	wantResp := pb.GetRecommendationResponse_builder{
+	wantResp := pb.ArbitratedRecommendation_builder{
 		Recommendation: pb.Recommendation_builder{
 			WorkloadResources:     recommendation.GetWorkloadResources(),
 			PodContainerResources: recommendation.GetPodContainerResources(),
@@ -1709,9 +1709,9 @@ func TestUpdateRecommenderState_VerticalResources_PerContainer(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: id}.Build())
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: id}.Build())
 
-	wantResp := pb.GetRecommendationResponse_builder{
+	wantResp := pb.ArbitratedRecommendation_builder{
 		Recommendation: pb.Recommendation_builder{
 			WorkloadResources: append([]*pb.ContainerResource{}, append(appVote.GetWorkloadResources(), sidecarVote.GetWorkloadResources()...)...),
 		}.Build(),
@@ -1782,14 +1782,14 @@ func TestUpdateRecommenderState_Validation(t *testing.T) {
 	}
 }
 
-// --- GetRecommendation ---
+// --- GetArbitratedRecommendation ---
 
 func TestGetRecommendation_InvalidID(t *testing.T) {
 	_, client, cleanup := setupFunctionalGRPCServer(t, clock.RealClock{})
 	defer cleanup()
 	ctx := context.Background()
 
-	_, err := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: &pb.PolicyId{}}.Build())
+	_, err := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: &pb.PolicyId{}}.Build())
 	if status.Code(err) != codes.InvalidArgument {
 		t.Errorf("Expected InvalidArgument, got %v", err)
 	}
@@ -1800,7 +1800,7 @@ func TestGetRecommendation_NotFound(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	_, err := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{
+	_, err := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{
 		Id: pb.PolicyId_builder{ClusterName: proto.String("c1"), Namespace: proto.String("ns"), Name: proto.String("missing")}.Build(),
 	}.Build())
 	if status.Code(err) != codes.NotFound {
@@ -1817,8 +1817,8 @@ func TestGetRecommendation_NoRecommenders(t *testing.T) {
 	client.CreatePolicy(ctx, pb.CreatePolicyRequest_builder{Policy: pb.Policy_builder{Id: id}.Build()}.Build())
 
 	memStore.CalculateAll()
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: id}.Build())
-	if diff := cmp.Diff(&pb.GetRecommendationResponse{}, resp, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: id}.Build())
+	if diff := cmp.Diff(&pb.ArbitratedRecommendation{}, resp, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("Expected empty response for policy with no recommenders (-want +got):\n%s", diff)
 	}
 }
@@ -1837,8 +1837,8 @@ func TestGetRecommendation_NeverCalled(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: id}.Build())
-	if diff := cmp.Diff(&pb.GetRecommendationResponse{}, resp, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: id}.Build())
+	if diff := cmp.Diff(&pb.ArbitratedRecommendation{}, resp, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("Expected empty response before any recommender state update (-want +got):\n%s", diff)
 	}
 }
@@ -1899,9 +1899,9 @@ func TestGetRecommendation_Aggregation(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: id}.Build())
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: id}.Build())
 
-	wantResp := pb.GetRecommendationResponse_builder{
+	wantResp := pb.ArbitratedRecommendation_builder{
 		Recommendation: pb.Recommendation_builder{
 			Replicas: proto.Int32(20),
 			WorkloadResources: []*pb.ContainerResource{
@@ -1933,7 +1933,7 @@ func TestGetRecommendation_Aggregation(t *testing.T) {
 		protocmp.IgnoreFields(&pb.RecommenderStatus{}, "last_updated"),
 	}
 	if diff := cmp.Diff(wantResp, resp, opts...); diff != "" {
-		t.Errorf("GetRecommendation aggregation mismatch (-want +got):\n%s", diff)
+		t.Errorf("GetArbitratedRecommendation aggregation mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -1968,9 +1968,9 @@ func TestGetRecommendation_MetricStatuses(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: id}.Build())
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: id}.Build())
 
-	wantResp := pb.GetRecommendationResponse_builder{
+	wantResp := pb.ArbitratedRecommendation_builder{
 		Recommendation: pb.Recommendation_builder{
 			Replicas: proto.Int32(5),
 		}.Build(),
@@ -1987,7 +1987,7 @@ func TestGetRecommendation_MetricStatuses(t *testing.T) {
 		protocmp.IgnoreFields(&pb.RecommenderStatus{}, "last_updated"),
 	}
 	if diff := cmp.Diff(wantResp, resp, opts...); diff != "" {
-		t.Errorf("GetRecommendation response mismatch (-want +got):\n%s", diff)
+		t.Errorf("GetArbitratedRecommendation response mismatch (-want +got):\n%s", diff)
 	}
 }
 

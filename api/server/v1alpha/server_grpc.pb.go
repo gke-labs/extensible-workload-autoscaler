@@ -20,19 +20,19 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	XASServer_GetPolicy_FullMethodName              = "/xas.server.v1alpha.XASServer/GetPolicy"
-	XASServer_CreatePolicy_FullMethodName           = "/xas.server.v1alpha.XASServer/CreatePolicy"
-	XASServer_UpdatePolicy_FullMethodName           = "/xas.server.v1alpha.XASServer/UpdatePolicy"
-	XASServer_DeletePolicy_FullMethodName           = "/xas.server.v1alpha.XASServer/DeletePolicy"
-	XASServer_ListPolicies_FullMethodName           = "/xas.server.v1alpha.XASServer/ListPolicies"
-	XASServer_UpdateWorkload_FullMethodName         = "/xas.server.v1alpha.XASServer/UpdateWorkload"
-	XASServer_GetControlMetrics_FullMethodName      = "/xas.server.v1alpha.XASServer/GetControlMetrics"
-	XASServer_WatchControlMetrics_FullMethodName    = "/xas.server.v1alpha.XASServer/WatchControlMetrics"
-	XASServer_GetWorkload_FullMethodName            = "/xas.server.v1alpha.XASServer/GetWorkload"
-	XASServer_UpdateRecommenderState_FullMethodName = "/xas.server.v1alpha.XASServer/UpdateRecommenderState"
-	XASServer_GetRecommendation_FullMethodName      = "/xas.server.v1alpha.XASServer/GetRecommendation"
-	XASServer_WatchRecommendations_FullMethodName   = "/xas.server.v1alpha.XASServer/WatchRecommendations"
-	XASServer_IngestMetrics_FullMethodName          = "/xas.server.v1alpha.XASServer/IngestMetrics"
+	XASServer_GetPolicy_FullMethodName                      = "/xas.server.v1alpha.XASServer/GetPolicy"
+	XASServer_CreatePolicy_FullMethodName                   = "/xas.server.v1alpha.XASServer/CreatePolicy"
+	XASServer_UpdatePolicy_FullMethodName                   = "/xas.server.v1alpha.XASServer/UpdatePolicy"
+	XASServer_DeletePolicy_FullMethodName                   = "/xas.server.v1alpha.XASServer/DeletePolicy"
+	XASServer_ListPolicies_FullMethodName                   = "/xas.server.v1alpha.XASServer/ListPolicies"
+	XASServer_UpdateWorkload_FullMethodName                 = "/xas.server.v1alpha.XASServer/UpdateWorkload"
+	XASServer_GetControlMetrics_FullMethodName              = "/xas.server.v1alpha.XASServer/GetControlMetrics"
+	XASServer_WatchControlMetrics_FullMethodName            = "/xas.server.v1alpha.XASServer/WatchControlMetrics"
+	XASServer_GetWorkload_FullMethodName                    = "/xas.server.v1alpha.XASServer/GetWorkload"
+	XASServer_UpdateRecommenderState_FullMethodName         = "/xas.server.v1alpha.XASServer/UpdateRecommenderState"
+	XASServer_GetArbitratedRecommendation_FullMethodName    = "/xas.server.v1alpha.XASServer/GetArbitratedRecommendation"
+	XASServer_WatchArbitratedRecommendations_FullMethodName = "/xas.server.v1alpha.XASServer/WatchArbitratedRecommendations"
+	XASServer_IngestMetrics_FullMethodName                  = "/xas.server.v1alpha.XASServer/IngestMetrics"
 )
 
 // XASServerClient is the client API for XASServer service.
@@ -57,14 +57,13 @@ type XASServerClient interface {
 	// --- Workload Management (Controller -> Server) ---
 	// Update the Server's view of the workload (Pods) for a specific policy.
 	// This is a full replacement of the pod list.
-	// TODO(): This method should probably just return an empty response (google.protobuf.Empty).
 	UpdateWorkload(ctx context.Context, in *UpdateWorkloadRequest, opts ...grpc.CallOption) (*Workload, error)
 	// --- Control Metrics (Recommender -> Server) ---
 	// Read the current control metric values for a policy. Recommenders use
 	// these to compute their recommendations.
 	GetControlMetrics(ctx context.Context, in *GetControlMetricsRequest, opts ...grpc.CallOption) (*GetControlMetricsResponse, error)
 	// Stream changes to control metrics.
-	WatchControlMetrics(ctx context.Context, in *WatchControlMetricsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WatchControlMetricsResponse], error)
+	WatchControlMetrics(ctx context.Context, in *WatchControlMetricsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ControlMetricsEvent], error)
 	// --- Workload (Recommender -> Server) ---
 	// Read the Server's view of the workload (Pods and their requests) for a
 	// policy, as last reported by the Controller with UpdateWorkload.
@@ -77,9 +76,9 @@ type XASServerClient interface {
 	// --- Recommendation (Controller -> Server) ---
 	// Retrieve the final arbitrated recommendation for a policy.
 	// The Controller uses this to scale the target workload.
-	GetRecommendation(ctx context.Context, in *GetRecommendationRequest, opts ...grpc.CallOption) (*GetRecommendationResponse, error)
+	GetArbitratedRecommendation(ctx context.Context, in *GetArbitratedRecommendationRequest, opts ...grpc.CallOption) (*ArbitratedRecommendation, error)
 	// Stream changes to arbitrated recommendations.
-	WatchRecommendations(ctx context.Context, in *WatchRecommendationsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WatchRecommendationsResponse], error)
+	WatchArbitratedRecommendations(ctx context.Context, in *WatchArbitratedRecommendationsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ArbitratedRecommendationsEvent], error)
 	// --- Ingestion (Agent -> Server) ---
 	// Push raw metric samples from an Agent (Node).
 	IngestMetrics(ctx context.Context, in *IngestMetricsRequest, opts ...grpc.CallOption) (*IngestMetricsResponse, error)
@@ -163,13 +162,13 @@ func (c *xASServerClient) GetControlMetrics(ctx context.Context, in *GetControlM
 	return out, nil
 }
 
-func (c *xASServerClient) WatchControlMetrics(ctx context.Context, in *WatchControlMetricsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WatchControlMetricsResponse], error) {
+func (c *xASServerClient) WatchControlMetrics(ctx context.Context, in *WatchControlMetricsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ControlMetricsEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &XASServer_ServiceDesc.Streams[0], XASServer_WatchControlMetrics_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[WatchControlMetricsRequest, WatchControlMetricsResponse]{ClientStream: stream}
+	x := &grpc.GenericClientStream[WatchControlMetricsRequest, ControlMetricsEvent]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -180,7 +179,7 @@ func (c *xASServerClient) WatchControlMetrics(ctx context.Context, in *WatchCont
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type XASServer_WatchControlMetricsClient = grpc.ServerStreamingClient[WatchControlMetricsResponse]
+type XASServer_WatchControlMetricsClient = grpc.ServerStreamingClient[ControlMetricsEvent]
 
 func (c *xASServerClient) GetWorkload(ctx context.Context, in *GetWorkloadRequest, opts ...grpc.CallOption) (*Workload, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -202,23 +201,23 @@ func (c *xASServerClient) UpdateRecommenderState(ctx context.Context, in *Update
 	return out, nil
 }
 
-func (c *xASServerClient) GetRecommendation(ctx context.Context, in *GetRecommendationRequest, opts ...grpc.CallOption) (*GetRecommendationResponse, error) {
+func (c *xASServerClient) GetArbitratedRecommendation(ctx context.Context, in *GetArbitratedRecommendationRequest, opts ...grpc.CallOption) (*ArbitratedRecommendation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetRecommendationResponse)
-	err := c.cc.Invoke(ctx, XASServer_GetRecommendation_FullMethodName, in, out, cOpts...)
+	out := new(ArbitratedRecommendation)
+	err := c.cc.Invoke(ctx, XASServer_GetArbitratedRecommendation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *xASServerClient) WatchRecommendations(ctx context.Context, in *WatchRecommendationsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WatchRecommendationsResponse], error) {
+func (c *xASServerClient) WatchArbitratedRecommendations(ctx context.Context, in *WatchArbitratedRecommendationsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ArbitratedRecommendationsEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &XASServer_ServiceDesc.Streams[1], XASServer_WatchRecommendations_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &XASServer_ServiceDesc.Streams[1], XASServer_WatchArbitratedRecommendations_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[WatchRecommendationsRequest, WatchRecommendationsResponse]{ClientStream: stream}
+	x := &grpc.GenericClientStream[WatchArbitratedRecommendationsRequest, ArbitratedRecommendationsEvent]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -229,7 +228,7 @@ func (c *xASServerClient) WatchRecommendations(ctx context.Context, in *WatchRec
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type XASServer_WatchRecommendationsClient = grpc.ServerStreamingClient[WatchRecommendationsResponse]
+type XASServer_WatchArbitratedRecommendationsClient = grpc.ServerStreamingClient[ArbitratedRecommendationsEvent]
 
 func (c *xASServerClient) IngestMetrics(ctx context.Context, in *IngestMetricsRequest, opts ...grpc.CallOption) (*IngestMetricsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -263,14 +262,13 @@ type XASServerServer interface {
 	// --- Workload Management (Controller -> Server) ---
 	// Update the Server's view of the workload (Pods) for a specific policy.
 	// This is a full replacement of the pod list.
-	// TODO(): This method should probably just return an empty response (google.protobuf.Empty).
 	UpdateWorkload(context.Context, *UpdateWorkloadRequest) (*Workload, error)
 	// --- Control Metrics (Recommender -> Server) ---
 	// Read the current control metric values for a policy. Recommenders use
 	// these to compute their recommendations.
 	GetControlMetrics(context.Context, *GetControlMetricsRequest) (*GetControlMetricsResponse, error)
 	// Stream changes to control metrics.
-	WatchControlMetrics(*WatchControlMetricsRequest, grpc.ServerStreamingServer[WatchControlMetricsResponse]) error
+	WatchControlMetrics(*WatchControlMetricsRequest, grpc.ServerStreamingServer[ControlMetricsEvent]) error
 	// --- Workload (Recommender -> Server) ---
 	// Read the Server's view of the workload (Pods and their requests) for a
 	// policy, as last reported by the Controller with UpdateWorkload.
@@ -283,9 +281,9 @@ type XASServerServer interface {
 	// --- Recommendation (Controller -> Server) ---
 	// Retrieve the final arbitrated recommendation for a policy.
 	// The Controller uses this to scale the target workload.
-	GetRecommendation(context.Context, *GetRecommendationRequest) (*GetRecommendationResponse, error)
+	GetArbitratedRecommendation(context.Context, *GetArbitratedRecommendationRequest) (*ArbitratedRecommendation, error)
 	// Stream changes to arbitrated recommendations.
-	WatchRecommendations(*WatchRecommendationsRequest, grpc.ServerStreamingServer[WatchRecommendationsResponse]) error
+	WatchArbitratedRecommendations(*WatchArbitratedRecommendationsRequest, grpc.ServerStreamingServer[ArbitratedRecommendationsEvent]) error
 	// --- Ingestion (Agent -> Server) ---
 	// Push raw metric samples from an Agent (Node).
 	IngestMetrics(context.Context, *IngestMetricsRequest) (*IngestMetricsResponse, error)
@@ -320,7 +318,7 @@ func (UnimplementedXASServerServer) UpdateWorkload(context.Context, *UpdateWorkl
 func (UnimplementedXASServerServer) GetControlMetrics(context.Context, *GetControlMetricsRequest) (*GetControlMetricsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetControlMetrics not implemented")
 }
-func (UnimplementedXASServerServer) WatchControlMetrics(*WatchControlMetricsRequest, grpc.ServerStreamingServer[WatchControlMetricsResponse]) error {
+func (UnimplementedXASServerServer) WatchControlMetrics(*WatchControlMetricsRequest, grpc.ServerStreamingServer[ControlMetricsEvent]) error {
 	return status.Error(codes.Unimplemented, "method WatchControlMetrics not implemented")
 }
 func (UnimplementedXASServerServer) GetWorkload(context.Context, *GetWorkloadRequest) (*Workload, error) {
@@ -329,11 +327,11 @@ func (UnimplementedXASServerServer) GetWorkload(context.Context, *GetWorkloadReq
 func (UnimplementedXASServerServer) UpdateRecommenderState(context.Context, *UpdateRecommenderStateRequest) (*RecommenderState, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateRecommenderState not implemented")
 }
-func (UnimplementedXASServerServer) GetRecommendation(context.Context, *GetRecommendationRequest) (*GetRecommendationResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetRecommendation not implemented")
+func (UnimplementedXASServerServer) GetArbitratedRecommendation(context.Context, *GetArbitratedRecommendationRequest) (*ArbitratedRecommendation, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetArbitratedRecommendation not implemented")
 }
-func (UnimplementedXASServerServer) WatchRecommendations(*WatchRecommendationsRequest, grpc.ServerStreamingServer[WatchRecommendationsResponse]) error {
-	return status.Error(codes.Unimplemented, "method WatchRecommendations not implemented")
+func (UnimplementedXASServerServer) WatchArbitratedRecommendations(*WatchArbitratedRecommendationsRequest, grpc.ServerStreamingServer[ArbitratedRecommendationsEvent]) error {
+	return status.Error(codes.Unimplemented, "method WatchArbitratedRecommendations not implemented")
 }
 func (UnimplementedXASServerServer) IngestMetrics(context.Context, *IngestMetricsRequest) (*IngestMetricsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method IngestMetrics not implemented")
@@ -490,11 +488,11 @@ func _XASServer_WatchControlMetrics_Handler(srv interface{}, stream grpc.ServerS
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(XASServerServer).WatchControlMetrics(m, &grpc.GenericServerStream[WatchControlMetricsRequest, WatchControlMetricsResponse]{ServerStream: stream})
+	return srv.(XASServerServer).WatchControlMetrics(m, &grpc.GenericServerStream[WatchControlMetricsRequest, ControlMetricsEvent]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type XASServer_WatchControlMetricsServer = grpc.ServerStreamingServer[WatchControlMetricsResponse]
+type XASServer_WatchControlMetricsServer = grpc.ServerStreamingServer[ControlMetricsEvent]
 
 func _XASServer_GetWorkload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetWorkloadRequest)
@@ -532,34 +530,34 @@ func _XASServer_UpdateRecommenderState_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
-func _XASServer_GetRecommendation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetRecommendationRequest)
+func _XASServer_GetArbitratedRecommendation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetArbitratedRecommendationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(XASServerServer).GetRecommendation(ctx, in)
+		return srv.(XASServerServer).GetArbitratedRecommendation(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: XASServer_GetRecommendation_FullMethodName,
+		FullMethod: XASServer_GetArbitratedRecommendation_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(XASServerServer).GetRecommendation(ctx, req.(*GetRecommendationRequest))
+		return srv.(XASServerServer).GetArbitratedRecommendation(ctx, req.(*GetArbitratedRecommendationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _XASServer_WatchRecommendations_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(WatchRecommendationsRequest)
+func _XASServer_WatchArbitratedRecommendations_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(WatchArbitratedRecommendationsRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(XASServerServer).WatchRecommendations(m, &grpc.GenericServerStream[WatchRecommendationsRequest, WatchRecommendationsResponse]{ServerStream: stream})
+	return srv.(XASServerServer).WatchArbitratedRecommendations(m, &grpc.GenericServerStream[WatchArbitratedRecommendationsRequest, ArbitratedRecommendationsEvent]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type XASServer_WatchRecommendationsServer = grpc.ServerStreamingServer[WatchRecommendationsResponse]
+type XASServer_WatchArbitratedRecommendationsServer = grpc.ServerStreamingServer[ArbitratedRecommendationsEvent]
 
 func _XASServer_IngestMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(IngestMetricsRequest)
@@ -623,8 +621,8 @@ var XASServer_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _XASServer_UpdateRecommenderState_Handler,
 		},
 		{
-			MethodName: "GetRecommendation",
-			Handler:    _XASServer_GetRecommendation_Handler,
+			MethodName: "GetArbitratedRecommendation",
+			Handler:    _XASServer_GetArbitratedRecommendation_Handler,
 		},
 		{
 			MethodName: "IngestMetrics",
@@ -638,8 +636,8 @@ var XASServer_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "WatchRecommendations",
-			Handler:       _XASServer_WatchRecommendations_Handler,
+			StreamName:    "WatchArbitratedRecommendations",
+			Handler:       _XASServer_WatchArbitratedRecommendations_Handler,
 			ServerStreams: true,
 		},
 	},

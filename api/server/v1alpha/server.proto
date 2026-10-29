@@ -32,7 +32,6 @@ service XASServer {
   // --- Workload Management (Controller -> Server) ---
   // Update the Server's view of the workload (Pods) for a specific policy.
   // This is a full replacement of the pod list.
-  // TODO(): This method should probably just return an empty response (google.protobuf.Empty).
   rpc UpdateWorkload(UpdateWorkloadRequest) returns (Workload);
 
   // --- Control Metrics (Recommender -> Server) ---
@@ -41,7 +40,7 @@ service XASServer {
   rpc GetControlMetrics(GetControlMetricsRequest) returns (GetControlMetricsResponse);
 
   // Stream changes to control metrics.
-  rpc WatchControlMetrics(WatchControlMetricsRequest) returns (stream WatchControlMetricsResponse);
+  rpc WatchControlMetrics(WatchControlMetricsRequest) returns (stream ControlMetricsEvent);
 
   // --- Workload (Recommender -> Server) ---
   // Read the Server's view of the workload (Pods and their requests) for a
@@ -57,10 +56,10 @@ service XASServer {
   // --- Recommendation (Controller -> Server) ---
   // Retrieve the final arbitrated recommendation for a policy.
   // The Controller uses this to scale the target workload.
-  rpc GetRecommendation(GetRecommendationRequest) returns (GetRecommendationResponse);
+  rpc GetArbitratedRecommendation(GetArbitratedRecommendationRequest) returns (ArbitratedRecommendation);
 
   // Stream changes to arbitrated recommendations.
-  rpc WatchRecommendations(WatchRecommendationsRequest) returns (stream WatchRecommendationsResponse);
+  rpc WatchArbitratedRecommendations(WatchArbitratedRecommendationsRequest) returns (stream ArbitratedRecommendationsEvent);
 
   // --- Ingestion (Agent -> Server) ---
   // Push raw metric samples from an Agent (Node).
@@ -347,7 +346,7 @@ message MetricValues {
 
 // ContainerMetrics contains control metrics for specific containers.
 message ContainerMetrics {
-  // Metrics sourced from specific containers, keyed by metric name.
+  // Metrics sourced from specific containers, keyed by container name.
   map<string, MetricValues> container_metrics = 1;
 }
 
@@ -369,10 +368,10 @@ message WatchControlMetricsRequest {
   string cluster_name = 1;
 }
 
-// WatchControlMetricsResponse is the response sent on the WatchControlMetrics
+// ControlMetricsEvent is the response sent on the WatchControlMetrics
 // streaming RPC. Unless throttled, such an object is sent every time a metric
 // or the number of ready replicas changes.
-message WatchControlMetricsResponse {
+message ControlMetricsEvent {
   PolicyId id = 1;
   // Global metrics.
   ControlMetrics control_metrics = 2;
@@ -473,15 +472,15 @@ message RecommenderStatus {
 
 // --- Recommendation ---
 
-// GetRecommendationRequest retrieves the final recommendation for a policy.
-message GetRecommendationRequest { 
+// GetArbitratedRecommendationRequest retrieves the final recommendation for a policy.
+message GetArbitratedRecommendationRequest { 
   // The policy ID.
   PolicyId id = 1; 
 }
 
-// GetRecommendationResponse wraps the arbitrated recommendation.
-// If recommendation is not set, it means no arbitrated recommendation is available yet.
-message GetRecommendationResponse {
+// ArbitratedRecommendation wraps the arbitrated recommendation and information
+// about how it was derived (e.g. the recommender and control metric statuses).
+message ArbitratedRecommendation {
   Recommendation recommendation = 1;
 
   // Explains the arbitrated recommendation by listing the status of all
@@ -492,18 +491,18 @@ message GetRecommendationResponse {
   repeated MetricStatus metric_statuses = 2;
 }
 
-// WatchRecommendationsRequest retrieves all arbitrated recommendations for all
+// WatchArbitratedRecommendationsRequest retrieves all arbitrated recommendations for all
 // policies in the given cluster.
-message WatchRecommendationsRequest {
+message WatchArbitratedRecommendationsRequest {
   string cluster_name = 1;
 }
 
-// WatchRecommendationsResponse is the response sent on the WatchRecommendations
+// ArbitratedRecommendationsEvent is the response sent on the WatchArbitratedRecommendations
 // streaming RPC. Unless throttled, such an object is sent every time a new
 // arbitrated recommendation is emitted: when the recommendation, its
 // explanation or the status of its metrics change. Timestamps alone do not
 // count as a change.
-message WatchRecommendationsResponse {
+message ArbitratedRecommendationsEvent {
   PolicyId id = 1;
   // The arbitrated recommendation.
   Recommendation recommendation = 2;

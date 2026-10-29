@@ -13,7 +13,7 @@ import (
 // ControlMetricsClient implements a client watching ControlMetrics updates.
 // Not thread-safe.
 type ControlMetricsClient struct {
-	connection *watch.Connection[pb.WatchControlMetricsResponse]
+	connection *watch.Connection[pb.ControlMetricsEvent]
 }
 
 // NewControlMetricsClient creates a new client using a given UAS connection.
@@ -25,7 +25,7 @@ func NewControlMetricsClient(c *grpc.ClientConn, clusterName string) *ControlMet
 
 // Run starts this client that listens for control metrics updates and pushes
 // them to a channel. It reconnects on failure.
-func (c *ControlMetricsClient) Run(ctx context.Context, ch chan *pb.WatchControlMetricsResponse) {
+func (c *ControlMetricsClient) Run(ctx context.Context, ch chan *pb.ControlMetricsEvent) {
 	slog.Info("ControlMetrics watch client started")
 	defer slog.Info("ControlMetrics watch client stopped")
 

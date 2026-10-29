@@ -174,9 +174,9 @@ func TestServerEndToEndGRPC(t *testing.T) {
 	// 7. Calc Recommendation
 	memStore.CalculateAll()
 
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
 
-	wantResp := pb.GetRecommendationResponse_builder{
+	wantResp := pb.ArbitratedRecommendation_builder{
 		Recommendation: pb.Recommendation_builder{
 			Replicas: proto.Int32(4),
 		}.Build(),
@@ -299,9 +299,9 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
 
-	wantResp := pb.GetRecommendationResponse_builder{
+	wantResp := pb.ArbitratedRecommendation_builder{
 		Recommendation: pb.Recommendation_builder{
 			Replicas: proto.Int32(16),
 		}.Build(),
@@ -375,9 +375,9 @@ func TestExternalMetricGRPC(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
 
-	wantResp := pb.GetRecommendationResponse_builder{
+	wantResp := pb.ArbitratedRecommendation_builder{
 		Recommendation: pb.Recommendation_builder{
 			Replicas: proto.Int32(100),
 		}.Build(),
@@ -451,9 +451,9 @@ func TestPerPodExternalMetricGRPC(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
 
-	wantResp := pb.GetRecommendationResponse_builder{
+	wantResp := pb.ArbitratedRecommendation_builder{
 		Recommendation: pb.Recommendation_builder{
 			Replicas: proto.Int32(2),
 		}.Build(),
@@ -518,9 +518,9 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
 
-	wantWakeUp := pb.GetRecommendationResponse_builder{
+	wantWakeUp := pb.ArbitratedRecommendation_builder{
 		Recommendation: pb.Recommendation_builder{
 			Replicas: proto.Int32(5),
 		}.Build(),
@@ -558,9 +558,9 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ = client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
+	resp, _ = client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
 
-	wantCooldown := pb.GetRecommendationResponse_builder{
+	wantCooldown := pb.ArbitratedRecommendation_builder{
 		Recommendation: pb.Recommendation_builder{
 			Replicas: proto.Int32(1), // MinReplicas (Server kept active due to window)
 		}.Build(),
@@ -593,9 +593,9 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ = client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
+	resp, _ = client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
 
-	wantScaleDown := pb.GetRecommendationResponse_builder{
+	wantScaleDown := pb.ArbitratedRecommendation_builder{
 		Recommendation: pb.Recommendation_builder{
 			Replicas: proto.Int32(0),
 		}.Build(),
@@ -661,9 +661,9 @@ func TestDryRunGRPC(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
 
-	wantResp := pb.GetRecommendationResponse_builder{
+	wantResp := pb.ArbitratedRecommendation_builder{
 		Recommendation: pb.Recommendation_builder{
 			Replicas: proto.Int32(10),
 		}.Build(),
@@ -852,9 +852,9 @@ func TestHistogramLatencyScalingGRPC(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
 
-	wantResp := pb.GetRecommendationResponse_builder{
+	wantResp := pb.ArbitratedRecommendation_builder{
 		Recommendation: pb.Recommendation_builder{
 			Replicas: proto.Int32(2),
 		}.Build(),
@@ -1357,9 +1357,9 @@ func TestRecommenderInactiveGRPC(t *testing.T) {
 
 	memStore.CalculateAll()
 
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
 
-	wantResp := pb.GetRecommendationResponse_builder{
+	wantResp := pb.ArbitratedRecommendation_builder{
 		Recommendation: pb.Recommendation_builder{
 			Replicas: proto.Int32(5),
 		}.Build(),
@@ -1553,7 +1553,7 @@ func TestRemoveScalingSectionGRPC(t *testing.T) {
 
 	// 3. Calc Recommendation
 	memStore.CalculateAll()
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: id}.Build())
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: id}.Build())
 	if !resp.HasRecommendation() || resp.GetRecommendation().GetReplicas() != 10 {
 		t.Errorf("Initial: Want 10, Got %v", resp.GetRecommendation())
 	}
@@ -1569,7 +1569,7 @@ func TestRemoveScalingSectionGRPC(t *testing.T) {
 	}.Build())
 
 	// 5. Verify No Recommendation
-	resp, _ = client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: id}.Build())
+	resp, _ = client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: id}.Build())
 	if resp.HasRecommendation() {
 	}
 }
@@ -1737,7 +1737,7 @@ func TestRecommenderArbitrationGRPC(t *testing.T) {
 	}.Build())
 
 	memStore.CalculateAll()
-	resp, _ := client.GetRecommendation(ctx, pb.GetRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
+	resp, _ := client.GetArbitratedRecommendation(ctx, pb.GetArbitratedRecommendationRequest_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build()}.Build())
 
 	// Should equal Max(5, 20) = 20
 	if resp.GetRecommendation().GetReplicas() != 20 {
@@ -2150,7 +2150,7 @@ func TestWatchControlMetricsGRPC(t *testing.T) {
 
 	// 4. Ingesting new samples publishes the recomputed policy right away, so
 	// the first message received must be the changed one.
-	recv := func() *pb.WatchControlMetricsResponse {
+	recv := func() *pb.ControlMetricsEvent {
 		t.Helper()
 		res, err := stream.Recv()
 		if err != nil {
@@ -2158,8 +2158,8 @@ func TestWatchControlMetricsGRPC(t *testing.T) {
 		}
 		return res
 	}
-	wantResponse := func(readyReplicas int32, qps, owned float64) *pb.WatchControlMetricsResponse {
-		return pb.WatchControlMetricsResponse_builder{
+	wantResponse := func(readyReplicas int32, qps, owned float64) *pb.ControlMetricsEvent {
+		return pb.ControlMetricsEvent_builder{
 			Id:             id,
 			ControlMetrics: pb.ControlMetrics_builder{Values: map[string]float64{"qps": qps}}.Build(),
 			RecommenderControlMetrics: map[string]*pb.ControlMetrics{
@@ -2204,7 +2204,7 @@ func TestWatchControlMetricsGRPC(t *testing.T) {
 	}
 }
 
-// TestWatchRecommendationsGRPC validates the WatchRecommendations stream.
+// TestWatchRecommendationsGRPC validates the WatchArbitratedRecommendations stream.
 // Steps:
 //  1. Create a policy with an activation and a scaling recommender, activate
 //     it and calculate: there is no arbitrated recommendation yet.
@@ -2269,11 +2269,11 @@ func TestWatchRecommendationsGRPC(t *testing.T) {
 	memStore.CalculateAll()
 
 	// 2. Watch, then recalculate.
-	stream, err := client.WatchRecommendations(ctx, pb.WatchRecommendationsRequest_builder{
+	stream, err := client.WatchArbitratedRecommendations(ctx, pb.WatchArbitratedRecommendationsRequest_builder{
 		ClusterName: proto.String("default"),
 	}.Build())
 	if err != nil {
-		t.Fatalf("WatchRecommendations: %v", err)
+		t.Fatalf("WatchArbitratedRecommendations: %v", err)
 	}
 	// The headers are sent once the watch is registered: wait for them so
 	// that the changes made below cannot race with the registration.
@@ -2281,7 +2281,7 @@ func TestWatchRecommendationsGRPC(t *testing.T) {
 		t.Fatalf("Header: %v", err)
 	}
 
-	recv := func() *pb.WatchRecommendationsResponse {
+	recv := func() *pb.ArbitratedRecommendationsEvent {
 		t.Helper()
 		res, err := stream.Recv()
 		if err != nil {
@@ -2291,8 +2291,8 @@ func TestWatchRecommendationsGRPC(t *testing.T) {
 	}
 	// Every response carries the status of the policy's only metric, which
 	// never gets any sample.
-	wantResponse := func(rec *pb.Recommendation, explanation ...*pb.RecommenderStatus) *pb.WatchRecommendationsResponse {
-		return pb.WatchRecommendationsResponse_builder{
+	wantResponse := func(rec *pb.Recommendation, explanation ...*pb.RecommenderStatus) *pb.ArbitratedRecommendationsEvent {
+		return pb.ArbitratedRecommendationsEvent_builder{
 			Id:             id,
 			Recommendation: rec,
 			Explanation:    explanation,
@@ -2363,11 +2363,11 @@ func TestWatchRecommendationsGRPC(t *testing.T) {
 	}
 
 	// 8. A new watcher starts from the last event of every policy.
-	late, err := client.WatchRecommendations(ctx, pb.WatchRecommendationsRequest_builder{
+	late, err := client.WatchArbitratedRecommendations(ctx, pb.WatchArbitratedRecommendationsRequest_builder{
 		ClusterName: proto.String("default"),
 	}.Build())
 	if err != nil {
-		t.Fatalf("WatchRecommendations: %v", err)
+		t.Fatalf("WatchArbitratedRecommendations: %v", err)
 	}
 	primed, err := late.Recv()
 	if err != nil {
@@ -2378,9 +2378,9 @@ func TestWatchRecommendationsGRPC(t *testing.T) {
 	}
 
 	// 9. Validation.
-	bad, err := client.WatchRecommendations(ctx, pb.WatchRecommendationsRequest_builder{}.Build())
+	bad, err := client.WatchArbitratedRecommendations(ctx, pb.WatchArbitratedRecommendationsRequest_builder{}.Build())
 	if err != nil {
-		t.Fatalf("WatchRecommendations: %v", err)
+		t.Fatalf("WatchArbitratedRecommendations: %v", err)
 	}
 	if _, err := bad.Recv(); status.Code(err) != codes.InvalidArgument {
 		t.Errorf("Recv() on invalid request: got %v, want %v", err, codes.InvalidArgument)

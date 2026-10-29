@@ -78,7 +78,7 @@ func (e *Engine) Run(ctx context.Context) {
 	// Learn the policies before watching their metrics.
 	e.Tick()
 
-	ch := make(chan *pb.WatchControlMetricsResponse, 100)
+	ch := make(chan *pb.ControlMetricsEvent, 100)
 	cmc := watchclient.NewControlMetricsClient(e.grpcConn, e.clusterName)
 	go cmc.Run(ctx, ch)
 
@@ -97,7 +97,7 @@ func (e *Engine) Run(ctx context.Context) {
 // handleControlMetricsUpdate runs the recommenders of a policy on its new
 // control metrics and pushes their recommendations. Updates for policies the
 // engine does not know about (see Tick) are dropped.
-func (e *Engine) handleControlMetricsUpdate(ctx context.Context, metric *pb.WatchControlMetricsResponse) {
+func (e *Engine) handleControlMetricsUpdate(ctx context.Context, metric *pb.ControlMetricsEvent) {
 	policyID, clusterName := PolicyIDFromProto(metric.GetId())
 
 	if clusterName != e.clusterName {

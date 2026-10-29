@@ -210,7 +210,7 @@ func TestHandleControlMetricsUpdate(t *testing.T) {
 	webID, _ := PolicyIDFromProto(id)
 	policyWide := pb.ControlMetrics_builder{Values: map[string]float64{"cpu": 2}}.Build()
 	vpaOwned := pb.ControlMetrics_builder{Values: map[string]float64{"cpu": 30}}.Build()
-	update := pb.WatchControlMetricsResponse_builder{
+	update := pb.ControlMetricsEvent_builder{
 		Id:                        id,
 		ControlMetrics:            policyWide,
 		RecommenderControlMetrics: map[string]*pb.ControlMetrics{"vpa": vpaOwned},
@@ -289,7 +289,7 @@ func TestHandleControlMetricsUpdate(t *testing.T) {
 		client := &recommendClient{}
 		rec := &recordingRecommender{}
 		e := newEngine(t, client, rec)
-		foreign := proto.Clone(update).(*pb.WatchControlMetricsResponse)
+		foreign := proto.Clone(update).(*pb.ControlMetricsEvent)
 		foreign.SetId(policyID("other", "prod", "web"))
 
 		e.handleControlMetricsUpdate(context.Background(), foreign)
