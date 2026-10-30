@@ -1,0 +1,4 @@
+.*.value
+.*.yaml
+__pycache__/
+*.pyc
