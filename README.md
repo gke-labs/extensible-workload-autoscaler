@@ -68,6 +68,9 @@ $ hack/create-kind-cluster.sh
 # Build and deploy xAS.
 $ hack/deploy.sh
 
+# Optionally deploy the metrics-server (enables `kubectl top`).
+$ hack/deploy-metrics-server.sh
+
 # Deploy the samples.
 $ kubectl apply -f samples/manifests
 
