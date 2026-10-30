@@ -108,16 +108,18 @@ kubectl top pods -n fibonacci-hpa
 You can override any of the following variables when invoking `make` (e.g.,
 `make deploy-hpa CLUSTER_NAME=my-cluster`):
 
-| Variable                    | Default          | Description                                                           |
-| :-------------------------- | :--------------- | :-------------------------------------------------------------------- |
-| `CLUSTER_NAME`              | `xas-e2e`        | Name of the target KinD cluster for `kind load`                       |
-| `NAMESPACE`                 | `default`        | Target namespace for `make deploy` (`deploy-hpa` uses `fibonacci-hpa`) |
-| `FIBONACCI_DEPLOYMENT_NAME` | `fibonacci`      | Name of the Fibonacci `Deployment`, `Service`, and autoscaler target  |
-| `FIBONACCI_IMAGE_NAME`      | `fibonacci`      | Docker image name for the Fibonacci server                            |
-| `FIBONACCI_IMAGE_TAG`       | `latest`         | Docker image tag for the Fibonacci server                             |
-| `LOADGEN_DEPLOYMENT_NAME`   | `load-generator` | Name of the load generator `Deployment`                               |
-| `LOADGEN_IMAGE_NAME`        | `loadgen`        | Docker image name for the load generator                              |
-| `LOADGEN_IMAGE_TAG`         | `latest`         | Docker image tag for the load generator                               |
+| Variable                    | Default              | Description                                                           |
+| :-------------------------- | :------------------- | :-------------------------------------------------------------------- |
+| `CLUSTER_NAME`              | `xas-e2e`            | Name of the target KinD cluster for `kind load`                       |
+| `NAMESPACE`                 | `default`            | Target namespace for `make deploy` (`deploy-hpa` uses `fibonacci-hpa`) |
+| `FIBONACCI_DEPLOYMENT_NAME` | `fibonacci`          | Name of the Fibonacci `Deployment`, `Service`, and autoscaler target  |
+| `FIBONACCI_IMAGE_NAME`      | `fibonacci`          | Docker image name for the Fibonacci server                            |
+| `FIBONACCI_IMAGE_TAG`       | `latest`             | Docker image tag for the Fibonacci server                             |
+| `LOADGEN_DEPLOYMENT_NAME`   | `load-generator`     | Name of the load generator `Deployment`                               |
+| `LOADGEN_IMAGE_NAME`        | `loadgen`            | Docker image name for the load generator                              |
+| `LOADGEN_IMAGE_TAG`         | `latest`             | Docker image tag for the load generator                               |
+| `BASELINE_NAMESPACE`        | `fibonacci-baseline` | Ephemeral namespace used by `make baseline`                           |
+| `BASELINE_DURATION`         | `30`                 | Duration in seconds for 1-QPS baseline latency measurement            |
 
 *(Note: The `Makefile` caches variable values in hidden `.*.value` files and
 automatically regenerates `.*.yaml` manifests whenever any template variable or

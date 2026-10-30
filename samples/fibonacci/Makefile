@@ -102,7 +102,29 @@ deploy-hpa: NAMESPACE := fibonacci-hpa
 deploy-hpa: ensure-metrics-server deploy .fibonacci_hpa.yaml
 	kubectl --context "$(KUBE_CONTEXT)" apply -n $(NAMESPACE) -f .fibonacci_hpa.yaml
 
+BASELINE_NAMESPACE ?= fibonacci-baseline
+BASELINE_DURATION ?= 30
+
+.PHONY: baseline
+baseline: kind-load .baseline_latency
+
+.baseline_latency: .fibonacci.yaml | kind-load
+	trap 'kubectl --context "$(KUBE_CONTEXT)" delete namespace $(BASELINE_NAMESPACE) --ignore-not-found' EXIT; \
+	set -e; \
+	kubectl --context "$(KUBE_CONTEXT)" create namespace $(BASELINE_NAMESPACE) \
+		--dry-run=client -o yaml \
+		| kubectl --context "$(KUBE_CONTEXT)" apply -f -; \
+	kubectl --context "$(KUBE_CONTEXT)" apply -n $(BASELINE_NAMESPACE) -f .fibonacci.yaml; \
+	kubectl --context "$(KUBE_CONTEXT)" rollout status -n $(BASELINE_NAMESPACE) \
+		deployment/$(FIBONACCI_DEPLOYMENT_NAME); \
+	kubectl --context "$(KUBE_CONTEXT)" run baseline-test -n $(BASELINE_NAMESPACE) \
+		--rm -i --quiet --restart=Never \
+		--image=$(LOADGEN_IMAGE_NAME):$(LOADGEN_IMAGE_TAG) \
+		--image-pull-policy=IfNotPresent \
+		--env="FIB_SERVICE_URL=http://$(FIBONACCI_DEPLOYMENT_NAME)" \
+		-- python app.py --baseline --duration=$(BASELINE_DURATION) > $@
+
 .PHONY: clean
 clean:
-	rm -f $(YAML_FILES) .fibonacci_hpa.yaml
+	rm -f $(YAML_FILES) .fibonacci_hpa.yaml .baseline_latency
 	rm -f .*.value
