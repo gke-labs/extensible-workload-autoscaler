@@ -30,6 +30,12 @@ ensure-kind-cluster:
 		CLUSTER_NAME=$(CLUSTER_NAME) $(REPO_ROOT)/hack/create-kind-cluster.sh; \
 	fi
 
+.PHONY: ensure-metrics-server
+ensure-metrics-server: ensure-kind-cluster
+	@if ! kubectl --context "$(KUBE_CONTEXT)" get deployment metrics-server -n kube-system >/dev/null 2>&1; then \
+		CLUSTER_NAME=$(CLUSTER_NAME) $(REPO_ROOT)/hack/deploy-metrics-server.sh; \
+	fi
+
 .PHONY: create-kind-cluster
 create-kind-cluster:
 	CLUSTER_NAME=$(CLUSTER_NAME) $(REPO_ROOT)/hack/create-kind-cluster.sh
@@ -37,6 +43,19 @@ create-kind-cluster:
 .PHONY: delete-kind-cluster
 delete-kind-cluster:
 	CLUSTER_NAME=$(CLUSTER_NAME) $(REPO_ROOT)/hack/delete-kind-cluster.sh
+
+.PHONY: deploy-metrics-server
+deploy-metrics-server: ensure-kind-cluster
+	CLUSTER_NAME=$(CLUSTER_NAME) $(REPO_ROOT)/hack/deploy-metrics-server.sh
+
+.PHONY: deploy-prereqs
+deploy-prereqs:
+	$(MAKE) deploy-metrics-server
+
+.PHONY: prereqs
+prereqs:
+	$(MAKE) create-kind-cluster
+	$(MAKE) deploy-prereqs
 
 # A dependency that forces a target's recipe to always run while still allowing
 # Make to check the target file's timestamp afterward (unlike .PHONY, which
@@ -78,7 +97,12 @@ deploy: kind-load $(YAML_FILES)
 		deployment/$(FIBONACCI_DEPLOYMENT_NAME) \
 		deployment/$(LOADGEN_DEPLOYMENT_NAME) -n $(NAMESPACE)
 
+.PHONY: deploy-hpa
+deploy-hpa: NAMESPACE := fibonacci-hpa
+deploy-hpa: ensure-metrics-server deploy .fibonacci_hpa.yaml
+	kubectl --context "$(KUBE_CONTEXT)" apply -n $(NAMESPACE) -f .fibonacci_hpa.yaml
+
 .PHONY: clean
 clean:
-	rm -f $(YAML_FILES)
+	rm -f $(YAML_FILES) .fibonacci_hpa.yaml
 	rm -f .*.value
