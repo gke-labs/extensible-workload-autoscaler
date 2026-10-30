@@ -2,3 +2,4 @@
 .*.yaml
 __pycache__/
 *.pyc
+.baseline_latency
