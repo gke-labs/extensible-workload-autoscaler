@@ -127,6 +127,13 @@ baseline: kind-load .baseline_latency
 		--env="FIB_SERVICE_URL=http://$(FIBONACCI_DEPLOYMENT_NAME)" \
 		-- python app.py --baseline --duration=$(BASELINE_DURATION) > $@
 
+.PHONY: score
+score:
+	python3 score.py \
+		--context="$(KUBE_CONTEXT)" \
+		--fib-deployment=$(FIBONACCI_DEPLOYMENT_NAME) \
+		--loadgen-service=$(LOADGEN_DEPLOYMENT_NAME)
+
 .PHONY: clean
 clean:
 	rm -f $(YAML_FILES) .fibonacci_hpa.yaml .baseline_latency

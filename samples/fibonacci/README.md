@@ -97,6 +97,16 @@ make deploy
 make deploy NAMESPACE=my-namespace
 ```
 
+### Score Scaling Performance
+
+Run the live scorer ([`score.py`](score.py)) to track replica-seconds, slow
+(2x–5x) and failed (> 5x) queries, replica churn, and the overall weighted
+score:
+
+```bash
+make score
+```
+
 ### Monitor Scaling Behaviour
 
 ```bash
