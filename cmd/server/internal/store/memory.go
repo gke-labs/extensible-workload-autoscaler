@@ -1,6 +1,7 @@
 package store
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"maps"
@@ -38,6 +39,8 @@ type ServerStore interface {
 	UpdatePolicy(clusterName string, allowMissing bool, p *pb.Policy) (*pb.Policy, error)
 	DeletePolicy(id *pb.PolicyId) error
 	GetPolicy(id *pb.PolicyId) *pb.Policy
+	// ListPolicies returns the policies of a cluster, or of all clusters if
+	// clusterName is empty, sorted by cluster name, namespace and name.
 	ListPolicies(clusterName string) []*pb.Policy
 	UpdateWorkload(req *pb.UpdateWorkloadRequest) error
 	GetArbitratedRecommendation(id *pb.PolicyId) (*pb.ArbitratedRecommendation, bool)
@@ -238,6 +241,15 @@ func (s *MemoryStore) ListPolicies(clusterName string) []*pb.Policy {
 		}
 		policies = append(policies, ps.Policy)
 	}
+
+	slices.SortFunc(policies, func(p1, p2 *pb.Policy) int {
+		id1, id2 := p1.GetId(), p2.GetId()
+		return cmp.Or(
+			cmp.Compare(id1.GetClusterName(), id2.GetClusterName()),
+			cmp.Compare(id1.GetNamespace(), id2.GetNamespace()),
+			cmp.Compare(id1.GetName(), id2.GetName()),
+		)
+	})
 	return policies
 }
 

@@ -1690,3 +1690,64 @@ func TestOwnedMetricStatuses(t *testing.T) {
 		t.Errorf("MetricStatuses mismatch (-want +got):\n%s", diff)
 	}
 }
+
+func TestListPolicies_Sorted(t *testing.T) {
+	s := NewMemoryStore()
+	// Inserted out of order, across two clusters and two namespaces.
+	ids := [][3]string{
+		{"cluster-b", "prod", "api"},
+		{"cluster-a", "prod", "web"},
+		{"cluster-a", "default", "web"},
+		{"cluster-b", "default", "api"},
+		{"cluster-a", "prod", "api"},
+		{"cluster-a", "default", "api"},
+	}
+	for _, id := range ids {
+		p := pb.Policy_builder{
+			Id: pb.PolicyId_builder{
+				ClusterName: proto.String(id[0]),
+				Namespace:   proto.String(id[1]),
+				Name:        proto.String(id[2]),
+			}.Build(),
+		}.Build()
+		if _, err := s.UpdatePolicy(id[0], true, p); err != nil {
+			t.Fatalf("UpdatePolicy(%v) failed: %v", id, err)
+		}
+	}
+
+	tests := []struct {
+		cluster string
+		want    []string
+	}{
+		{
+			cluster: "",
+			want: []string{
+				"cluster-a/default/api",
+				"cluster-a/default/web",
+				"cluster-a/prod/api",
+				"cluster-a/prod/web",
+				"cluster-b/default/api",
+				"cluster-b/prod/api",
+			},
+		},
+		{
+			cluster: "cluster-a",
+			want: []string{
+				"cluster-a/default/api",
+				"cluster-a/default/web",
+				"cluster-a/prod/api",
+				"cluster-a/prod/web",
+			},
+		},
+	}
+	for _, tc := range tests {
+		var got []string
+		for _, p := range s.ListPolicies(tc.cluster) {
+			id := p.GetId()
+			got = append(got, id.GetClusterName()+"/"+id.GetNamespace()+"/"+id.GetName())
+		}
+		if diff := cmp.Diff(tc.want, got); diff != "" {
+			t.Errorf("ListPolicies(%q) order mismatch (-want +got):\n%s", tc.cluster, diff)
+		}
+	}
+}

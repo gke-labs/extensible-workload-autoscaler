@@ -2,6 +2,7 @@ package grpc_test
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"net"
 	"testing"
@@ -340,6 +341,153 @@ func TestListPolicies_Empty(t *testing.T) {
 	resp, _ := client.ListPolicies(ctx, pb.ListPoliciesRequest_builder{ClusterName: proto.String("non-existent")}.Build())
 	if diff := cmp.Diff(&pb.ListPoliciesResponse{}, resp, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("Expected empty response for non-existent cluster (-want +got):\n%s", diff)
+	}
+}
+
+// --- ListPolicies pagination ---
+
+// createPolicies stores policies c1/default/<name> for each name.
+func createPolicies(t *testing.T, client pb.XASServerClient, names ...string) {
+	t.Helper()
+	for _, name := range names {
+		mustUpdatePolicy(t, client, pb.Policy_builder{Id: pb.PolicyId_builder{
+			ClusterName: proto.String("c1"), Namespace: proto.String("default"), Name: proto.String(name),
+		}.Build()}.Build())
+	}
+}
+
+// listPage calls ListPolicies on c1 and returns the policy names and the next
+// page token.
+func listPage(t *testing.T, client pb.XASServerClient, size int32, token string) ([]string, string) {
+	t.Helper()
+	resp, err := client.ListPolicies(context.Background(), pb.ListPoliciesRequest_builder{
+		ClusterName: proto.String("c1"), PageSize: proto.Int32(size), PageToken: proto.String(token),
+	}.Build())
+	if err != nil {
+		t.Fatalf("ListPolicies(size=%d, token=%q) failed: %v", size, token, err)
+	}
+	var names []string
+	for _, p := range resp.GetPolicies() {
+		names = append(names, p.GetId().GetName())
+	}
+	return names, resp.GetNextPageToken()
+}
+
+func TestListPolicies_Pagination(t *testing.T) {
+	_, client, cleanup := setupFunctionalGRPCServer(t, clock.RealClock{})
+	defer cleanup()
+	createPolicies(t, client, "e", "c", "a", "d", "b")
+
+	var pages [][]string
+	token := ""
+	for {
+		names, next := listPage(t, client, 2, token)
+		pages = append(pages, names)
+		if next == "" {
+			break
+		}
+		token = next
+	}
+	want := [][]string{{"a", "b"}, {"c", "d"}, {"e"}}
+	if diff := cmp.Diff(want, pages); diff != "" {
+		t.Errorf("pages mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestListPolicies_PaginationExactFit(t *testing.T) {
+	_, client, cleanup := setupFunctionalGRPCServer(t, clock.RealClock{})
+	defer cleanup()
+	createPolicies(t, client, "a", "b")
+
+	names, next := listPage(t, client, 2, "")
+	if diff := cmp.Diff([]string{"a", "b"}, names); diff != "" {
+		t.Errorf("page mismatch (-want +got):\n%s", diff)
+	}
+	if next != "" {
+		t.Errorf("next_page_token = %q, want empty when all policies fit in one page", next)
+	}
+}
+
+func TestListPolicies_PaginationCursorDeleted(t *testing.T) {
+	_, client, cleanup := setupFunctionalGRPCServer(t, clock.RealClock{})
+	defer cleanup()
+	createPolicies(t, client, "a", "b", "c", "d")
+
+	names, token := listPage(t, client, 2, "")
+	if diff := cmp.Diff([]string{"a", "b"}, names); diff != "" {
+		t.Fatalf("page 1 mismatch (-want +got):\n%s", diff)
+	}
+	// Delete the cursor's policy and one before it between the two pages.
+	for _, name := range []string{"a", "b"} {
+		if _, err := client.DeletePolicy(context.Background(), pb.DeletePolicyRequest_builder{Id: pb.PolicyId_builder{
+			ClusterName: proto.String("c1"), Namespace: proto.String("default"), Name: proto.String(name),
+		}.Build()}.Build()); err != nil {
+			t.Fatalf("DeletePolicy(%s) failed: %v", name, err)
+		}
+	}
+	names, next := listPage(t, client, 2, token)
+	if diff := cmp.Diff([]string{"c", "d"}, names); diff != "" {
+		t.Errorf("page 2 mismatch (-want +got):\n%s", diff)
+	}
+	if next != "" {
+		t.Errorf("next_page_token = %q, want empty", next)
+	}
+}
+
+func TestListPolicies_PaginationDefaultAndMaxPageSize(t *testing.T) {
+	_, client, cleanup := setupFunctionalGRPCServer(t, clock.RealClock{})
+	defer cleanup()
+	var names []string
+	for i := range 1001 {
+		names = append(names, fmt.Sprintf("p%04d", i))
+	}
+	createPolicies(t, client, names...)
+
+	tests := []struct {
+		size int32
+		want int
+	}{
+		{size: 0, want: 100},
+		{size: 5000, want: 1000},
+	}
+	for _, tc := range tests {
+		got, next := listPage(t, client, tc.size, "")
+		if len(got) != tc.want || next == "" {
+			t.Errorf("ListPolicies(size=%d) = %d policies, token %q; want %d policies and a token", tc.size, len(got), next, tc.want)
+		}
+	}
+}
+
+func TestListPolicies_PaginationInvalidArgument(t *testing.T) {
+	_, client, cleanup := setupFunctionalGRPCServer(t, clock.RealClock{})
+	defer cleanup()
+	createPolicies(t, client, "a", "b", "c")
+	_, c1Token := listPage(t, client, 1, "")
+
+	tests := []struct {
+		name string
+		req  *pb.ListPoliciesRequest
+	}{
+		{
+			name: "negative page_size",
+			req:  pb.ListPoliciesRequest_builder{ClusterName: proto.String("c1"), PageSize: proto.Int32(-1)}.Build(),
+		},
+		{
+			name: "garbage page_token",
+			req:  pb.ListPoliciesRequest_builder{ClusterName: proto.String("c1"), PageToken: proto.String("%%%")}.Build(),
+		},
+		{
+			name: "page_token from another cluster",
+			req:  pb.ListPoliciesRequest_builder{ClusterName: proto.String("c2"), PageToken: proto.String(c1Token)}.Build(),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := client.ListPolicies(context.Background(), tc.req)
+			if status.Code(err) != codes.InvalidArgument {
+				t.Errorf("ListPolicies() error = %v, want InvalidArgument", err)
+			}
+		})
 	}
 }
 
