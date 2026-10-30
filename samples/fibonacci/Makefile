@@ -7,16 +7,21 @@ NAMESPACE ?= default
 FIBONACCI_DEPLOYMENT_NAME ?= fibonacci
 FIBONACCI_IMAGE_NAME ?= fibonacci
 FIBONACCI_IMAGE_TAG ?= latest
+LOADGEN_DEPLOYMENT_NAME ?= load-generator
+LOADGEN_IMAGE_NAME ?= loadgen
+LOADGEN_IMAGE_TAG ?= latest
 
 .DELETE_ON_ERROR:
 
 .PHONY: docker-build
 docker-build:
 	cd fibonacci && docker build -t $(FIBONACCI_IMAGE_NAME):$(FIBONACCI_IMAGE_TAG) .
+	cd load-generator && docker build -t $(LOADGEN_IMAGE_NAME):$(LOADGEN_IMAGE_TAG) .
 
 .PHONY: kind-load
 kind-load: ensure-kind-cluster docker-build
 	kind load docker-image $(FIBONACCI_IMAGE_NAME):$(FIBONACCI_IMAGE_TAG) --name $(CLUSTER_NAME)
+	kind load docker-image $(LOADGEN_IMAGE_NAME):$(LOADGEN_IMAGE_TAG) --name $(CLUSTER_NAME)
 
 # Prerequisites
 .PHONY: ensure-kind-cluster
@@ -44,7 +49,10 @@ delete-kind-cluster:
 TEMPLATE_VARS := \
 	FIBONACCI_DEPLOYMENT_NAME \
 	FIBONACCI_IMAGE_NAME \
-	FIBONACCI_IMAGE_TAG
+	FIBONACCI_IMAGE_TAG \
+	LOADGEN_DEPLOYMENT_NAME \
+	LOADGEN_IMAGE_NAME \
+	LOADGEN_IMAGE_TAG
 
 export $(TEMPLATE_VARS)
 
@@ -58,7 +66,7 @@ export $(TEMPLATE_VARS)
 .%.yaml: %.yaml.in $(TEMPLATE_VARS:%=.%.value)
 	envsubst '$(patsubst %,$${%},$(TEMPLATE_VARS))' < $< > $@
 
-YAML_FILES := .fibonacci.yaml
+YAML_FILES := .fibonacci.yaml .load_generator.yaml
 
 .PHONY: deploy
 deploy: kind-load $(YAML_FILES)
@@ -67,7 +75,8 @@ deploy: kind-load $(YAML_FILES)
 		| kubectl --context "$(KUBE_CONTEXT)" apply -f -
 	kubectl --context "$(KUBE_CONTEXT)" apply -n $(NAMESPACE) $(YAML_FILES:%=-f %)
 	kubectl --context "$(KUBE_CONTEXT)" rollout restart \
-		deployment/$(FIBONACCI_DEPLOYMENT_NAME) -n $(NAMESPACE)
+		deployment/$(FIBONACCI_DEPLOYMENT_NAME) \
+		deployment/$(LOADGEN_DEPLOYMENT_NAME) -n $(NAMESPACE)
 
 .PHONY: clean
 clean:

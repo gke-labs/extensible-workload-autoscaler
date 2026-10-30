@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${LOADGEN_DEPLOYMENT_NAME}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${LOADGEN_DEPLOYMENT_NAME}
+  template:
+    metadata:
+      labels:
+        app: ${LOADGEN_DEPLOYMENT_NAME}
+    spec:
+      containers:
+        - name: load-generator
+          image: ${LOADGEN_IMAGE_NAME}:${LOADGEN_IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: FIB_SERVICE_URL
+              value: "http://${FIBONACCI_DEPLOYMENT_NAME}"
