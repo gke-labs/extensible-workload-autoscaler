@@ -83,7 +83,10 @@ export $(TEMPLATE_VARS)
 # Rebuild the yaml files if the corresponding yaml.in file changed, or if any
 # of the dependent variables changed.
 .%.yaml: %.yaml.in $(TEMPLATE_VARS:%=.%.value)
-	envsubst '$(patsubst %,$${%},$(TEMPLATE_VARS))' < $< > $@
+	BASELINE_LATENCY="$$(cat .baseline_latency 2>/dev/null)" \
+		envsubst '$(patsubst %,$${%},$(TEMPLATE_VARS) BASELINE_LATENCY)' < $< > $@
+
+.load_generator.yaml: .baseline_latency
 
 YAML_FILES := .fibonacci.yaml .load_generator.yaml
 

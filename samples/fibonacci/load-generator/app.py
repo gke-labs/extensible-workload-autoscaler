@@ -2,6 +2,7 @@ import aiohttp
 import argparse
 import asyncio
 import os
+from prometheus_client import Counter, Gauge, start_http_server
 import schedule
 import signal
 import statistics
@@ -9,23 +10,49 @@ import sys
 import time
 
 FIB_SERVICE_URL = os.environ.get("FIB_SERVICE_URL", "http://fibonacci")
+BASELINE_LATENCY = float(os.environ.get("BASELINE_LATENCY") or "0.4")
+METRICS_PORT = int(os.environ.get("METRICS_PORT", "8080"))
 
-async def send_request(session, log_stream=sys.stdout):
+QUERIES_TOTAL = Counter(
+    "loadgen_queries_total",
+    "Total queries sent by the load generator, partitioned by SLO status",
+    ["status"],
+)
+for _status in ("pass", "slow", "failed"):
+    QUERIES_TOTAL.labels(status=_status)
+
+TARGET_QPS = Gauge(
+    "loadgen_target_qps",
+    "Current target QPS of the load generator",
+)
+
+async def send_request(session, baseline_latency=None, log_stream=sys.stdout):
     req_start = time.monotonic()
     try:
         async with session.get(FIB_SERVICE_URL) as response:
             elapsed = time.monotonic() - req_start
             if response.status == 200:
-                print(".", end="", file=log_stream, flush=True)
+                if baseline_latency is not None and elapsed > 2.0 * baseline_latency:
+                    QUERIES_TOTAL.labels(status="slow").inc()
+                    print("S", end="", file=log_stream, flush=True)
+                else:
+                    QUERIES_TOTAL.labels(status="pass").inc()
+                    print(".", end="", file=log_stream, flush=True)
                 return elapsed
             else:
+                QUERIES_TOTAL.labels(status="failed").inc()
                 print(f"E({response.status})", end="", file=log_stream, flush=True)
                 return None
-    except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+    except asyncio.TimeoutError:
+        QUERIES_TOTAL.labels(status="failed").inc()
+        print("T", end="", file=log_stream, flush=True)
+        return None
+    except aiohttp.ClientError as e:
+        QUERIES_TOTAL.labels(status="failed").inc()
         print(f"X({e})", end="", file=log_stream, flush=True)
         return None
 
-async def generate_load(duration_seconds, qps_func, log_stream=sys.stdout):
+async def generate_load(duration_seconds, qps_func, baseline_latency=None, log_stream=sys.stdout):
     start_time = time.monotonic()
     pending_tasks = set()
     latencies = []
@@ -37,16 +64,24 @@ async def generate_load(duration_seconds, qps_func, log_stream=sys.stdout):
             if result is not None:
                 latencies.append(result)
 
+    timeout = (
+        aiohttp.ClientTimeout(total=5.0 * baseline_latency)
+        if baseline_latency is not None
+        else aiohttp.ClientTimeout(total=300)
+    )
     connector = aiohttp.TCPConnector(force_close=True, limit=0)
-    async with aiohttp.ClientSession(connector=connector) as session:
+    async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
         while time.monotonic() - start_time < duration_seconds:
             loop_start_time = time.monotonic()
             elapsed_in_loop = loop_start_time - start_time
             target_qps = qps_func(elapsed_in_loop)
+            TARGET_QPS.set(int(target_qps))
 
             if target_qps > 0:
                 for _ in range(int(target_qps)):
-                    task = asyncio.create_task(send_request(session, log_stream=log_stream))
+                    task = asyncio.create_task(
+                        send_request(session, baseline_latency=baseline_latency, log_stream=log_stream)
+                    )
                     pending_tasks.add(task)
                     task.add_done_callback(on_task_done)
 
@@ -57,12 +92,16 @@ async def generate_load(duration_seconds, qps_func, log_stream=sys.stdout):
 
         if pending_tasks:
             await asyncio.gather(*pending_tasks, return_exceptions=True)
+        TARGET_QPS.set(0)
 
     return latencies
 
 
 def run_load_cycle():
-    print(f"\nStarting new load cycle at {time.ctime()}")
+    print(
+        f"\nStarting new load cycle at {time.ctime()} "
+        f"(baseline={BASELINE_LATENCY:.4f}s, slow>{2*BASELINE_LATENCY:.4f}s, timeout>{5*BASELINE_LATENCY:.4f}s)"
+    )
 
     # Ramp-up and sustain phase (15 minutes)
     def ramp_and_sustain_qps(t):
@@ -72,7 +111,7 @@ def run_load_cycle():
         return 25
 
     print("\n--- Phase 1: Ramp-up and Sustain (15 mins) ---")
-    asyncio.run(generate_load(900, ramp_and_sustain_qps))
+    asyncio.run(generate_load(900, ramp_and_sustain_qps, baseline_latency=BASELINE_LATENCY))
 
     # Decay phase (15 minutes)
     def decay_qps(t):
@@ -80,7 +119,7 @@ def run_load_cycle():
         return (1 - (t / 900)) * 25
 
     print("\n--- Phase 2: Decay (15 mins) ---")
-    asyncio.run(generate_load(900, decay_qps))
+    asyncio.run(generate_load(900, decay_qps, baseline_latency=BASELINE_LATENCY))
 
     print(f"\nLoad cycle finished at {time.ctime()}. Waiting for next hour.")
 
@@ -127,6 +166,9 @@ def main():
     if args.baseline:
         run_baseline(args.duration)
         return
+
+    start_http_server(METRICS_PORT)
+    print(f"Prometheus metrics server listening on port {METRICS_PORT}.")
     print("Load generator started. Scheduling job for the start of every hour.")
     schedule.every().hour.at(":00").do(run_load_cycle)
     # For testing, you can uncomment the line below to run every minute

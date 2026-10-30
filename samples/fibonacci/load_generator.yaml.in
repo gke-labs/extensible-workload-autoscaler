@@ -19,3 +19,20 @@ spec:
           env:
             - name: FIB_SERVICE_URL
               value: "http://${FIBONACCI_DEPLOYMENT_NAME}"
+            - name: BASELINE_LATENCY
+              value: "${BASELINE_LATENCY}"
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${LOADGEN_DEPLOYMENT_NAME}
+spec:
+  ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: ${LOADGEN_DEPLOYMENT_NAME}
