@@ -118,7 +118,7 @@ func (e *Engine) handleControlMetricsUpdate(ctx context.Context, metric *pb.Cont
 		rec, err := e.recommenderFor(def.GetRecommender())
 		if err != nil {
 			slog.Warn("RecommenderClass not found for policy", "recommender", def.GetRecommender(), "policy", policy.GetId().GetName(), "error", err)
-			return
+			continue
 		}
 		// Recommenders that own no metric have no entry: ownedMetrics is nil.
 		ownedMetrics := metric.GetRecommenderControlMetrics()[recName]

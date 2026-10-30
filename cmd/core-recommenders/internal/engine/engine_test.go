@@ -298,4 +298,48 @@ func TestHandleControlMetricsUpdate(t *testing.T) {
 			t.Errorf("Recommend called %d times and %d recommendations pushed, want none", len(rec.got), len(client.pushed))
 		}
 	})
+
+	t.Run("skips unknown recommenders without aborting the policy", func(t *testing.T) {
+		mixedPolicy := pb.Policy_builder{
+			Id: id,
+			Activation: []*pb.RecommenderDefinition{
+				pb.RecommenderDefinition_builder{
+					Name:        proto.String("unknown-type"),
+					Recommender: proto.String("third-party-class"),
+				}.Build(),
+				pb.RecommenderDefinition_builder{
+					Name:        proto.String("act"),
+					Recommender: proto.String("rec-class"),
+				}.Build(),
+			},
+			Scaling: []*pb.RecommenderDefinition{
+				pb.RecommenderDefinition_builder{
+					Name:        proto.String("vpa"),
+					Recommender: proto.String("rec-class"),
+				}.Build(),
+				pb.RecommenderDefinition_builder{
+					Name:        proto.String("missing-class"),
+					Recommender: proto.String("nonexistent-class"),
+				}.Build(),
+			},
+		}.Build()
+
+		client := &recommendClient{}
+		rec := &recordingRecommender{}
+		classes := map[string]string{
+			"rec-class":         "Rec",
+			"third-party-class": "ThirdParty",
+		}
+		e := newTestEngine(t, client, classes, map[string]Recommender{"Rec": rec})
+		e.state[webID] = &PolicyState{policy: mixedPolicy, workload: workload}
+
+		e.handleControlMetricsUpdate(context.Background(), update)
+
+		if len(rec.got) != 2 {
+			t.Errorf("Recommend called %d times, want 2", len(rec.got))
+		}
+		if len(client.pushed) != 2 {
+			t.Errorf("pushed %d recommendations, want 2", len(client.pushed))
+		}
+	})
 }
