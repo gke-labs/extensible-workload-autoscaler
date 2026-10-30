@@ -11,7 +11,11 @@ generator (`load-generator`) to evaluate Kubernetes **Horizontal Pod Autoscaler
     CPU load per request. Each pod is configured with `200m` CPU requests and
     limits.
 *   **`load-generator` ([load-generator/app.py](load-generator/app.py)):** Runs
-    a 30-minute load cycle against `http://fibonacci`:
+    a 30-minute load cycle against `http://fibonacci`, classifies request
+    latencies against `BASELINE_LATENCY` (`pass` <= 2x, `slow` 2x–5x, `failed`
+    > 5x timeout or error), and exposes Prometheus metrics
+    (`loadgen_queries_total` and `loadgen_target_qps`) on port `8080` (Service
+    port `80`):
     *   **Phase 1 (15 mins):** Ramps up over 10 seconds to 25 QPS and sustains
         25 QPS.
     *   **Phase 2 (15 mins):** Linearly decays from 25 QPS down to 0 QPS.
