@@ -355,6 +355,9 @@ func NewTimeWindow(def *pb.MetricDefinition) model.TimeWindow {
 	}
 }
 
+// RateAggregation computes the per-second rate of change of a scalar series
+// over a sliding window: its increase between the oldest and the newest
+// samples of the window, divided by the time elapsed between them.
 type RateAggregation struct {
 	sampleWindow
 }
@@ -376,9 +379,31 @@ func (r *RateAggregation) Apply() (model.Sample, bool) {
 	if deltaTime == 0 {
 		return model.Sample{}, false
 	}
-	deltaValue := newest.Value - oldest.Value
-	v := deltaValue / deltaTime
-	return model.Sample{Value: v}, true
+	return model.Sample{Value: r.increase() / deltaTime}, true
+}
+
+// increase returns how much the series grew over the window, which must hold
+// at least one sample. A gauge may go up or down, so its increase is simply
+// the difference between the newest and the oldest samples. A counter only
+// increases, except when its source resets it (e.g. on restart): a counter
+// sample lower than the previous one marks a reset, and the value the counter
+// had reached before it is added back, as the counter counted from zero
+// since.
+func (r *RateAggregation) increase() float64 {
+	total := r.newest().Value - r.oldest().Value
+	if !r.newest().Counter {
+		return total
+	}
+
+	// Handle counter resets.
+	prev := r.oldest()
+	for s := range r.All() {
+		if s.Value < prev.Value {
+			total += prev.Value
+		}
+		prev = s
+	}
+	return total
 }
 
 // DistributionAggregation computes the per-second rate of each bucket of a

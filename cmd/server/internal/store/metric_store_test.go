@@ -34,9 +34,18 @@ func readyPods(names ...string) map[string]*pb.PodState {
 	return workload
 }
 
-// newSample returns a scalar sample measured at ts.
+// newSample returns a gauge sample measured at ts.
 func newSample(name string, ts time.Time, val float64) *pb.MetricSample {
 	b := pb.MetricSample_builder{Name: proto.String(name), Gauge: proto.Float64(val)}
+	if !ts.IsZero() {
+		b.Timestamp = timestamppb.New(ts)
+	}
+	return b.Build()
+}
+
+// newCounterSample returns a counter sample measured at ts.
+func newCounterSample(name string, ts time.Time, val float64) *pb.MetricSample {
+	b := pb.MetricSample_builder{Name: proto.String(name), Counter: proto.Float64(val)}
 	if !ts.IsZero() {
 		b.Timestamp = timestamppb.New(ts)
 	}
@@ -123,7 +132,7 @@ func TestSampleTimestamp(t *testing.T) {
 	}
 }
 
-func TestIngest_CounterDefaultsToIngestTime(t *testing.T) {
+func TestIngest_RateDefaultsToIngestTime(t *testing.T) {
 	policy := newRatePolicy("reqs")
 	ms := NewMetricStore()
 
@@ -136,6 +145,116 @@ func TestIngest_CounterDefaultsToIngestTime(t *testing.T) {
 	}
 	if got, want := ser.LastRaw.Timestamp, at(10*time.Second); !got.Equal(want) {
 		t.Errorf("LastRaw.Timestamp = %v, want %v", got, want)
+	}
+}
+
+func TestIngest_CounterRate(t *testing.T) {
+	policy := newRatePolicy("reqs")
+	ms := NewMetricStore()
+
+	ingestSample(t, ms, policy, newCounterSample("reqs", t0, 100), t0)
+	ingestSample(t, ms, policy, newCounterSample("reqs", at(10*time.Second), 150), at(10*time.Second))
+
+	ser := onlySeries(t, ms, "reqs")
+	if !ser.LastRaw.Counter {
+		t.Errorf("LastRaw.Counter = false, want true")
+	}
+	if got, want := apply(t, ser).Value, 5.0; got != want {
+		t.Errorf("rate = %v, want %v", got, want)
+	}
+}
+
+func TestIngest_CounterReset(t *testing.T) {
+	policy := newRatePolicy("reqs")
+	ms := NewMetricStore()
+
+	// The counter resets between the second and the third sample (e.g. its
+	// source restarted): it grew by 50, then by 20 from zero, then by 40.
+	ingestSample(t, ms, policy, newCounterSample("reqs", t0, 100), t0)
+	ingestSample(t, ms, policy, newCounterSample("reqs", at(10*time.Second), 150), at(10*time.Second))
+	ingestSample(t, ms, policy, newCounterSample("reqs", at(20*time.Second), 20), at(20*time.Second))
+	ingestSample(t, ms, policy, newCounterSample("reqs", at(30*time.Second), 60), at(30*time.Second))
+
+	ser := onlySeries(t, ms, "reqs")
+	if got, want := apply(t, ser).Value, 110.0/30; !cmp.Equal(got, want, cmpopts.EquateApprox(0, 1e-9)) {
+		t.Errorf("rate = %v, want %v", got, want)
+	}
+}
+
+func TestIngest_GaugeDecreaseIsNotAReset(t *testing.T) {
+	policy := newRatePolicy("temperature")
+	ms := NewMetricStore()
+
+	// A gauge may go down: its rate of change is simply negative.
+	ingestSample(t, ms, policy, newSample("temperature", t0, 100), t0)
+	ingestSample(t, ms, policy, newSample("temperature", at(10*time.Second), 20), at(10*time.Second))
+
+	ser := onlySeries(t, ms, "temperature")
+	if got, want := apply(t, ser).Value, -8.0; got != want {
+		t.Errorf("rate = %v, want %v", got, want)
+	}
+}
+
+func TestIngest_CounterAsGauge(t *testing.T) {
+	// A gauge metric fed with a counter reports its latest value, i.e. the
+	// total counted so far.
+	policy := newGaugePolicy("total")
+	ms := NewMetricStore()
+
+	ingestSample(t, ms, policy, newCounterSample("total", t0, 100), t0)
+	ingestSample(t, ms, policy, newCounterSample("total", at(10*time.Second), 150), at(10*time.Second))
+
+	ser := onlySeries(t, ms, "total")
+	if got, want := apply(t, ser).Value, 150.0; got != want {
+		t.Errorf("value = %v, want %v", got, want)
+	}
+}
+
+func TestIngest_CounterDecayingDistributionReset(t *testing.T) {
+	// A decaying distribution of the rate of a counter accounts for its
+	// resets too.
+	policy := pb.Policy_builder{Metrics: []*pb.MetricDefinition{pb.MetricDefinition_builder{
+		Name: proto.String("reqs"),
+		DecayingDistribution: pb.DecayingDistribution_builder{
+			HalfLife:   durationpb.New(time.Hour),
+			BucketSize: proto.String("1"),
+			Percentile: proto.String("p50"),
+			Rate:       durationpb.New(time.Minute),
+		}.Build(),
+	}.Build()}}.Build()
+	ms := NewMetricStore()
+
+	ingestSample(t, ms, policy, newCounterSample("reqs", t0, 0), t0)
+	// +100 in 10s: a rate of 10/s is observed.
+	ingestSample(t, ms, policy, newCounterSample("reqs", at(10*time.Second), 100), at(10*time.Second))
+	// Reset, then +20: (100 + 20) in 20s, a rate of 6/s is observed, rather
+	// than (20 - 0) / 20s = 1/s.
+	ingestSample(t, ms, policy, newCounterSample("reqs", at(20*time.Second), 20), at(20*time.Second))
+
+	hist := apply(t, onlySeries(t, ms, "reqs")).DecayingHistogram
+	if got, want := hist.TotalWeight, 2.0; !cmp.Equal(got, want, cmpopts.EquateApprox(0, 0.01)) {
+		t.Errorf("TotalWeight = %v, want ~%v", got, want)
+	}
+	// The p50 falls in the bucket of the lowest observation, [6, 7).
+	if got, want := hist.Percentile(0.5, hist.ReferenceTime), 7.0; got != want {
+		t.Errorf("p50 = %v, want %v", got, want)
+	}
+}
+
+func TestIngest_SampleWithoutDataIsDropped(t *testing.T) {
+	policy := newGaugePolicy("queue")
+	ms := NewMetricStore()
+
+	ingestSample(t, ms, policy, pb.MetricSample_builder{Name: proto.String("queue"), Timestamp: timestamppb.New(t0)}.Build(), t0)
+	ser := onlySeries(t, ms, "queue")
+	if _, ok := ser.TimeWindow.Apply(); ok {
+		t.Errorf("TimeWindow.Apply() reported a value for a sample without data")
+	}
+
+	// Valid samples are still recorded.
+	ingestSample(t, ms, policy, newSample("queue", at(10*time.Second), 2), at(10*time.Second))
+	if got, want := apply(t, ser).Value, 2.0; got != want {
+		t.Errorf("value = %v, want %v", got, want)
 	}
 }
 

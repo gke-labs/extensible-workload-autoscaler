@@ -151,7 +151,17 @@ func (ms *MetricStore) seriesIngestSample(ser *model.Series, m *pb.MetricSample,
 	if !ok || ts.Before(ser.LastRaw.Timestamp) {
 		return // Drop invalid and out of order samples.
 	}
-	sample := model.Sample{Timestamp: ts, Value: m.GetGauge(), Distribution: model.NewDistributionFromHistogram(m.GetHistogram())}
+	sample := model.Sample{Timestamp: ts}
+	switch m.WhichData() {
+	case pb.MetricSample_Gauge_case:
+		sample.Value = m.GetGauge()
+	case pb.MetricSample_Counter_case:
+		sample.Value, sample.Counter = m.GetCounter(), true
+	case pb.MetricSample_Histogram_case:
+		sample.Distribution = model.NewDistributionFromHistogram(m.GetHistogram())
+	default:
+		return // Drop samples without data: they are invalid.
+	}
 	ser.AddSample(sample, ingestTime)
 }
 

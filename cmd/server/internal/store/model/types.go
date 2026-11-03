@@ -31,6 +31,10 @@ type Sample struct {
 	Timestamp time.Time
 	// If the sample is a scalar, its value.
 	Value float64
+	// If the sample is a scalar, whether it is a counter: a cumulative value
+	// that only increases, except when its source resets it (e.g. on
+	// restart), as opposed to a gauge, which may go up or down.
+	Counter bool
 	// If the sample is a distribution, its cumulative buckets: the counts
 	// reported by the source, or values derived from them (e.g. their rates).
 	Distribution *Distribution

@@ -2046,11 +2046,36 @@ func TestIngestMetrics_NotDefinedMetric(t *testing.T) {
 		Timestamp:   timestamppb.Now(),
 		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
 			Namespace: proto.String("ns"), Name: proto.String("p1"),
-			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("undefined")}.Build()}}.Build()},
+			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("undefined"), Gauge: proto.Float64(1)}.Build()}}.Build()},
 		}.Build()},
 	}.Build())
 	if status.Code(err) != codes.InvalidArgument {
 		t.Errorf("Expected InvalidArgument for undefined metric, got %v", err)
+	}
+}
+
+func TestIngestMetrics_SampleWithoutData(t *testing.T) {
+	_, client, cleanup := setupFunctionalGRPCServer(t, clock.RealClock{})
+	defer cleanup()
+	ctx := context.Background()
+
+	id := pb.PolicyId_builder{ClusterName: proto.String("c1"), Namespace: proto.String("ns"), Name: proto.String("p1")}.Build()
+	client.CreatePolicy(ctx, pb.CreatePolicyRequest_builder{Policy: pb.Policy_builder{
+		Id:      id,
+		Metrics: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: proto.String("queue"), Gauge: pb.Gauge_builder{}.Build()}.Build()},
+	}.Build()}.Build())
+
+	// A sample must carry one of gauge, counter or histogram.
+	_, err := client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
+		ClusterName: proto.String("c1"),
+		Timestamp:   timestamppb.Now(),
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
+			Namespace: proto.String("ns"), Name: proto.String("p1"),
+			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("queue")}.Build()}}.Build()},
+		}.Build()},
+	}.Build())
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("Expected InvalidArgument for a sample without data, got %v", err)
 	}
 }
 
@@ -2465,6 +2490,64 @@ func TestIntent_RateCalculation(t *testing.T) {
 		ReadyReplicas: proto.Int32(1),
 		ControlMetrics: pb.ControlMetrics_builder{
 			Values: map[string]float64{"rps": 1.0},
+		}.Build(),
+	}.Build()
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestIntent_RateCalculation_CounterReset(t *testing.T) {
+	clk := &clock.FakeClock{CurrentTime: time.Unix(1000, 0)}
+	memStore, client, cleanup := setupFunctionalGRPCServer(t, clk)
+	defer cleanup()
+	ctx := context.Background()
+
+	id := pb.PolicyId_builder{ClusterName: proto.String("c1"), Namespace: proto.String("ns"), Name: proto.String("p1")}.Build()
+	client.CreatePolicy(ctx, pb.CreatePolicyRequest_builder{
+		Policy: pb.Policy_builder{
+			Id: id,
+			Metrics: []*pb.MetricDefinition{
+				pb.MetricDefinition_builder{Name: proto.String("rps"), Rate: pb.Rate_builder{Window: durationpb.New(time.Minute), Aggregation: proto.String("Sum")}.Build()}.Build(),
+			},
+		}.Build(),
+	}.Build())
+
+	client.UpdateWorkload(ctx, pb.UpdateWorkloadRequest_builder{
+		Id: id,
+		Workload: pb.Workload_builder{
+			Pods: []*pb.PodState{pb.PodState_builder{Name: proto.String("p1"), IsReady: proto.Bool(true)}.Build()}}.Build(),
+	}.Build())
+
+	ingestCounter := func(value float64) {
+		ts := clk.Now().Unix()
+		client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
+			ClusterName: proto.String("c1"), Timestamp: timestamppb.New(time.Unix(ts, 0)),
+			PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
+				Namespace: proto.String("ns"), Name: proto.String("p1"),
+				Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("rps"), Counter: proto.Float64(value)}.Build()}}.Build()},
+			}.Build()},
+		}.Build())
+	}
+
+	// T0
+	ingestCounter(100)
+	// T1 (10s later): the pod restarted and its counter counts from zero.
+	clk.Advance(10 * time.Second)
+	ingestCounter(20)
+	// T2 (20s later)
+	clk.Advance(10 * time.Second)
+	ingestCounter(60)
+
+	memStore.CalculateAll()
+	res := getControlMetrics(t, ctx, client, id)
+
+	// Rate = (20 + 40) / 20s = 3.0, the reset being accounted for.
+	wantRes := pb.GetControlMetricsResponse_builder{
+		Timestamp:     timestamppb.New(time.Unix(clk.Now().Unix(), 0)),
+		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"rps": 3.0},
 		}.Build(),
 	}.Build()
 	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {

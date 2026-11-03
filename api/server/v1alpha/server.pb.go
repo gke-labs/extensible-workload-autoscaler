@@ -5524,6 +5524,15 @@ func (x *MetricSample) GetGauge() float64 {
 	return 0
 }
 
+func (x *MetricSample) GetCounter() float64 {
+	if x != nil {
+		if x, ok := x.xxx_hidden_Data.(*metricSample_Counter); ok {
+			return x.Counter
+		}
+	}
+	return 0
+}
+
 func (x *MetricSample) GetHistogram() *Histogram {
 	if x != nil {
 		if x, ok := x.xxx_hidden_Data.(*metricSample_Histogram); ok {
@@ -5558,6 +5567,10 @@ func (x *MetricSample) SetTimestamp(v *timestamppb.Timestamp) {
 
 func (x *MetricSample) SetGauge(v float64) {
 	x.xxx_hidden_Data = &metricSample_Gauge{v}
+}
+
+func (x *MetricSample) SetCounter(v float64) {
+	x.xxx_hidden_Data = &metricSample_Counter{v}
 }
 
 func (x *MetricSample) SetHistogram(v *Histogram) {
@@ -5611,6 +5624,14 @@ func (x *MetricSample) HasGauge() bool {
 	return ok
 }
 
+func (x *MetricSample) HasCounter() bool {
+	if x == nil {
+		return false
+	}
+	_, ok := x.xxx_hidden_Data.(*metricSample_Counter)
+	return ok
+}
+
 func (x *MetricSample) HasHistogram() bool {
 	if x == nil {
 		return false
@@ -5648,6 +5669,12 @@ func (x *MetricSample) ClearGauge() {
 	}
 }
 
+func (x *MetricSample) ClearCounter() {
+	if _, ok := x.xxx_hidden_Data.(*metricSample_Counter); ok {
+		x.xxx_hidden_Data = nil
+	}
+}
+
 func (x *MetricSample) ClearHistogram() {
 	if _, ok := x.xxx_hidden_Data.(*metricSample_Histogram); ok {
 		x.xxx_hidden_Data = nil
@@ -5656,6 +5683,7 @@ func (x *MetricSample) ClearHistogram() {
 
 const MetricSample_Data_not_set_case case_MetricSample_Data = 0
 const MetricSample_Gauge_case case_MetricSample_Data = 3
+const MetricSample_Counter_case case_MetricSample_Data = 6
 const MetricSample_Histogram_case case_MetricSample_Data = 5
 
 func (x *MetricSample) WhichData() case_MetricSample_Data {
@@ -5665,6 +5693,8 @@ func (x *MetricSample) WhichData() case_MetricSample_Data {
 	switch x.xxx_hidden_Data.(type) {
 	case *metricSample_Gauge:
 		return MetricSample_Gauge_case
+	case *metricSample_Counter:
+		return MetricSample_Counter_case
 	case *metricSample_Histogram:
 		return MetricSample_Histogram_case
 	default:
@@ -5692,11 +5722,17 @@ type MetricSample_builder struct {
 	// supersedes it, except in decaying distributions, which cannot replace an
 	// observation and ignore it.
 	Timestamp *timestamppb.Timestamp
-	// The data point itself: a scalar, or a histogram for distributions.
+	// The data point itself: a gauge or a counter for scalars, or a histogram
+	// for distributions.
 
 	// Fields of oneof xxx_hidden_Data:
-	// The scalar value of the sample.
+	// The scalar value of the sample, which may go up or down (e.g. a queue
+	// depth).
 	Gauge *float64
+	// The cumulative value of the sample (e.g. a request count): a counter
+	// only increases, except when its source resets it (e.g. on restart).
+	// Rates account for such resets.
+	Counter *float64
 	// The histogram value of the sample (if its a distribution).
 	Histogram *Histogram
 	// -- end of xxx_hidden_Data
@@ -5723,6 +5759,9 @@ func (b0 MetricSample_builder) Build() *MetricSample {
 	if b.Gauge != nil {
 		x.xxx_hidden_Data = &metricSample_Gauge{*b.Gauge}
 	}
+	if b.Counter != nil {
+		x.xxx_hidden_Data = &metricSample_Counter{*b.Counter}
+	}
 	if b.Histogram != nil {
 		x.xxx_hidden_Data = &metricSample_Histogram{b.Histogram}
 	}
@@ -5744,8 +5783,16 @@ type isMetricSample_Data interface {
 }
 
 type metricSample_Gauge struct {
-	// The scalar value of the sample.
+	// The scalar value of the sample, which may go up or down (e.g. a queue
+	// depth).
 	Gauge float64 `protobuf:"fixed64,3,opt,name=gauge,oneof"`
+}
+
+type metricSample_Counter struct {
+	// The cumulative value of the sample (e.g. a request count): a counter
+	// only increases, except when its source resets it (e.g. on restart).
+	// Rates account for such resets.
+	Counter float64 `protobuf:"fixed64,6,opt,name=counter,oneof"`
 }
 
 type metricSample_Histogram struct {
@@ -5754,6 +5801,8 @@ type metricSample_Histogram struct {
 }
 
 func (*metricSample_Gauge) isMetricSample_Data() {}
+
+func (*metricSample_Counter) isMetricSample_Data() {}
 
 func (*metricSample_Histogram) isMetricSample_Data() {}
 
@@ -6308,14 +6357,15 @@ const file_server_proto_rawDesc = "" +
 	"\vMetricBatch\x12\x19\n" +
 	"\bpod_name\x18\x01 \x01(\tR\apodName\x12%\n" +
 	"\x0econtainer_name\x18\x03 \x01(\tR\rcontainerName\x12:\n" +
-	"\asamples\x18\x02 \x03(\v2 .xas.server.v1alpha.MetricSampleR\asamples\"\x8c\x03\n" +
+	"\asamples\x18\x02 \x03(\v2 .xas.server.v1alpha.MetricSampleR\asamples\"\xa8\x03\n" +
 	"\fMetricSample\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12)\n" +
 	"\x10recommender_name\x18\t \x01(\tR\x0frecommenderName\x12D\n" +
 	"\x06labels\x18\x02 \x03(\v2,.xas.server.v1alpha.MetricSample.LabelsEntryR\x06labels\x12#\n" +
 	"\rresource_name\x18\b \x01(\tR\fresourceName\x128\n" +
 	"\ttimestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x16\n" +
-	"\x05gauge\x18\x03 \x01(\x01H\x00R\x05gauge\x12=\n" +
+	"\x05gauge\x18\x03 \x01(\x01H\x00R\x05gauge\x12\x1a\n" +
+	"\acounter\x18\x06 \x01(\x01H\x00R\acounter\x12=\n" +
 	"\thistogram\x18\x05 \x01(\v2\x1d.xas.server.v1alpha.HistogramH\x00R\thistogram\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
@@ -6539,6 +6589,7 @@ func file_server_proto_init() {
 	}
 	file_server_proto_msgTypes[42].OneofWrappers = []any{
 		(*metricSample_Gauge)(nil),
+		(*metricSample_Counter)(nil),
 		(*metricSample_Histogram)(nil),
 	}
 	type x struct{}

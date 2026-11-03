@@ -201,6 +201,15 @@ func validateIngestMetricsRequest(req *pb.IngestMetricsRequest) error {
 	if !req.HasTimestamp() {
 		return status.Errorf(codes.InvalidArgument, "timestamp is required")
 	}
+	for _, policyMetrics := range req.GetPolicyMetrics() {
+		for _, batch := range policyMetrics.GetBatches() {
+			for _, sample := range batch.GetSamples() {
+				if !sample.HasData() {
+					return status.Errorf(codes.InvalidArgument, "sample of metric %q has no data: one of gauge, counter or histogram is required", sample.GetName())
+				}
+			}
+		}
+	}
 	return validateClusterName(req.GetClusterName())
 }
 

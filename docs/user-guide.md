@@ -29,11 +29,11 @@ the provider to define which parameters are expected. xAS pre-defines a handful
 of core metric providers, such as the *kubelet* provider for CPU and memory
 metrics.
 
-Metric providers emit metrics of a given *type* (e.g. *gauge* or *histogram*),
-and can optionally hold *labels* (i.e. a set of key/value pairs). Since
-ultimately autoscaling decisions are based on a single number for each metric,
-xAS includes a metrics processing pipeline that aggregates raw data into a
-single number, known as a *control metric*.
+Metric providers emit metrics of a given *type* (i.e. *gauge*, *counter* or
+*histogram*), and can optionally hold *labels* (i.e. a set of key/value pairs).
+Since ultimately autoscaling decisions are based on a single number for each
+metric, xAS includes a metrics processing pipeline that aggregates raw data into
+a single number, known as a *control metric*.
 
 In practice, this aggregation step typically takes the form of an `aggregation`
 field with values such as "Avg" to compute the average across all the pods.

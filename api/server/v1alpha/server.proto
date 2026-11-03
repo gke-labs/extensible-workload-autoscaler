@@ -590,10 +590,16 @@ message MetricSample {
   // supersedes it, except in decaying distributions, which cannot replace an
   // observation and ignore it.
   google.protobuf.Timestamp timestamp = 4;
-  // The data point itself: a scalar, or a histogram for distributions.
+  // The data point itself: a gauge or a counter for scalars, or a histogram
+  // for distributions.
   oneof data {
-    // The scalar value of the sample.
+    // The scalar value of the sample, which may go up or down (e.g. a queue
+    // depth).
     double gauge = 3;
+    // The cumulative value of the sample (e.g. a request count): a counter
+    // only increases, except when its source resets it (e.g. on restart).
+    // Rates account for such resets.
+    double counter = 6;
     // The histogram value of the sample (if its a distribution).
     Histogram histogram = 5;
   }
