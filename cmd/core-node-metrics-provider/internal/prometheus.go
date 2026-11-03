@@ -78,7 +78,7 @@ func (a *CoreNodeMetricsProvider) scrapePod(ip string, port string, path string,
 					samples = append(samples, pb.MetricSample_builder{
 						Name:   proto.String(name),
 						Labels: labels,
-						Value:  proto.Float64(m.Gauge.GetValue()),
+						Gauge:  proto.Float64(m.Gauge.GetValue()),
 					}.Build())
 				}
 			case dto.MetricType_COUNTER:
@@ -86,7 +86,7 @@ func (a *CoreNodeMetricsProvider) scrapePod(ip string, port string, path string,
 					samples = append(samples, pb.MetricSample_builder{
 						Name:   proto.String(name),
 						Labels: labels,
-						Value:  proto.Float64(m.Counter.GetValue()),
+						Gauge:  proto.Float64(m.Counter.GetValue()),
 					}.Build())
 				}
 			case dto.MetricType_HISTOGRAM:
@@ -116,7 +116,7 @@ func (a *CoreNodeMetricsProvider) scrapePod(ip string, port string, path string,
 						samples = append(samples, pb.MetricSample_builder{
 							Name:   proto.String(name + "_sum"),
 							Labels: labels,
-							Value:  proto.Float64(m.Histogram.GetSampleSum()),
+							Gauge:  proto.Float64(m.Histogram.GetSampleSum()),
 						}.Build())
 					}
 
@@ -124,7 +124,7 @@ func (a *CoreNodeMetricsProvider) scrapePod(ip string, port string, path string,
 						samples = append(samples, pb.MetricSample_builder{
 							Name:   proto.String(name + "_count"),
 							Labels: labels,
-							Value:  proto.Float64(float64(m.Histogram.GetSampleCount())),
+							Gauge:  proto.Float64(float64(m.Histogram.GetSampleCount())),
 						}.Build())
 					}
 				}

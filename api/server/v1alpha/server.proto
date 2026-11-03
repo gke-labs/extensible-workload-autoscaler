@@ -581,8 +581,6 @@ message MetricSample {
   map<string, string> labels = 2;
   // For resource metrics (e.g. "cpu" or "memory"), the resource name.
   string resource_name = 8;
-  // The scalar value of the sample.
-  double value = 3;
   // Time at which the sample was measured by its source. Optional.
   //
   // Defaults to IngestMetricsRequest.timestamp when unset. Samples older than
@@ -592,8 +590,13 @@ message MetricSample {
   // supersedes it, except in decaying distributions, which cannot replace an
   // observation and ignore it.
   google.protobuf.Timestamp timestamp = 4;
-  // The histogram value of the sample (if its a distribution).
-  Histogram histogram = 5;
+  // The data point itself: a scalar, or a histogram for distributions.
+  oneof data {
+    // The scalar value of the sample.
+    double gauge = 3;
+    // The histogram value of the sample (if its a distribution).
+    Histogram histogram = 5;
+  }
 }
 
 // A histogram (aka distribution) value.

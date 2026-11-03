@@ -282,7 +282,7 @@ func ingestWithLabels(s *MemoryStore, ts int64, ns, pol, pod, metric string, val
 				PodName: proto.String(pod),
 				Samples: []*pb.MetricSample{pb.MetricSample_builder{
 					Name:      proto.String(metric),
-					Value:     proto.Float64(val),
+					Gauge:     proto.Float64(val),
 					Labels:    labels,
 					Timestamp: timestamppb.New(time.Unix(ts, 0)),
 				}.Build()},
@@ -409,7 +409,7 @@ func TestDump(t *testing.T) {
 			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{
 				PodName: proto.String("p1"),
 				Samples: []*pb.MetricSample{pb.MetricSample_builder{
-					Name: proto.String("cpu"), Value: proto.Float64(1.0), Timestamp: timestamppb.New(time.Unix(1000, 0)),
+					Name: proto.String("cpu"), Gauge: proto.Float64(1.0), Timestamp: timestamppb.New(time.Unix(1000, 0)),
 				}.Build()},
 			}.Build()},
 		}.Build()},
@@ -736,14 +736,14 @@ func TestMultiTenantIsolation(t *testing.T) {
 		ClusterName: proto.String("cluster-A"), Timestamp: timestamppb.New(time.Unix(1000, 0)),
 		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
 			Namespace: proto.String(ns), Name: proto.String(name),
-			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("pod-a"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(1000, 0))}.Build()}}.Build()},
+			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("pod-a"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Gauge: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(1000, 0))}.Build()}}.Build()},
 		}.Build()},
 	}.Build())
 	s.AddBatch(pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("cluster-B"), Timestamp: timestamppb.New(time.Unix(1000, 0)),
 		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
 			Namespace: proto.String(ns), Name: proto.String(name),
-			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("pod-b"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(200), Timestamp: timestamppb.New(time.Unix(1000, 0))}.Build()}}.Build()},
+			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("pod-b"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Gauge: proto.Float64(200), Timestamp: timestamppb.New(time.Unix(1000, 0))}.Build()}}.Build()},
 		}.Build()},
 	}.Build())
 
@@ -1138,7 +1138,7 @@ func ingestResource(s *MemoryStore, ts int64, ns, pol, pod, container, metric, r
 				Samples: []*pb.MetricSample{pb.MetricSample_builder{
 					Name:         proto.String(metric),
 					ResourceName: proto.String(resourceName),
-					Value:        proto.Float64(val),
+					Gauge:        proto.Float64(val),
 					Timestamp:    timestamppb.New(time.Unix(ts, 0)),
 				}.Build()},
 			}.Build()},
@@ -1158,7 +1158,7 @@ func ingestOwned(s *MemoryStore, ts int64, ns, pol, pod, owner, metric string, v
 				Samples: []*pb.MetricSample{pb.MetricSample_builder{
 					Name:            proto.String(metric),
 					RecommenderName: proto.String(owner),
-					Value:           proto.Float64(val),
+					Gauge:           proto.Float64(val),
 					Timestamp:       timestamppb.New(time.Unix(ts, 0)),
 				}.Build()},
 			}.Build()},

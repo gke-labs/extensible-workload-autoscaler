@@ -36,7 +36,7 @@ func readyPods(names ...string) map[string]*pb.PodState {
 
 // newSample returns a scalar sample measured at ts.
 func newSample(name string, ts time.Time, val float64) *pb.MetricSample {
-	b := pb.MetricSample_builder{Name: proto.String(name), Value: proto.Float64(val)}
+	b := pb.MetricSample_builder{Name: proto.String(name), Gauge: proto.Float64(val)}
 	if !ts.IsZero() {
 		b.Timestamp = timestamppb.New(ts)
 	}

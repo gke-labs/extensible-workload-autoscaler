@@ -125,8 +125,8 @@ func TestServerEndToEndGRPC(t *testing.T) {
 			pb.PolicyMetricBatch_builder{
 				Namespace: proto.String(ns), Name: proto.String(policyName),
 				Batches: []*pb.MetricBatch{
-					pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Value: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
-					pb.MetricBatch_builder{PodName: proto.String("p2"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Value: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
+					pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Gauge: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
+					pb.MetricBatch_builder{PodName: proto.String("p2"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Gauge: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
 				},
 			}.Build(),
 		},
@@ -142,8 +142,8 @@ func TestServerEndToEndGRPC(t *testing.T) {
 			pb.PolicyMetricBatch_builder{
 				Namespace: proto.String(ns), Name: proto.String(policyName),
 				Batches: []*pb.MetricBatch{
-					pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Value: proto.Float64(108), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
-					pb.MetricBatch_builder{PodName: proto.String("p2"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Value: proto.Float64(108), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
+					pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Gauge: proto.Float64(108), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
+					pb.MetricBatch_builder{PodName: proto.String("p2"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Gauge: proto.Float64(108), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
 				},
 			}.Build(),
 		},
@@ -242,10 +242,10 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 			pb.PolicyMetricBatch_builder{
 				Namespace: proto.String(ns), Name: proto.String(policyName),
 				Batches: []*pb.MetricBatch{
-					pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Value: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
-					pb.MetricBatch_builder{PodName: proto.String("p2"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Value: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
-					pb.MetricBatch_builder{PodName: proto.String("p3"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Value: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
-					pb.MetricBatch_builder{PodName: proto.String("p4"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Value: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
+					pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Gauge: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
+					pb.MetricBatch_builder{PodName: proto.String("p2"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Gauge: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
+					pb.MetricBatch_builder{PodName: proto.String("p3"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Gauge: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
+					pb.MetricBatch_builder{PodName: proto.String("p4"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Gauge: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
 				},
 			}.Build(),
 		},
@@ -261,8 +261,8 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 			pb.PolicyMetricBatch_builder{
 				Namespace: proto.String(ns), Name: proto.String(policyName),
 				Batches: []*pb.MetricBatch{
-					pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Value: proto.Float64(120), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
-					pb.MetricBatch_builder{PodName: proto.String("p2"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Value: proto.Float64(120), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
+					pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Gauge: proto.Float64(120), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
+					pb.MetricBatch_builder{PodName: proto.String("p2"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Gauge: proto.Float64(120), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
 				},
 			}.Build(),
 		},
@@ -278,8 +278,8 @@ func TestDistributedCollectionGRPC(t *testing.T) {
 			pb.PolicyMetricBatch_builder{
 				Namespace: proto.String(ns), Name: proto.String(policyName),
 				Batches: []*pb.MetricBatch{
-					pb.MetricBatch_builder{PodName: proto.String("p3"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Value: proto.Float64(124), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
-					pb.MetricBatch_builder{PodName: proto.String("p4"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Value: proto.Float64(124), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
+					pb.MetricBatch_builder{PodName: proto.String("p3"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Gauge: proto.Float64(124), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
+					pb.MetricBatch_builder{PodName: proto.String("p4"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_avg"), Gauge: proto.Float64(124), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
 				},
 			}.Build(),
 		},
@@ -356,7 +356,7 @@ func TestExternalMetricGRPC(t *testing.T) {
 		PolicyMetrics: []*pb.PolicyMetricBatch{
 			pb.PolicyMetricBatch_builder{
 				Namespace: proto.String(ns), Name: proto.String(policyName),
-				Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String(""), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("queue"), Value: proto.Float64(1000), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()},
+				Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String(""), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("queue"), Gauge: proto.Float64(1000), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()},
 			}.Build(),
 		},
 	}.Build())
@@ -430,8 +430,8 @@ func TestPerPodExternalMetricGRPC(t *testing.T) {
 			pb.PolicyMetricBatch_builder{
 				Namespace: proto.String(ns), Name: proto.String(policyName),
 				Batches: []*pb.MetricBatch{
-					pb.MetricBatch_builder{PodName: proto.String("pod-1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("sidecar_latency"), Value: proto.Float64(50), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
-					pb.MetricBatch_builder{PodName: proto.String("pod-2"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("sidecar_latency"), Value: proto.Float64(150), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
+					pb.MetricBatch_builder{PodName: proto.String("pod-1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("sidecar_latency"), Gauge: proto.Float64(50), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
+					pb.MetricBatch_builder{PodName: proto.String("pod-2"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("sidecar_latency"), Gauge: proto.Float64(150), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build(),
 				},
 			}.Build(),
 		},
@@ -504,7 +504,7 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName:   proto.String("default"),
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String(""), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("queue"), Value: proto.Float64(50), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String(""), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("queue"), Gauge: proto.Float64(50), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 
 	memStore.CalculateAll()
@@ -544,7 +544,7 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName:   proto.String("default"),
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String(""), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("queue"), Value: proto.Float64(0), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String(""), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("queue"), Gauge: proto.Float64(0), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 
 	memStore.CalculateAll()
@@ -580,7 +580,7 @@ func TestScaleToZeroGRPC(t *testing.T) {
 	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName:   proto.String("default"),
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String(""), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("queue"), Value: proto.Float64(0), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String(""), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("queue"), Gauge: proto.Float64(0), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 	memStore.CalculateAll()
 	client.UpdateRecommenderState(ctx, pb.UpdateRecommenderStateRequest_builder{
@@ -646,7 +646,7 @@ func TestDryRunGRPC(t *testing.T) {
 	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName:   proto.String("default"),
 		Timestamp:     timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m1"), Value: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m1"), Gauge: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 
 	memStore.CalculateAll()
@@ -905,7 +905,7 @@ func TestWindowedMetricsGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"), Timestamp: timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_hist"), Value: proto.Float64(1.0), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_hist"), Gauge: proto.Float64(1.0), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 
 	memStore.CalculateAll()
@@ -1118,8 +1118,8 @@ func TestMultiplePoliciesGRPC(t *testing.T) {
 		ClusterName: proto.String("default"),
 		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		PolicyMetrics: []*pb.PolicyMetricBatch{
-			pb.PolicyMetricBatch_builder{Namespace: proto.String("default"), Name: proto.String(p1), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu"), Value: proto.Float64(0.5), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build(),
-			pb.PolicyMetricBatch_builder{Namespace: proto.String("default"), Name: proto.String(p2), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("mem"), Value: proto.Float64(1024), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build(),
+			pb.PolicyMetricBatch_builder{Namespace: proto.String("default"), Name: proto.String(p1), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu"), Gauge: proto.Float64(0.5), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build(),
+			pb.PolicyMetricBatch_builder{Namespace: proto.String("default"), Name: proto.String(p2), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("mem"), Gauge: proto.Float64(1024), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build(),
 		},
 	}.Build())
 
@@ -1199,8 +1199,8 @@ func TestNamespaceIsolationGRPC(t *testing.T) {
 		ClusterName: proto.String("default"),
 		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
 		PolicyMetrics: []*pb.PolicyMetricBatch{
-			pb.PolicyMetricBatch_builder{Namespace: proto.String("ns1"), Name: proto.String(name), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build(),
-			pb.PolicyMetricBatch_builder{Namespace: proto.String("ns2"), Name: proto.String(name), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(20), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build(),
+			pb.PolicyMetricBatch_builder{Namespace: proto.String("ns1"), Name: proto.String(name), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Gauge: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build(),
+			pb.PolicyMetricBatch_builder{Namespace: proto.String("ns2"), Name: proto.String(name), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Gauge: proto.Float64(20), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build(),
 		},
 	}.Build())
 
@@ -1278,16 +1278,16 @@ func TestMetricAggregationGRPC(t *testing.T) {
 			Namespace: proto.String(ns), Name: proto.String(policyName),
 			Batches: []*pb.MetricBatch{
 				pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{
-					pb.MetricSample_builder{Name: proto.String("m_avg"), Value: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
-					pb.MetricSample_builder{Name: proto.String("m_sum"), Value: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
-					pb.MetricSample_builder{Name: proto.String("m_max"), Value: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
-					pb.MetricSample_builder{Name: proto.String("m_min"), Value: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
+					pb.MetricSample_builder{Name: proto.String("m_avg"), Gauge: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
+					pb.MetricSample_builder{Name: proto.String("m_sum"), Gauge: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
+					pb.MetricSample_builder{Name: proto.String("m_max"), Gauge: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
+					pb.MetricSample_builder{Name: proto.String("m_min"), Gauge: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
 				}}.Build(),
 				pb.MetricBatch_builder{PodName: proto.String("p2"), Samples: []*pb.MetricSample{
-					pb.MetricSample_builder{Name: proto.String("m_avg"), Value: proto.Float64(30), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
-					pb.MetricSample_builder{Name: proto.String("m_sum"), Value: proto.Float64(30), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
-					pb.MetricSample_builder{Name: proto.String("m_max"), Value: proto.Float64(30), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
-					pb.MetricSample_builder{Name: proto.String("m_min"), Value: proto.Float64(30), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
+					pb.MetricSample_builder{Name: proto.String("m_avg"), Gauge: proto.Float64(30), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
+					pb.MetricSample_builder{Name: proto.String("m_sum"), Gauge: proto.Float64(30), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
+					pb.MetricSample_builder{Name: proto.String("m_max"), Gauge: proto.Float64(30), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
+					pb.MetricSample_builder{Name: proto.String("m_min"), Gauge: proto.Float64(30), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build(),
 				}}.Build(),
 			},
 		}.Build()},
@@ -1420,7 +1420,7 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"), Timestamp: timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("load"), Value: proto.Float64(100.0), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("load"), Gauge: proto.Float64(100.0), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 
 	memStore.CalculateAll()
@@ -1458,7 +1458,7 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"), Timestamp: timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("load"), Value: proto.Float64(200.0), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("load"), Gauge: proto.Float64(200.0), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 
 	memStore.CalculateAll()
@@ -1480,7 +1480,7 @@ func TestDecayingHistogramLifecycleGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"), Timestamp: timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("load"), Value: proto.Float64(300.0), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("load"), Gauge: proto.Float64(300.0), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 
 	memStore.CalculateAll()
@@ -1613,7 +1613,7 @@ func TestSlidingWindowGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"), Timestamp: timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Gauge: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 	memStore.CalculateAll()
 	res := getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
@@ -1624,7 +1624,7 @@ func TestSlidingWindowGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"), Timestamp: timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(20), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Gauge: proto.Float64(20), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 	memStore.CalculateAll()
 	res = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
@@ -1635,7 +1635,7 @@ func TestSlidingWindowGRPC(t *testing.T) {
 	ts = clk.Now().Unix() // 1090
 	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"), Timestamp: timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(20), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Gauge: proto.Float64(20), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 	memStore.CalculateAll()
 	res = getControlMetrics(t, ctx, client, pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String(ns), Name: proto.String(policyName)}.Build())
@@ -1671,7 +1671,7 @@ func TestMetricGCGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"), Timestamp: timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Gauge: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 
 	// Verify exists
@@ -1769,7 +1769,7 @@ func TestPolicyMutationGRPC(t *testing.T) {
 	ts := clk.Now().Unix()
 	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"), Timestamp: timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Gauge: proto.Float64(10), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 	memStore.CalculateAll()
 
@@ -1793,7 +1793,7 @@ func TestPolicyMutationGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"), Timestamp: timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(20), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Gauge: proto.Float64(20), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 	memStore.CalculateAll()
 
@@ -1807,7 +1807,7 @@ func TestPolicyMutationGRPC(t *testing.T) {
 	ts = clk.Now().Unix()
 	client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"), Timestamp: timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(30), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
+		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{Namespace: proto.String(ns), Name: proto.String(policyName), Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Gauge: proto.Float64(30), Timestamp: timestamppb.New(time.Unix(ts, 0))}.Build()}}.Build()}}.Build()},
 	}.Build())
 	memStore.CalculateAll()
 
@@ -1890,14 +1890,14 @@ func TestRecommenderOwnedMetricsGRPC(t *testing.T) {
 			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{
 				PodName: proto.String("p1"),
 				Samples: []*pb.MetricSample{
-					pb.MetricSample_builder{Name: proto.String("cpu"), Value: proto.Float64(2), Timestamp: timestamppb.New(time.Unix(start.Unix(), 0))}.Build(),
-					pb.MetricSample_builder{Name: proto.String("cpu"), RecommenderName: proto.String("vpa"), Value: proto.Float64(20), Timestamp: timestamppb.New(time.Unix(start.Unix(), 0))}.Build(),
+					pb.MetricSample_builder{Name: proto.String("cpu"), Gauge: proto.Float64(2), Timestamp: timestamppb.New(time.Unix(start.Unix(), 0))}.Build(),
+					pb.MetricSample_builder{Name: proto.String("cpu"), RecommenderName: proto.String("vpa"), Gauge: proto.Float64(20), Timestamp: timestamppb.New(time.Unix(start.Unix(), 0))}.Build(),
 				},
 			}.Build(), pb.MetricBatch_builder{
 				PodName: proto.String("p2"),
 				Samples: []*pb.MetricSample{
-					pb.MetricSample_builder{Name: proto.String("cpu"), Value: proto.Float64(4), Timestamp: timestamppb.New(time.Unix(start.Unix(), 0))}.Build(),
-					pb.MetricSample_builder{Name: proto.String("cpu"), RecommenderName: proto.String("vpa"), Value: proto.Float64(40), Timestamp: timestamppb.New(time.Unix(start.Unix(), 0))}.Build(),
+					pb.MetricSample_builder{Name: proto.String("cpu"), Gauge: proto.Float64(4), Timestamp: timestamppb.New(time.Unix(start.Unix(), 0))}.Build(),
+					pb.MetricSample_builder{Name: proto.String("cpu"), RecommenderName: proto.String("vpa"), Gauge: proto.Float64(40), Timestamp: timestamppb.New(time.Unix(start.Unix(), 0))}.Build(),
 				},
 			}.Build()},
 		}.Build()},
@@ -2112,8 +2112,8 @@ func TestWatchControlMetricsGRPC(t *testing.T) {
 			PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
 				Namespace: proto.String(ns), Name: proto.String(policyName),
 				Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{
-					pb.MetricSample_builder{Name: proto.String("qps"), Value: proto.Float64(qps), Timestamp: ts}.Build(),
-					pb.MetricSample_builder{Name: proto.String("owned"), RecommenderName: proto.String("lin"), Value: proto.Float64(owned), Timestamp: ts}.Build(),
+					pb.MetricSample_builder{Name: proto.String("qps"), Gauge: proto.Float64(qps), Timestamp: ts}.Build(),
+					pb.MetricSample_builder{Name: proto.String("owned"), RecommenderName: proto.String("lin"), Gauge: proto.Float64(owned), Timestamp: ts}.Build(),
 				}}.Build()},
 			}.Build()},
 		}.Build()); err != nil {

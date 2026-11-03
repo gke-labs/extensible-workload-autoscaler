@@ -109,7 +109,7 @@ func TestProcessCustomMetric(t *testing.T) {
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
 						Name:      proto.String("pod_http_requests"),
-						Value:     proto.Float64(85),
+						Gauge:     proto.Float64(85),
 						Timestamp: timestamppb.New(time.Unix(1720000000, 0)),
 					}.Build(),
 				},
@@ -155,7 +155,7 @@ func TestProcessCustomMetric(t *testing.T) {
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
 						Name:      proto.String("service_http_requests"),
-						Value:     proto.Float64(450),
+						Gauge:     proto.Float64(450),
 						Timestamp: timestamppb.New(time.Unix(1720000000, 0)),
 					}.Build(),
 				},

@@ -77,7 +77,7 @@ func TestProcessExternalMetric(t *testing.T) {
 						pb.MetricSample_builder{
 							Name:      proto.String("queue_depth"),
 							Labels:    map[string]string{"sub": "task-sub"},
-							Value:     proto.Float64(150),
+							Gauge:     proto.Float64(150),
 							Timestamp: timestamppb.New(time.Unix(1720000000, 0)),
 						}.Build(),
 					},

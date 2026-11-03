@@ -198,7 +198,7 @@ func (a *CoreNodeMetricsProvider) processKubeletMetric(pod corev1.Pod, m *pb.Met
 					Name:            proto.String(m.GetName()),
 					RecommenderName: proto.String(m.GetRecommenderName()),
 					ResourceName:    proto.String(metricType),
-					Value:           proto.Float64(val),
+					Gauge:           proto.Float64(val),
 					Timestamp:       timestamppb.New(time.Unix(ts, 0)),
 				}.Build(),
 			},
