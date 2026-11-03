@@ -541,10 +541,6 @@ type DecayingDistributionAggregation struct {
 
 var _ model.TimeWindow = (*DecayingDistributionAggregation)(nil)
 
-// Supersedes implements model.TimeWindow. A histogram cannot replace an
-// observation once it is added.
-func (d *DecayingDistributionAggregation) Supersedes() bool { return false }
-
 // NewDecayingDistributionAggregation returns the decaying distribution def
 // describes, for a series of samples of type typ.
 func NewDecayingDistributionAggregation(def *pb.DecayingDistribution, typ model.SampleType) *DecayingDistributionAggregation {
@@ -601,17 +597,8 @@ func newSamplesWindow(duration time.Duration) sampleWindow {
 }
 
 // AddSample appends sample to the window, after dropping the samples that
-// have fallen out of the window relative to the sample timestamp. A sample
-// carrying the same timestamp as the newest one supersedes it (e.g. a
-// re-scrape of a source that has not produced a new value).
+// have fallen out of the window relative to the sample timestamp.
 func (m *sampleWindow) AddSample(sample model.Sample) {
-	// A superseding sample takes the slot of the sample it supersedes, which
-	// the window was already pruned for: pruning again would drop the sample
-	// a window of zero duration pairs it with.
-	if m.Len() > 0 && m.newest().Timestamp.Equal(sample.Timestamp) {
-		m.samples[(m.end+len(m.samples)-1)%len(m.samples)] = sample
-		return
-	}
 	m.prune(sample.Timestamp)
 	// Never let the buffer fill up completely, so that start == end can
 	// only mean that the window is empty.
@@ -621,9 +608,6 @@ func (m *sampleWindow) AddSample(sample model.Sample) {
 	m.samples[m.end] = sample
 	m.end = (m.end + 1) % len(m.samples)
 }
-
-// Supersedes implements model.TimeWindow: see AddSample.
-func (m *sampleWindow) Supersedes() bool { return true }
 
 // prune drops the samples that have fallen out of the window relative to now,
 // ahead of the addition of a new sample. A window of zero duration keeps its

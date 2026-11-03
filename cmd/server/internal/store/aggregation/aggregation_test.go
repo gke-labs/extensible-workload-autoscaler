@@ -63,21 +63,6 @@ func TestRateAggregation_InstantaneousRate(t *testing.T) {
 	}
 }
 
-func TestRateAggregation_InstantaneousRateSupersedes(t *testing.T) {
-	r := NewRateAggregation(0, model.SampleTypeGauge)
-	add(r, t0, 0)
-	add(r, at(10*time.Second), 100)
-	// A re-scrape within the same second supersedes the newest sample, and
-	// the sample before it is kept: the rate is still between two samples.
-	add(r, at(10*time.Second), 200)
-	if got, want := applyValue(t, r), 20.0; got != want {
-		t.Errorf("rate = %v, want %v", got, want)
-	}
-	if got, want := r.Len(), 2; got != want {
-		t.Errorf("Len() = %v, want %v", got, want)
-	}
-}
-
 func TestRateAggregation_InstantaneousRateCounterReset(t *testing.T) {
 	r := NewRateAggregation(0, model.SampleTypeCounter)
 	add(r, t0, 100)

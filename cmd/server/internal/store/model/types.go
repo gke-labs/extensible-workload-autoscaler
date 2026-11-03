@@ -3,7 +3,6 @@ package model
 import (
 	"fmt"
 	"hash/fnv"
-	"reflect"
 	"sort"
 	"time"
 )
@@ -60,15 +59,9 @@ type TimeWindow interface {
 	// AddSample feeds sample to the window, which advances on the sample
 	// timestamp (the clock of the series' source) rather than on the time
 	// the sample was ingested, so that a source lagging behind by more than
-	// the window duration still fills its window.
+	// the window duration still fills its window. The samples of a series
+	// are fed in strictly increasing timestamp order (see Series.AddSample).
 	AddSample(sample Sample)
-	// Supersedes reports whether a sample carrying the same timestamp as the
-	// previous one replaces it in the window. Windows that accumulate every
-	// sample as a distinct observation and cannot replace one once added
-	// (e.g. decaying histograms) report false: Series do not feed them such a
-	// sample, which they would count twice, so the first sample wins, as in
-	// the VPA recommender.
-	Supersedes() bool
 }
 
 // Series holds the state of a single metric stream
@@ -123,40 +116,23 @@ func NewSeries(podName, containerName, resourceName string, labels map[string]st
 // liveness of the series: the time window advances on the sample timestamp
 // (see TimeWindow.AddSample).
 //
-// A sample identical to the last one (e.g. a source re-reporting its last
-// value) only shows that the series is still being reported. A sample carrying
-// the same timestamp as the last one with a new value (e.g. a re-scrape of a
-// source within the same second) supersedes it in the time window, unless the
-// window cannot supersede a sample (see TimeWindow.Supersedes), in which case
-// the sample is not recorded: the window keeps the sample it already holds.
+// A sample carrying the same timestamp as the last one (e.g. a source
+// re-reporting its last value, or a re-scrape of a source within the same
+// second) is ignored: the first sample wins, as in the VPA recommender. It
+// only shows that the series is still being reported.
 func (s *Series) AddSample(sample Sample, ingestTime time.Time) {
 	// Requests may be delivered out of order.
 	if ingestTime.After(s.LastIngested) {
 		s.LastIngested = ingestTime
 	}
-	if s.isRepeat(sample) {
-		return
-	}
-	sameTimestamp := !s.LastRaw.Timestamp.IsZero() && sample.Timestamp.Equal(s.LastRaw.Timestamp)
-	if sameTimestamp && !s.TimeWindow.Supersedes() {
+	if !s.LastRaw.Timestamp.IsZero() && sample.Timestamp.Equal(s.LastRaw.Timestamp) {
 		return
 	}
 	s.TimeWindow.AddSample(sample)
-	// A superseding sample was measured over the same interval as the sample
-	// it supersedes.
-	if !s.LastRaw.Timestamp.IsZero() && !sameTimestamp {
+	if !s.LastRaw.Timestamp.IsZero() {
 		s.LastRawWindow = sample.Timestamp.Sub(s.LastRaw.Timestamp)
 	}
 	s.LastRaw = sample
-}
-
-// isRepeat reports whether sample is identical to the last sample of the
-// series.
-func (s *Series) isRepeat(sample Sample) bool {
-	return !s.LastRaw.Timestamp.IsZero() &&
-		sample.Timestamp.Equal(s.LastRaw.Timestamp) &&
-		sample.Value == s.LastRaw.Value &&
-		reflect.DeepEqual(sample.Distribution, s.LastRaw.Distribution)
 }
 
 // SeriesID identifies a timeseries within a metric. It's composed of the pod,

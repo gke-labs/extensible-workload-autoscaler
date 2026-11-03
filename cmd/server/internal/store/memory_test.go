@@ -178,13 +178,13 @@ func TestMetricCalculations(t *testing.T) {
 			ingest: func(s *MemoryStore, clk *clock.FakeClock, ns, pol string) {
 				t0 := clk.Now().Unix()
 				ingest(s, t0, ns, pol, "p1", "reqs", 100)
-				ingest(s, t0, ns, pol, "p1", "reqs", 150) // Same timestamp, should update LastRaw.Value to 150
+				ingest(s, t0, ns, pol, "p1", "reqs", 150) // Same timestamp: ignored, the first sample wins.
 
 				clk.Advance(10 * time.Second)
 				t1 := clk.Now().Unix()
-				ingest(s, t1, ns, pol, "p1", "reqs", 250) // diff = 250 - 150 = 100. rate = 100/10 = 10
+				ingest(s, t1, ns, pol, "p1", "reqs", 250) // diff = 250 - 100 = 150. rate = 150/10 = 15
 			},
-			want: map[string]float64{"reqs": 10.0},
+			want: map[string]float64{"reqs": 15.0},
 		},
 		{
 			name: "Readiness: Ignore NotReady Pods",

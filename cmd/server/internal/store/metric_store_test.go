@@ -429,25 +429,28 @@ func TestGCSeries_KeepsLaggingSources(t *testing.T) {
 	}
 }
 
-func TestIngest_SameTimestampSupersedes(t *testing.T) {
+func TestIngest_SameTimestampIgnored(t *testing.T) {
 	policy := newRatePolicy("reqs")
 	ms := NewMetricStore()
 
 	ingestSample(t, ms, policy, newSample("reqs", t0, 0), t0)
 	ingestSample(t, ms, policy, newSample("reqs", at(10*time.Second), 100), at(10*time.Second))
-	// A re-scrape within the same second supersedes the previous sample.
-	ingestSample(t, ms, policy, newSample("reqs", at(10*time.Second), 200), at(10*time.Second))
+	// A re-scrape within the same second is ignored: the first sample wins.
+	ingestSample(t, ms, policy, newSample("reqs", at(10*time.Second), 200), at(20*time.Second))
 
 	ser := onlySeries(t, ms, "reqs")
-	if got, want := apply(t, ser).Value, 20.0; got != want {
+	if got, want := apply(t, ser).Value, 10.0; got != want {
 		t.Errorf("rate = %v, want %v", got, want)
 	}
-	if got, want := ser.LastRaw.Value, 200.0; got != want {
+	if got, want := ser.LastRaw.Value, 100.0; got != want {
 		t.Errorf("LastRaw.Value = %v, want %v", got, want)
 	}
-	// The superseding sample was measured over the same interval.
 	if got, want := ser.LastRawWindow, 10*time.Second; got != want {
 		t.Errorf("LastRawWindow = %v, want %v", got, want)
+	}
+	// The ignored sample still shows that the series is being reported.
+	if got, want := ser.LastIngested, at(20*time.Second); !got.Equal(want) {
+		t.Errorf("LastIngested = %v, want %v", got, want)
 	}
 }
 
@@ -474,8 +477,7 @@ func TestIngest_DecayingDistributionDuplicatesAndOutOfOrder(t *testing.T) {
 		t.Errorf("after duplicate: LastIngested = %v, want %v", got, want)
 	}
 
-	// Same timestamp, different value: a histogram cannot supersede an
-	// observation, so the first one wins and the sample is not recorded.
+	// Same timestamp, different value: ignored, the first sample wins.
 	ingestSample(t, ms, policy, newSample("cpu", at(-10*time.Second), 3), at(20*time.Second))
 	if got, want := totalWeight(ser), 1.0; got != want {
 		t.Errorf("after same timestamp: TotalWeight = %v, want %v", got, want)

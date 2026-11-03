@@ -5722,8 +5722,7 @@ type MetricSample_builder struct {
 	// the last sample of their series are dropped as out of order, and samples
 	// timestamped more than 5 minutes after IngestMetricsRequest.timestamp are
 	// dropped as invalid. A sample carrying the same timestamp as the last one
-	// supersedes it, except in decaying distributions, which cannot replace an
-	// observation and ignore it.
+	// is ignored: the first sample wins.
 	Timestamp *timestamppb.Timestamp
 	// The data point itself: a gauge or a counter for scalars, or a histogram
 	// for distributions.
