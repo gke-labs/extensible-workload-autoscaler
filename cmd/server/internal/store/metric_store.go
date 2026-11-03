@@ -27,11 +27,12 @@ type MetricSeries struct {
 	ResourceName string
 }
 
-// newMetricSeries creates an initialized MetricSeries.
-func newMetricSeries(def *pb.MetricDefinition, podName, containerName string, sample *pb.MetricSample) *MetricSeries {
+// newMetricSeries creates an initialized MetricSeries for a metric whose first
+// sample is sample, of type typ.
+func newMetricSeries(def *pb.MetricDefinition, typ model.SampleType, podName, containerName string, sample *pb.MetricSample) *MetricSeries {
 	return &MetricSeries{
 		Series:       make(map[model.SeriesID]*model.Series),
-		Aggregation:  aggregation.CreateSeriesAggregation(def, sample.GetResourceName(), podName, containerName),
+		Aggregation:  aggregation.CreateSeriesAggregation(def, typ, sample.GetResourceName(), podName, containerName),
 		Definition:   def,
 		ResourceName: sample.GetResourceName(),
 	}
@@ -105,6 +106,10 @@ func (ms *MetricStore) ingestSample(policy *pb.Policy, workload map[string]*pb.P
 		}
 		return fmt.Errorf("metric %s not defined in policy", sample.GetName())
 	}
+	typ, ok := sampleType(sample)
+	if !ok {
+		return nil // Drop samples without data: they are invalid.
+	}
 
 	// Filter early
 	if !model.MatchFilter(sample.GetLabels(), def.GetFilter()) {
@@ -125,20 +130,36 @@ func (ms *MetricStore) ingestSample(policy *pb.Policy, workload map[string]*pb.P
 	id := newMetricID(def)
 	metricSeries, ok := ms.Series[id]
 	if !ok {
-		metricSeries = newMetricSeries(def, podName, containerName, sample)
+		metricSeries = newMetricSeries(def, typ, podName, containerName, sample)
 		ms.Series[id] = metricSeries
 	}
 	sid := model.NewSeriesID(podName, containerName, sample.GetLabels())
 	series, ok := metricSeries.getSeries(sid)
 	if !ok {
-		series = model.NewSeries(podName, containerName, sample.GetResourceName(), sample.GetLabels(), metricSeries.Aggregation.NewTimeWindow(def))
+		series = model.NewSeries(podName, containerName, sample.GetResourceName(), sample.GetLabels(), typ, metricSeries.Aggregation.NewTimeWindow(def, typ))
 		metricSeries.setSeries(sid, series)
 	}
-	ms.seriesIngestSample(series, sample, ingestTime)
+	ms.seriesIngestSample(series, sample, typ, ingestTime)
 	return nil
 }
 
-// seriesIngestSample records sample m, reported at ingestTime, into ser.
+// sampleType returns the type of the data m carries, reporting false when m
+// carries none.
+func sampleType(m *pb.MetricSample) (model.SampleType, bool) {
+	switch m.WhichData() {
+	case pb.MetricSample_Gauge_case:
+		return model.SampleTypeGauge, true
+	case pb.MetricSample_Counter_case:
+		return model.SampleTypeCounter, true
+	case pb.MetricSample_Histogram_case:
+		return model.SampleTypeHistogram, true
+	default:
+		return "", false
+	}
+}
+
+// seriesIngestSample records sample m, of type typ and reported at ingestTime,
+// into ser.
 //
 // Two timestamps are involved:
 //   - the sample timestamp (see sampleTimestamp), the time at which the sample
@@ -146,21 +167,27 @@ func (ms *MetricStore) ingestSample(policy *pb.Policy, workload map[string]*pb.P
 //     rate computation, time windows and decaying histograms.
 //   - ingestTime, the time at which the sample was collected, tracks whether
 //     the series is still being reported (see gcSeries).
-func (ms *MetricStore) seriesIngestSample(ser *model.Series, m *pb.MetricSample, ingestTime time.Time) {
+func (ms *MetricStore) seriesIngestSample(ser *model.Series, m *pb.MetricSample, typ model.SampleType, ingestTime time.Time) {
+	// The samples of a series are all of the type of its first sample, which
+	// its time window was built for: a sample of another type (e.g. the source
+	// redefined the metric) is dropped. It does not keep the series alive
+	// either, so that the series is garbage collected and recreated for the
+	// new type if the source does not report the old one anymore.
+	if typ != ser.Type {
+		return
+	}
 	ts, ok := sampleTimestamp(m, ingestTime)
 	if !ok || ts.Before(ser.LastRaw.Timestamp) {
 		return // Drop invalid and out of order samples.
 	}
 	sample := model.Sample{Timestamp: ts}
-	switch m.WhichData() {
-	case pb.MetricSample_Gauge_case:
+	switch typ {
+	case model.SampleTypeGauge:
 		sample.Value = m.GetGauge()
-	case pb.MetricSample_Counter_case:
-		sample.Value, sample.Counter = m.GetCounter(), true
-	case pb.MetricSample_Histogram_case:
+	case model.SampleTypeCounter:
+		sample.Value = m.GetCounter()
+	case model.SampleTypeHistogram:
 		sample.Distribution = model.NewDistributionFromHistogram(m.GetHistogram())
-	default:
-		return // Drop samples without data: they are invalid.
 	}
 	ser.AddSample(sample, ingestTime)
 }

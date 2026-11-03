@@ -156,8 +156,8 @@ func TestIngest_CounterRate(t *testing.T) {
 	ingestSample(t, ms, policy, newCounterSample("reqs", at(10*time.Second), 150), at(10*time.Second))
 
 	ser := onlySeries(t, ms, "reqs")
-	if !ser.LastRaw.Counter {
-		t.Errorf("LastRaw.Counter = false, want true")
+	if got, want := ser.Type, model.SampleTypeCounter; got != want {
+		t.Errorf("Type = %v, want %v", got, want)
 	}
 	if got, want := apply(t, ser).Value, 5.0; got != want {
 		t.Errorf("rate = %v, want %v", got, want)
@@ -245,16 +245,50 @@ func TestIngest_SampleWithoutDataIsDropped(t *testing.T) {
 	policy := newGaugePolicy("queue")
 	ms := NewMetricStore()
 
+	// A sample without data has no effect: it does not even create its series.
 	ingestSample(t, ms, policy, pb.MetricSample_builder{Name: proto.String("queue"), Timestamp: timestamppb.New(t0)}.Build(), t0)
-	ser := onlySeries(t, ms, "queue")
-	if _, ok := ser.TimeWindow.Apply(); ok {
-		t.Errorf("TimeWindow.Apply() reported a value for a sample without data")
+	if metric := ms.Series[metricID{name: "queue"}]; !metric.isEmpty() {
+		t.Errorf("got %v for a sample without data, want no series", metric)
 	}
 
 	// Valid samples are still recorded.
 	ingestSample(t, ms, policy, newSample("queue", at(10*time.Second), 2), at(10*time.Second))
-	if got, want := apply(t, ser).Value, 2.0; got != want {
+	if got, want := apply(t, onlySeries(t, ms, "queue")).Value, 2.0; got != want {
 		t.Errorf("value = %v, want %v", got, want)
+	}
+}
+
+func TestIngest_SampleOfAnotherTypeIsDropped(t *testing.T) {
+	policy := newRatePolicy("reqs")
+	ms := NewMetricStore()
+
+	ingestSample(t, ms, policy, newSample("reqs", t0, 0), t0)
+	ingestSample(t, ms, policy, newSample("reqs", at(10*time.Second), 100), at(10*time.Second))
+	ser := onlySeries(t, ms, "reqs")
+	if got, want := ser.Type, model.SampleTypeGauge; got != want {
+		t.Fatalf("Type = %v, want %v", got, want)
+	}
+
+	// The source now reports the metric as a counter: the sample is of
+	// another type than the series, and is dropped without keeping the series
+	// alive.
+	ingestSample(t, ms, policy, newCounterSample("reqs", at(20*time.Second), 1000), at(20*time.Second))
+	if got, want := apply(t, ser).Value, 10.0; got != want {
+		t.Errorf("rate = %v, want %v", got, want)
+	}
+	if got, want := ser.LastRaw.Timestamp, at(10*time.Second); !got.Equal(want) {
+		t.Errorf("LastRaw.Timestamp = %v, want %v", got, want)
+	}
+	if got, want := ser.LastIngested, at(10*time.Second); !got.Equal(want) {
+		t.Errorf("LastIngested = %v, want %v", got, want)
+	}
+
+	// Once the series is garbage collected, it is recreated for the new type.
+	now := at(10*time.Second + seriesRetention + time.Second)
+	ms.gcSeries(now)
+	ingestSample(t, ms, policy, newCounterSample("reqs", now, 1000), now)
+	if got, want := onlySeries(t, ms, "reqs").Type, model.SampleTypeCounter; got != want {
+		t.Errorf("after GC: Type = %v, want %v", got, want)
 	}
 }
 
@@ -465,7 +499,7 @@ func TestIngest_SharedDecayingDistributionRepeats(t *testing.T) {
 	}
 	totalWeight := func() float64 {
 		t.Helper()
-		s, ok := ms.Series[metricID{name: "cpu"}].Aggregation.NewTimeWindow(policy.GetMetrics()[0]).Apply()
+		s, ok := ms.Series[metricID{name: "cpu"}].Aggregation.NewTimeWindow(policy.GetMetrics()[0], model.SampleTypeGauge).Apply()
 		if !ok {
 			t.Fatalf("TimeWindow.Apply() reported no value")
 		}

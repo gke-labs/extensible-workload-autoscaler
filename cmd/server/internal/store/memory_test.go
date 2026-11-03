@@ -502,10 +502,10 @@ func TestDump(t *testing.T) {
               "ContainerName": "",
               "ResourceName": "",
               "Labels": null,
+              "Type": "Gauge",
               "LastRaw": {
                 "Timestamp": "1970-01-01T00:16:40Z",
                 "Value": 1,
-                "Counter": false,
                 "Distribution": null,
                 "DecayingHistogram": null
               },

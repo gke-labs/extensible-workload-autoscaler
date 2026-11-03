@@ -25,16 +25,26 @@ const (
 	ScopeContainer = "Container"
 )
 
+// SampleType is the type of the samples of a series, which all share it.
+type SampleType string
+
+const (
+	// SampleTypeGauge is a scalar that may go up or down (e.g. a queue depth).
+	SampleTypeGauge SampleType = "Gauge"
+	// SampleTypeCounter is a cumulative scalar (e.g. a request count) that
+	// only increases, except when its source resets it (e.g. on restart).
+	SampleTypeCounter SampleType = "Counter"
+	// SampleTypeHistogram is a distribution: the cumulative buckets reported
+	// by the source.
+	SampleTypeHistogram SampleType = "Histogram"
+)
+
 // Sample represents the raw data from the source
 type Sample struct {
 	// Source Timestamp.
 	Timestamp time.Time
 	// If the sample is a scalar, its value.
 	Value float64
-	// If the sample is a scalar, whether it is a counter: a cumulative value
-	// that only increases, except when its source resets it (e.g. on
-	// restart), as opposed to a gauge, which may go up or down.
-	Counter bool
 	// If the sample is a distribution, its cumulative buckets: the counts
 	// reported by the source, or values derived from them (e.g. their rates).
 	Distribution *Distribution
@@ -67,6 +77,10 @@ type Series struct {
 	// The name of the resource this metric describes (e.g. "cpu or "memory").
 	ResourceName string
 	Labels       map[string]string
+	// Type is the type of the samples of the series: all of them are of the
+	// type of the sample the series was created with, which its time window
+	// is built for (e.g. the rate of a counter accounts for its resets).
+	Type SampleType
 
 	// LastRaw is the most recent sample recorded in the time window of the
 	// series. Its timestamp is the time at which the sample was measured by
@@ -86,14 +100,16 @@ type Series struct {
 	TimeWindow TimeWindow `json:"-"`
 }
 
-// NewSeries returns a series reported by the given container of the given pod
-// with the given labels, whose samples are aggregated over time by window.
-func NewSeries(podName, containerName, resourceName string, labels map[string]string, window TimeWindow) *Series {
+// NewSeries returns a series of samples of type typ reported by the given
+// container of the given pod with the given labels, whose samples are
+// aggregated over time by window.
+func NewSeries(podName, containerName, resourceName string, labels map[string]string, typ SampleType, window TimeWindow) *Series {
 	return &Series{
 		PodName:       podName,
 		ContainerName: containerName,
 		ResourceName:  resourceName,
 		Labels:        labels,
+		Type:          typ,
 		TimeWindow:    window,
 	}
 }
