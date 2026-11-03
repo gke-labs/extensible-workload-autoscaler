@@ -2555,6 +2555,68 @@ func TestIntent_RateCalculation_CounterReset(t *testing.T) {
 	}
 }
 
+func TestIntent_RateCalculation_Instantaneous(t *testing.T) {
+	clk := &clock.FakeClock{CurrentTime: time.Unix(1000, 0)}
+	memStore, client, cleanup := setupFunctionalGRPCServer(t, clk)
+	defer cleanup()
+	ctx := context.Background()
+
+	// A zero window is valid: the rate is computed between the last two
+	// samples.
+	id := pb.PolicyId_builder{ClusterName: proto.String("c1"), Namespace: proto.String("ns"), Name: proto.String("p1")}.Build()
+	if _, err := client.CreatePolicy(ctx, pb.CreatePolicyRequest_builder{
+		Policy: pb.Policy_builder{
+			Id: id,
+			Metrics: []*pb.MetricDefinition{
+				pb.MetricDefinition_builder{Name: proto.String("rps"), Rate: pb.Rate_builder{Window: durationpb.New(0), Aggregation: proto.String("Sum")}.Build()}.Build(),
+			},
+		}.Build(),
+	}.Build()); err != nil {
+		t.Fatalf("CreatePolicy() with a zero rate window: %v", err)
+	}
+
+	client.UpdateWorkload(ctx, pb.UpdateWorkloadRequest_builder{
+		Id: id,
+		Workload: pb.Workload_builder{
+			Pods: []*pb.PodState{pb.PodState_builder{Name: proto.String("p1"), IsReady: proto.Bool(true)}.Build()}}.Build(),
+	}.Build())
+
+	ingestCounter := func(value float64) {
+		ts := clk.Now().Unix()
+		client.IngestMetrics(ctx, pb.IngestMetricsRequest_builder{
+			ClusterName: proto.String("c1"), Timestamp: timestamppb.New(time.Unix(ts, 0)),
+			PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
+				Namespace: proto.String("ns"), Name: proto.String("p1"),
+				Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("p1"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("rps"), Counter: proto.Float64(value)}.Build()}}.Build()},
+			}.Build()},
+		}.Build())
+	}
+
+	// T0
+	ingestCounter(0)
+	// T1 (10s later)
+	clk.Advance(10 * time.Second)
+	ingestCounter(100)
+	// T2 (30s later)
+	clk.Advance(20 * time.Second)
+	ingestCounter(500)
+
+	memStore.CalculateAll()
+	res := getControlMetrics(t, ctx, client, id)
+
+	// Rate = (500 - 100) / 20s = 20.0, rather than (500 - 0) / 30s.
+	wantRes := pb.GetControlMetricsResponse_builder{
+		Timestamp:     timestamppb.New(time.Unix(clk.Now().Unix(), 0)),
+		ReadyReplicas: proto.Int32(1),
+		ControlMetrics: pb.ControlMetrics_builder{
+			Values: map[string]float64{"rps": 20.0},
+		}.Build(),
+	}.Build()
+	if diff := cmp.Diff(wantRes, res, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.01)); diff != "" {
+		t.Errorf("ControlMetrics mismatch (-want +got):\n%s", diff)
+	}
+}
+
 func TestIntent_DistributionPercentile(t *testing.T) {
 	clk := &clock.FakeClock{CurrentTime: time.Unix(1000, 0)}
 	memStore, client, cleanup := setupFunctionalGRPCServer(t, clk)
@@ -2700,6 +2762,13 @@ func TestIntent_Validation(t *testing.T) {
 			metric: pb.MetricDefinition_builder{
 				Name: proto.String("m1"),
 				Rate: pb.Rate_builder{Aggregation: proto.String("Sum")}.Build(),
+			}.Build(),
+		},
+		{
+			name: "Rate Negative Window",
+			metric: pb.MetricDefinition_builder{
+				Name: proto.String("m1"),
+				Rate: pb.Rate_builder{Window: durationpb.New(-time.Second)}.Build(),
 			}.Build(),
 		},
 		{

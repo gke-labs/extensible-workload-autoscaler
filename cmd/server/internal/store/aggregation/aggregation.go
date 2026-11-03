@@ -358,7 +358,9 @@ func NewTimeWindow(def *pb.MetricDefinition, typ model.SampleType) model.TimeWin
 
 // RateAggregation computes the per-second rate of change of a scalar series
 // over a sliding window: its increase between the oldest and the newest
-// samples of the window, divided by the time elapsed between them.
+// samples of the window, divided by the time elapsed between them. A window
+// of zero duration computes the instantaneous rate, between the last two
+// samples of the series.
 type RateAggregation struct {
 	sampleWindow
 	// typ is the type of the samples of the series: the increase of a counter
@@ -369,7 +371,8 @@ type RateAggregation struct {
 var _ model.TimeWindow = (*RateAggregation)(nil)
 
 // NewRateAggregation returns a rate window of the given duration for a series
-// of samples of type typ.
+// of samples of type typ. A zero duration computes the instantaneous rate,
+// between the last two samples of the series.
 func NewRateAggregation(duration time.Duration, typ model.SampleType) *RateAggregation {
 	return &RateAggregation{
 		sampleWindow: newSamplesWindow(duration),
@@ -549,7 +552,7 @@ func NewDecayingDistributionAggregation(def *pb.DecayingDistribution, typ model.
 	// The reference time is set by the first sample.
 	histogram, _ := model.NewDecayingHistogram(time.Time{}, halfLife, def.GetBucketSize())
 	a := &DecayingDistributionAggregation{histogram: histogram}
-	if def.GetRate().AsDuration() > 0 {
+	if def.HasRate() {
 		a.rate = NewRateAggregation(def.GetRate().AsDuration(), typ)
 	}
 	return a
@@ -580,6 +583,10 @@ func (d *DecayingDistributionAggregation) Apply() (model.Sample, bool) {
 
 // sampleWindow holds the samples that fall within a sliding time window.
 //
+// A window of zero duration is not empty: it holds the last two samples, the
+// newest one and the one before it. It is the window of the instantaneous
+// rates, computed between the last two samples of a series.
+//
 // The samples are stored oldest first in a ring buffer, in the half-open
 // index range [start, end). At least one slot is always kept free, so that
 // start == end unambiguously means the window is empty.
@@ -598,11 +605,14 @@ func newSamplesWindow(duration time.Duration) sampleWindow {
 // timestamp as the newest one supersedes it (e.g. a re-scrape of a source
 // that has not produced a new value).
 func (m *sampleWindow) AddSample(sample model.Sample, now time.Time) {
-	m.prune(now)
+	// A superseding sample takes the slot of the sample it supersedes, which
+	// the window was already pruned for: pruning again would drop the sample
+	// a window of zero duration pairs it with.
 	if m.Len() > 0 && m.newest().Timestamp.Equal(sample.Timestamp) {
 		m.samples[(m.end+len(m.samples)-1)%len(m.samples)] = sample
 		return
 	}
+	m.prune(now)
 	// Never let the buffer fill up completely, so that start == end can
 	// only mean that the window is empty.
 	if m.Len()+1 >= len(m.samples) {
@@ -615,10 +625,16 @@ func (m *sampleWindow) AddSample(sample model.Sample, now time.Time) {
 // Supersedes implements model.TimeWindow: see AddSample.
 func (m *sampleWindow) Supersedes() bool { return true }
 
-// prune drops the samples that have fallen out of the window relative to now.
+// prune drops the samples that have fallen out of the window relative to now,
+// ahead of the addition of a new sample. A window of zero duration keeps its
+// newest sample, however old, for the new sample to pair with.
 func (m *sampleWindow) prune(now time.Time) {
+	keep := 0
+	if m.duration == 0 {
+		keep = 1
+	}
 	cutoff := now.Add(-m.duration)
-	for m.start != m.end && m.samples[m.start].Timestamp.Before(cutoff) {
+	for m.Len() > keep && m.samples[m.start].Timestamp.Before(cutoff) {
 		m.start = (m.start + 1) % len(m.samples)
 	}
 }

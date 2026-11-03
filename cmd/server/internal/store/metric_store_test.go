@@ -84,9 +84,17 @@ func apply(t *testing.T, ser *model.Series) model.Sample {
 	return s
 }
 
+// newRatePolicy returns a policy with a single rate metric, computed over a
+// one minute window.
 func newRatePolicy(name string) *pb.Policy {
+	return newRateWindowPolicy(name, time.Minute)
+}
+
+// newRateWindowPolicy returns a policy with a single rate metric, computed
+// over the given window.
+func newRateWindowPolicy(name string, window time.Duration) *pb.Policy {
 	return pb.Policy_builder{Metrics: []*pb.MetricDefinition{
-		pb.MetricDefinition_builder{Name: proto.String(name), Rate: pb.Rate_builder{Window: durationpb.New(time.Minute)}.Build()}.Build(),
+		pb.MetricDefinition_builder{Name: proto.String(name), Rate: pb.Rate_builder{Window: durationpb.New(window)}.Build()}.Build(),
 	}}.Build()
 }
 
@@ -177,6 +185,22 @@ func TestIngest_CounterReset(t *testing.T) {
 
 	ser := onlySeries(t, ms, "reqs")
 	if got, want := apply(t, ser).Value, 110.0/30; !cmp.Equal(got, want, cmpopts.EquateApprox(0, 1e-9)) {
+		t.Errorf("rate = %v, want %v", got, want)
+	}
+}
+
+func TestIngest_InstantaneousRate(t *testing.T) {
+	// A zero window computes the rate between the last two samples.
+	policy := newRateWindowPolicy("reqs", 0)
+	ms := NewMetricStore()
+
+	ingestSample(t, ms, policy, newCounterSample("reqs", t0, 0), t0)
+	ingestSample(t, ms, policy, newCounterSample("reqs", at(10*time.Second), 100), at(10*time.Second))
+	ingestSample(t, ms, policy, newCounterSample("reqs", at(30*time.Second), 500), at(30*time.Second))
+
+	ser := onlySeries(t, ms, "reqs")
+	// (500 - 100) / 20s, rather than (500 - 0) / 30s.
+	if got, want := apply(t, ser).Value, 20.0; got != want {
 		t.Errorf("rate = %v, want %v", got, want)
 	}
 }

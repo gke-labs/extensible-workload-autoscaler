@@ -1707,7 +1707,8 @@ func (x *Rate) ClearAggregation() {
 type Rate_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// The temporal period for rate calculation.
+	// The temporal period for rate calculation. Zero computes the instantaneous
+	// rate, between the last two samples.
 	Window *durationpb.Duration
 	// Pod aggregation method: "Avg", "Sum", "Max", "Min".
 	Aggregation *string
@@ -1982,7 +1983,9 @@ type DecayingDistribution_builder struct {
 	BucketSize *string
 	// The percentile to extract (e.g. "p100").
 	Percentile *string
-	// If set, treat input as Counter and calculate rate over this window before sampling.
+	// If set, treat input as Counter and calculate rate over this window before
+	// sampling. Zero computes the instantaneous rate, between the last two
+	// samples.
 	Rate *durationpb.Duration
 }
 

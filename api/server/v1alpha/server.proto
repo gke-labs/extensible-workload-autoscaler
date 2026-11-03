@@ -224,7 +224,8 @@ message Gauge {
 }
 
 message Rate {
-  // The temporal period for rate calculation.
+  // The temporal period for rate calculation. Zero computes the instantaneous
+  // rate, between the last two samples.
   google.protobuf.Duration window = 1;
   // Pod aggregation method: "Avg", "Sum", "Max", "Min".
   string aggregation = 2;
@@ -244,7 +245,9 @@ message DecayingDistribution {
   string bucket_size = 2;
   // The percentile to extract (e.g. "p100").
   string percentile = 3;
-  // If set, treat input as Counter and calculate rate over this window before sampling.
+  // If set, treat input as Counter and calculate rate over this window before
+  // sampling. Zero computes the instantaneous rate, between the last two
+  // samples.
   google.protobuf.Duration rate = 4;
 }
 
