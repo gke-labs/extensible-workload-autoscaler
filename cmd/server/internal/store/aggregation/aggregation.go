@@ -436,11 +436,11 @@ func NewDistributionAggregation(duration time.Duration) *DistributionAggregation
 	}
 }
 
-func (d *DistributionAggregation) AddSample(sample model.Sample, now time.Time) {
+func (d *DistributionAggregation) AddSample(sample model.Sample) {
 	if sample.Distribution == nil {
 		return
 	}
-	d.sampleWindow.AddSample(sample, now)
+	d.sampleWindow.AddSample(sample)
 }
 
 func (d *DistributionAggregation) Apply() (model.Sample, bool) {
@@ -558,9 +558,9 @@ func NewDecayingDistributionAggregation(def *pb.DecayingDistribution, typ model.
 	return a
 }
 
-func (d *DecayingDistributionAggregation) AddSample(sample model.Sample, now time.Time) {
+func (d *DecayingDistributionAggregation) AddSample(sample model.Sample) {
 	if d.rate != nil {
-		d.rate.AddSample(sample, now)
+		d.rate.AddSample(sample)
 		rate, ok := d.rate.Apply()
 		if !ok {
 			return
@@ -601,10 +601,10 @@ func newSamplesWindow(duration time.Duration) sampleWindow {
 }
 
 // AddSample appends sample to the window, after dropping the samples that
-// have fallen out of the window relative to now. A sample carrying the same
-// timestamp as the newest one supersedes it (e.g. a re-scrape of a source
-// that has not produced a new value).
-func (m *sampleWindow) AddSample(sample model.Sample, now time.Time) {
+// have fallen out of the window relative to the sample timestamp. A sample
+// carrying the same timestamp as the newest one supersedes it (e.g. a
+// re-scrape of a source that has not produced a new value).
+func (m *sampleWindow) AddSample(sample model.Sample) {
 	// A superseding sample takes the slot of the sample it supersedes, which
 	// the window was already pruned for: pruning again would drop the sample
 	// a window of zero duration pairs it with.
@@ -612,7 +612,7 @@ func (m *sampleWindow) AddSample(sample model.Sample, now time.Time) {
 		m.samples[(m.end+len(m.samples)-1)%len(m.samples)] = sample
 		return
 	}
-	m.prune(now)
+	m.prune(sample.Timestamp)
 	// Never let the buffer fill up completely, so that start == end can
 	// only mean that the window is empty.
 	if m.Len()+1 >= len(m.samples) {

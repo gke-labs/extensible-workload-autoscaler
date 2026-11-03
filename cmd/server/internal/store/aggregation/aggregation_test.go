@@ -21,10 +21,9 @@ func at(d time.Duration) time.Time {
 	return t0.Add(d)
 }
 
-// add feeds a scalar sample measured at ts to w, on the clock of its source,
-// as model.Series does.
+// add feeds a scalar sample measured at ts to w.
 func add(w model.TimeWindow, ts time.Time, value float64) {
-	w.AddSample(model.Sample{Timestamp: ts, Value: value}, ts)
+	w.AddSample(model.Sample{Timestamp: ts, Value: value})
 }
 
 // applyValue returns the scalar aggregate of w, failing if there is none.

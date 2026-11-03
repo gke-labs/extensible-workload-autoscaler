@@ -57,7 +57,11 @@ type TimeWindow interface {
 	// Apply returns the aggregate, reporting false when there is nothing to
 	// report (e.g. no sample in the window).
 	Apply() (Sample, bool)
-	AddSample(sample Sample, now time.Time)
+	// AddSample feeds sample to the window, which advances on the sample
+	// timestamp (the clock of the series' source) rather than on the time
+	// the sample was ingested, so that a source lagging behind by more than
+	// the window duration still fills its window.
+	AddSample(sample Sample)
 	// Supersedes reports whether a sample carrying the same timestamp as the
 	// previous one replaces it in the window. Windows that accumulate every
 	// sample as a distinct observation and cannot replace one once added
@@ -115,11 +119,9 @@ func NewSeries(podName, containerName, resourceName string, labels map[string]st
 }
 
 // AddSample feeds sample, reported at ingestTime, to the time window of the
-// series and records it as the latest raw sample.
-//
-// The time window is advanced on the clock of the series' source (the sample
-// timestamp) rather than on ingestTime, so that a source lagging behind by
-// more than the window duration still fills its window.
+// series and records it as the latest raw sample. ingestTime only tracks the
+// liveness of the series: the time window advances on the sample timestamp
+// (see TimeWindow.AddSample).
 //
 // A sample identical to the last one (e.g. a source re-reporting its last
 // value) only shows that the series is still being reported. A sample carrying
@@ -139,7 +141,7 @@ func (s *Series) AddSample(sample Sample, ingestTime time.Time) {
 	if sameTimestamp && !s.TimeWindow.Supersedes() {
 		return
 	}
-	s.TimeWindow.AddSample(sample, sample.Timestamp)
+	s.TimeWindow.AddSample(sample)
 	// A superseding sample was measured over the same interval as the sample
 	// it supersedes.
 	if !s.LastRaw.Timestamp.IsZero() && !sameTimestamp {
