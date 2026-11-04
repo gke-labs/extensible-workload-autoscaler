@@ -26,8 +26,9 @@ type AggregatedMetrics struct {
 
 // SeriesAggregation aggregates a set of series.
 type SeriesAggregation interface {
-	// NewTimeWindow creates a new temporal aggregation for a given metric.
-	NewTimeWindow(def *pb.MetricDefinition) model.TimeWindow
+	// NewTimeWindow creates a new temporal aggregation for a series of samples
+	// of type typ of the given metric.
+	NewTimeWindow(def *pb.MetricDefinition, typ model.SampleType) model.TimeWindow
 	// Reduce aggregates the series of a metric as of time now, returning one
 	// aggregate for the global scope, one aggregate per pod for the pod
 	// scope, etc.
@@ -64,11 +65,11 @@ type DimensionalSeriesAggregation struct {
 var _ SeriesAggregation = (*DimensionalSeriesAggregation)(nil)
 
 // NewTimeWindow implements SeriesAggregation.
-func (a *DimensionalSeriesAggregation) NewTimeWindow(def *pb.MetricDefinition) model.TimeWindow {
+func (a *DimensionalSeriesAggregation) NewTimeWindow(def *pb.MetricDefinition, typ model.SampleType) model.TimeWindow {
 	if a.WorkloadTimeWindow != nil {
 		return a.WorkloadTimeWindow
 	}
-	return NewTimeWindow(def)
+	return NewTimeWindow(def, typ)
 }
 
 // Reduce implements SeriesAggregation.
@@ -120,10 +121,10 @@ func (a *DimensionalSeriesAggregation) Reduce(series iter.Seq[*model.Series], wo
 	return aggregates
 }
 
-// CreateSeriesAggregation returns the aggregation for a metric series. The
-// resourceName argument is not empty if the series describes a resource
-// (e.g. CPU or memory usage).
-func CreateSeriesAggregation(def *pb.MetricDefinition, resourceName, podName, containerName string) SeriesAggregation {
+// CreateSeriesAggregation returns the aggregation for a metric series. typ is
+// the type of the samples of the metric. The resourceName argument is not
+// empty if the series describes a resource (e.g. CPU or memory usage).
+func CreateSeriesAggregation(def *pb.MetricDefinition, typ model.SampleType, resourceName, podName, containerName string) SeriesAggregation {
 	seriesFilters := []SeriesFilter{
 		CreateLabelSeriesFilter(def.GetFilter()), // Apply label filters
 	}
@@ -171,7 +172,7 @@ func CreateSeriesAggregation(def *pb.MetricDefinition, resourceName, podName, co
 	// For global metrics with decaying distributions, we only build one
 	// distribution for the whole workload (i.e. not one-per-series).
 	case def.HasDecayingDistribution() && (def.GetScope() == "" || def.GetScope() == model.ScopeGlobal):
-		workloadDecayingDistribution = NewDecayingDistributionAggregation(def.GetDecayingDistribution())
+		workloadDecayingDistribution = NewDecayingDistributionAggregation(def.GetDecayingDistribution(), typ)
 		// Don't aggregate series, only use the workload-wide time window.
 		podReducer, containerReducer, labelsReducer = nil, nil, nil
 		finalTransform = CreatePercentileTransform(parsePercentile(def.GetDecayingDistribution().GetPercentile()))
@@ -337,33 +338,45 @@ func groupBy(aggregates []*SeriesAggregate, reduce SeriesReducer) []*SeriesAggre
 	return result
 }
 
-// NewTimeWindow returns the time window for the given
-// metric definition.
-func NewTimeWindow(def *pb.MetricDefinition) model.TimeWindow {
+// NewTimeWindow returns the time window for a series of samples of type typ of
+// the given metric definition.
+func NewTimeWindow(def *pb.MetricDefinition, typ model.SampleType) model.TimeWindow {
 	switch {
 	case def.HasGauge():
 		return NewLatestAggregation(time.Minute)
 	case def.HasRate():
-		return NewRateAggregation(def.GetRate().GetWindow().AsDuration())
+		return NewRateAggregation(def.GetRate().GetWindow().AsDuration(), typ)
 	case def.HasDistribution():
 		// Bucket rates over the same freshness window as gauges.
 		return NewDistributionAggregation(time.Minute)
 	case def.HasDecayingDistribution():
-		return NewDecayingDistributionAggregation(def.GetDecayingDistribution())
+		return NewDecayingDistributionAggregation(def.GetDecayingDistribution(), typ)
 	default:
 		panic("Not implemented")
 	}
 }
 
+// RateAggregation computes the per-second rate of change of a scalar series
+// over a sliding window: its increase between the oldest and the newest
+// samples of the window, divided by the time elapsed between them. A window
+// of zero duration computes the instantaneous rate, between the last two
+// samples of the series.
 type RateAggregation struct {
 	sampleWindow
+	// typ is the type of the samples of the series: the increase of a counter
+	// accounts for its resets.
+	typ model.SampleType
 }
 
 var _ model.TimeWindow = (*RateAggregation)(nil)
 
-func NewRateAggregation(duration time.Duration) *RateAggregation {
+// NewRateAggregation returns a rate window of the given duration for a series
+// of samples of type typ. A zero duration computes the instantaneous rate,
+// between the last two samples of the series.
+func NewRateAggregation(duration time.Duration, typ model.SampleType) *RateAggregation {
 	return &RateAggregation{
 		sampleWindow: newSamplesWindow(duration),
+		typ:          typ,
 	}
 }
 
@@ -376,9 +389,31 @@ func (r *RateAggregation) Apply() (model.Sample, bool) {
 	if deltaTime == 0 {
 		return model.Sample{}, false
 	}
-	deltaValue := newest.Value - oldest.Value
-	v := deltaValue / deltaTime
-	return model.Sample{Value: v}, true
+	return model.Sample{Value: r.increase() / deltaTime}, true
+}
+
+// increase returns how much the series grew over the window, which must hold
+// at least one sample. A gauge may go up or down, so its increase is simply
+// the difference between the newest and the oldest samples. A counter only
+// increases, except when its source resets it (e.g. on restart): a counter
+// sample lower than the previous one marks a reset, and the value the counter
+// had reached before it is added back, as the counter counted from zero
+// since.
+func (r *RateAggregation) increase() float64 {
+	total := r.newest().Value - r.oldest().Value
+	if r.typ != model.SampleTypeCounter {
+		return total
+	}
+
+	// Handle counter resets.
+	prev := r.oldest()
+	for s := range r.All() {
+		if s.Value < prev.Value {
+			total += prev.Value
+		}
+		prev = s
+	}
+	return total
 }
 
 // DistributionAggregation computes the per-second rate of each bucket of a
@@ -401,11 +436,11 @@ func NewDistributionAggregation(duration time.Duration) *DistributionAggregation
 	}
 }
 
-func (d *DistributionAggregation) AddSample(sample model.Sample, now time.Time) {
+func (d *DistributionAggregation) AddSample(sample model.Sample) {
 	if sample.Distribution == nil {
 		return
 	}
-	d.sampleWindow.AddSample(sample, now)
+	d.sampleWindow.AddSample(sample)
 }
 
 func (d *DistributionAggregation) Apply() (model.Sample, bool) {
@@ -489,9 +524,8 @@ func (m *LatestTimeWindow) Apply() (model.Sample, bool) {
 }
 
 // DecayingDistributionAggregation accumulates the samples of a series into a
-// time-decaying histogram. When a rate window is configured, the samples are
-// treated as a counter and the histogram accumulates the rate computed over
-// that window instead.
+// time-decaying histogram. When a rate window is configured, the histogram
+// accumulates the rate of the samples computed over that window instead.
 //
 // Apply returns the histogram itself rather than a percentile, so that the
 // distributions of several series can be merged by the series reducers
@@ -500,30 +534,29 @@ type DecayingDistributionAggregation struct {
 	// histogram is nil when the definition could not be parsed, in which case
 	// the aggregation never reports a value.
 	histogram *model.DecayingHistogram
-	// rate converts the counter samples into rates. Nil for gauges.
+	// rate converts the samples into rates. Nil when no rate window is
+	// configured.
 	rate *RateAggregation
 }
 
 var _ model.TimeWindow = (*DecayingDistributionAggregation)(nil)
 
-// Supersedes implements model.TimeWindow. A histogram cannot replace an
-// observation once it is added.
-func (d *DecayingDistributionAggregation) Supersedes() bool { return false }
-
-func NewDecayingDistributionAggregation(def *pb.DecayingDistribution) *DecayingDistributionAggregation {
+// NewDecayingDistributionAggregation returns the decaying distribution def
+// describes, for a series of samples of type typ.
+func NewDecayingDistributionAggregation(def *pb.DecayingDistribution, typ model.SampleType) *DecayingDistributionAggregation {
 	halfLife := def.GetHalfLife().AsDuration()
 	// The reference time is set by the first sample.
 	histogram, _ := model.NewDecayingHistogram(time.Time{}, halfLife, def.GetBucketSize())
 	a := &DecayingDistributionAggregation{histogram: histogram}
-	if def.GetRate().AsDuration() > 0 {
-		a.rate = NewRateAggregation(def.GetRate().AsDuration())
+	if def.HasRate() {
+		a.rate = NewRateAggregation(def.GetRate().AsDuration(), typ)
 	}
 	return a
 }
 
-func (d *DecayingDistributionAggregation) AddSample(sample model.Sample, now time.Time) {
+func (d *DecayingDistributionAggregation) AddSample(sample model.Sample) {
 	if d.rate != nil {
-		d.rate.AddSample(sample, now)
+		d.rate.AddSample(sample)
 		rate, ok := d.rate.Apply()
 		if !ok {
 			return
@@ -546,6 +579,10 @@ func (d *DecayingDistributionAggregation) Apply() (model.Sample, bool) {
 
 // sampleWindow holds the samples that fall within a sliding time window.
 //
+// A window of zero duration is not empty: it holds the last two samples, the
+// newest one and the one before it. It is the window of the instantaneous
+// rates, computed between the last two samples of a series.
+//
 // The samples are stored oldest first in a ring buffer, in the half-open
 // index range [start, end). At least one slot is always kept free, so that
 // start == end unambiguously means the window is empty.
@@ -560,15 +597,9 @@ func newSamplesWindow(duration time.Duration) sampleWindow {
 }
 
 // AddSample appends sample to the window, after dropping the samples that
-// have fallen out of the window relative to now. A sample carrying the same
-// timestamp as the newest one supersedes it (e.g. a re-scrape of a source
-// that has not produced a new value).
-func (m *sampleWindow) AddSample(sample model.Sample, now time.Time) {
-	m.prune(now)
-	if m.Len() > 0 && m.newest().Timestamp.Equal(sample.Timestamp) {
-		m.samples[(m.end+len(m.samples)-1)%len(m.samples)] = sample
-		return
-	}
+// have fallen out of the window relative to the sample timestamp.
+func (m *sampleWindow) AddSample(sample model.Sample) {
+	m.prune(sample.Timestamp)
 	// Never let the buffer fill up completely, so that start == end can
 	// only mean that the window is empty.
 	if m.Len()+1 >= len(m.samples) {
@@ -578,13 +609,16 @@ func (m *sampleWindow) AddSample(sample model.Sample, now time.Time) {
 	m.end = (m.end + 1) % len(m.samples)
 }
 
-// Supersedes implements model.TimeWindow: see AddSample.
-func (m *sampleWindow) Supersedes() bool { return true }
-
-// prune drops the samples that have fallen out of the window relative to now.
+// prune drops the samples that have fallen out of the window relative to now,
+// ahead of the addition of a new sample. A window of zero duration keeps its
+// newest sample, however old, for the new sample to pair with.
 func (m *sampleWindow) prune(now time.Time) {
+	keep := 0
+	if m.duration == 0 {
+		keep = 1
+	}
 	cutoff := now.Add(-m.duration)
-	for m.start != m.end && m.samples[m.start].Timestamp.Before(cutoff) {
+	for m.Len() > keep && m.samples[m.start].Timestamp.Before(cutoff) {
 		m.start = (m.start + 1) % len(m.samples)
 	}
 }

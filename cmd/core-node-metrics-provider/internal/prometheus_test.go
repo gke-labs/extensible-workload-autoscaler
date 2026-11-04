@@ -69,7 +69,7 @@ http_requests_total 10
 					pb.MetricSample_builder{
 						Name:   proto.String("req_count"),
 						Labels: map[string]string{},
-						Value:  proto.Float64(10),
+						Gauge:  proto.Float64(10),
 					}.Build(),
 				},
 			}.Build()},
@@ -96,7 +96,7 @@ custom 10
 					pb.MetricSample_builder{
 						Name:   proto.String("custom"),
 						Labels: map[string]string{},
-						Value:  proto.Float64(10),
+						Gauge:  proto.Float64(10),
 					}.Build(),
 				},
 			}.Build()},
@@ -128,7 +128,7 @@ class_path 10
 					pb.MetricSample_builder{
 						Name:   proto.String("class_path"),
 						Labels: map[string]string{},
-						Value:  proto.Float64(10),
+						Gauge:  proto.Float64(10),
 					}.Build(),
 				},
 			}.Build()},
@@ -160,7 +160,7 @@ override 10
 					pb.MetricSample_builder{
 						Name:   proto.String("override"),
 						Labels: map[string]string{},
-						Value:  proto.Float64(10),
+						Gauge:  proto.Float64(10),
 					}.Build(),
 				},
 			}.Build()},
@@ -183,12 +183,12 @@ http_requests_total{method="post",code="400"}    3 1395066363000
 					pb.MetricSample_builder{
 						Name:   proto.String("req_count"),
 						Labels: map[string]string{"method": "post", "code": "200"},
-						Value:  proto.Float64(1027),
+						Gauge:  proto.Float64(1027),
 					}.Build(),
 					pb.MetricSample_builder{
 						Name:   proto.String("req_count"),
 						Labels: map[string]string{"method": "post", "code": "400"},
-						Value:  proto.Float64(3),
+						Gauge:  proto.Float64(3),
 					}.Build(),
 				},
 			}.Build()},
@@ -210,7 +210,7 @@ queue_size 42
 					pb.MetricSample_builder{
 						Name:   proto.String("q_size"),
 						Labels: map[string]string{},
-						Value:  proto.Float64(42),
+						Gauge:  proto.Float64(42),
 					}.Build(),
 				},
 			}.Build()},
@@ -265,7 +265,7 @@ requested 456
 					pb.MetricSample_builder{
 						Name:   proto.String("my_metric"),
 						Labels: map[string]string{},
-						Value:  proto.Float64(456),
+						Gauge:  proto.Float64(456),
 					}.Build(),
 				},
 			}.Build()},

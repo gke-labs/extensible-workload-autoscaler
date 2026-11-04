@@ -145,7 +145,8 @@ type Gauge struct {
 
 type Rate struct {
 	// Window defines the temporal period over which the rate is calculated.
-	// Example: "1m", "5m".
+	// Example: "1m", "5m". "0s" calculates the instantaneous rate, between
+	// the last two samples.
 	Window metav1.Duration `json:"window"`
 
 	// Aggregation defines how to combine rates from multiple pods.
@@ -175,7 +176,8 @@ type DecayingDistribution struct {
 	Percentile string `json:"percentile"`
 
 	// Rate calculates a rate over the specified window before sampling.
-	// If set, the input metric is treated as a Counter.
+	// If set, the input metric is treated as a Counter. "0s" calculates the
+	// instantaneous rate, between the last two samples.
 	Rate *metav1.Duration `json:"rate,omitempty"`
 }
 

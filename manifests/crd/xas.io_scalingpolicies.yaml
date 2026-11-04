@@ -109,7 +109,8 @@ spec:
                         rate:
                           description: |-
                             Rate calculates a rate over the specified window before sampling.
-                            If set, the input metric is treated as a Counter.
+                            If set, the input metric is treated as a Counter. "0s" calculates the
+                            instantaneous rate, between the last two samples.
                           type: string
                       required:
                       - bucketSize
@@ -187,7 +188,8 @@ spec:
                         window:
                           description: |-
                             Window defines the temporal period over which the rate is calculated.
-                            Example: "1m", "5m".
+                            Example: "1m", "5m". "0s" calculates the instantaneous rate, between
+                            the last two samples.
                           type: string
                       required:
                       - window

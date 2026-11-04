@@ -224,7 +224,8 @@ message Gauge {
 }
 
 message Rate {
-  // The temporal period for rate calculation.
+  // The temporal period for rate calculation. Zero computes the instantaneous
+  // rate, between the last two samples.
   google.protobuf.Duration window = 1;
   // Pod aggregation method: "Avg", "Sum", "Max", "Min".
   string aggregation = 2;
@@ -244,7 +245,9 @@ message DecayingDistribution {
   string bucket_size = 2;
   // The percentile to extract (e.g. "p100").
   string percentile = 3;
-  // If set, treat input as Counter and calculate rate over this window before sampling.
+  // If set, treat input as Counter and calculate rate over this window before
+  // sampling. Zero computes the instantaneous rate, between the last two
+  // samples.
   google.protobuf.Duration rate = 4;
 }
 
@@ -581,19 +584,27 @@ message MetricSample {
   map<string, string> labels = 2;
   // For resource metrics (e.g. "cpu" or "memory"), the resource name.
   string resource_name = 8;
-  // The scalar value of the sample.
-  double value = 3;
   // Time at which the sample was measured by its source. Optional.
   //
   // Defaults to IngestMetricsRequest.timestamp when unset. Samples older than
   // the last sample of their series are dropped as out of order, and samples
   // timestamped more than 5 minutes after IngestMetricsRequest.timestamp are
   // dropped as invalid. A sample carrying the same timestamp as the last one
-  // supersedes it, except in decaying distributions, which cannot replace an
-  // observation and ignore it.
+  // is ignored: the first sample wins.
   google.protobuf.Timestamp timestamp = 4;
-  // The histogram value of the sample (if its a distribution).
-  Histogram histogram = 5;
+  // The data point itself: a gauge or a counter for scalars, or a histogram
+  // for distributions.
+  oneof data {
+    // The scalar value of the sample, which may go up or down (e.g. a queue
+    // depth).
+    double gauge = 3;
+    // The cumulative value of the sample (e.g. a request count): a counter
+    // only increases, except when its source resets it (e.g. on restart).
+    // Rates account for such resets.
+    double counter = 6;
+    // The histogram value of the sample (if its a distribution).
+    Histogram histogram = 5;
+  }
 }
 
 // A histogram (aka distribution) value.

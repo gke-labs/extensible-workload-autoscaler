@@ -118,7 +118,7 @@ func (p *CoreClusterMetricsProvider) processCustomMetric(
 					pb.MetricSample_builder{
 						Name:            proto.String(m.GetName()),
 						RecommenderName: proto.String(m.GetRecommenderName()),
-						Value:           proto.Float64(val),
+						Gauge:           proto.Float64(val),
 						Timestamp:       timestamppb.New(time.Unix(ts, 0)),
 					}.Build(),
 				},
@@ -152,7 +152,7 @@ func (p *CoreClusterMetricsProvider) processCustomMetric(
 			Samples: []*pb.MetricSample{
 				pb.MetricSample_builder{
 					Name:      proto.String(m.GetName()),
-					Value:     proto.Float64(val),
+					Gauge:     proto.Float64(val),
 					Timestamp: timestamppb.New(time.Unix(ts, 0)),
 				}.Build(),
 			},

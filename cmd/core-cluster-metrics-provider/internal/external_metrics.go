@@ -67,7 +67,7 @@ func (p *CoreClusterMetricsProvider) processExternalMetric(namespace string, m *
 			Name:            proto.String(m.GetName()),
 			RecommenderName: proto.String(m.GetRecommenderName()),
 			Labels:          item.MetricLabels,
-			Value:           proto.Float64(val),
+			Gauge:           proto.Float64(val),
 			Timestamp:       timestamppb.New(time.Unix(ts, 0)),
 		}.Build())
 	}

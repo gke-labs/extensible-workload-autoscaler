@@ -86,8 +86,12 @@ func validateMetricDefinition(m *pb.MetricDefinition) error {
 	}
 	if m.HasRate() {
 		intents++
-		if m.GetRate().GetWindow().AsDuration() <= 0 {
-			return status.Errorf(codes.InvalidArgument, "metric %s: a positive window is required for rate intent", m.GetName())
+		// A zero window is valid: it computes the instantaneous rate.
+		if !m.GetRate().HasWindow() {
+			return status.Errorf(codes.InvalidArgument, "metric %s: a window is required for rate intent", m.GetName())
+		}
+		if m.GetRate().GetWindow().AsDuration() < 0 {
+			return status.Errorf(codes.InvalidArgument, "metric %s: the window of a rate intent must not be negative", m.GetName())
 		}
 	}
 	if m.HasDistribution() {
@@ -106,6 +110,9 @@ func validateMetricDefinition(m *pb.MetricDefinition) error {
 		}
 		if m.GetDecayingDistribution().GetPercentile() == "" {
 			return status.Errorf(codes.InvalidArgument, "metric %s: percentile is required for decaying_distribution intent", m.GetName())
+		}
+		if m.GetDecayingDistribution().GetRate().AsDuration() < 0 {
+			return status.Errorf(codes.InvalidArgument, "metric %s: the rate of a decaying_distribution intent must not be negative", m.GetName())
 		}
 	}
 
@@ -200,6 +207,15 @@ func validateIngestMetricsRequest(req *pb.IngestMetricsRequest) error {
 	// freshness timestamp of the series, so it cannot be omitted.
 	if !req.HasTimestamp() {
 		return status.Errorf(codes.InvalidArgument, "timestamp is required")
+	}
+	for _, policyMetrics := range req.GetPolicyMetrics() {
+		for _, batch := range policyMetrics.GetBatches() {
+			for _, sample := range batch.GetSamples() {
+				if !sample.HasData() {
+					return status.Errorf(codes.InvalidArgument, "sample of metric %q has no data: one of gauge, counter or histogram is required", sample.GetName())
+				}
+			}
+		}
 	}
 	return validateClusterName(req.GetClusterName())
 }

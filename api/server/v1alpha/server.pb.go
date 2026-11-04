@@ -1707,7 +1707,8 @@ func (x *Rate) ClearAggregation() {
 type Rate_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// The temporal period for rate calculation.
+	// The temporal period for rate calculation. Zero computes the instantaneous
+	// rate, between the last two samples.
 	Window *durationpb.Duration
 	// Pod aggregation method: "Avg", "Sum", "Max", "Min".
 	Aggregation *string
@@ -1982,7 +1983,9 @@ type DecayingDistribution_builder struct {
 	BucketSize *string
 	// The percentile to extract (e.g. "p100").
 	Percentile *string
-	// If set, treat input as Counter and calculate rate over this window before sampling.
+	// If set, treat input as Counter and calculate rate over this window before
+	// sampling. Zero computes the instantaneous rate, between the last two
+	// samples.
 	Rate *durationpb.Duration
 }
 
@@ -5438,9 +5441,8 @@ type MetricSample struct {
 	xxx_hidden_RecommenderName *string                `protobuf:"bytes,9,opt,name=recommender_name,json=recommenderName"`
 	xxx_hidden_Labels          map[string]string      `protobuf:"bytes,2,rep,name=labels" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	xxx_hidden_ResourceName    *string                `protobuf:"bytes,8,opt,name=resource_name,json=resourceName"`
-	xxx_hidden_Value           float64                `protobuf:"fixed64,3,opt,name=value"`
 	xxx_hidden_Timestamp       *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=timestamp"`
-	xxx_hidden_Histogram       *Histogram             `protobuf:"bytes,5,opt,name=histogram"`
+	xxx_hidden_Data            isMetricSample_Data    `protobuf_oneof:"data"`
 	XXX_raceDetectHookData     protoimpl.RaceDetectHookData
 	XXX_presence               [1]uint32
 	unknownFields              protoimpl.UnknownFields
@@ -5509,13 +5511,6 @@ func (x *MetricSample) GetResourceName() string {
 	return ""
 }
 
-func (x *MetricSample) GetValue() float64 {
-	if x != nil {
-		return x.xxx_hidden_Value
-	}
-	return 0
-}
-
 func (x *MetricSample) GetTimestamp() *timestamppb.Timestamp {
 	if x != nil {
 		return x.xxx_hidden_Timestamp
@@ -5523,21 +5518,41 @@ func (x *MetricSample) GetTimestamp() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *MetricSample) GetGauge() float64 {
+	if x != nil {
+		if x, ok := x.xxx_hidden_Data.(*metricSample_Gauge); ok {
+			return x.Gauge
+		}
+	}
+	return 0
+}
+
+func (x *MetricSample) GetCounter() float64 {
+	if x != nil {
+		if x, ok := x.xxx_hidden_Data.(*metricSample_Counter); ok {
+			return x.Counter
+		}
+	}
+	return 0
+}
+
 func (x *MetricSample) GetHistogram() *Histogram {
 	if x != nil {
-		return x.xxx_hidden_Histogram
+		if x, ok := x.xxx_hidden_Data.(*metricSample_Histogram); ok {
+			return x.Histogram
+		}
 	}
 	return nil
 }
 
 func (x *MetricSample) SetName(v string) {
 	x.xxx_hidden_Name = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 7)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 6)
 }
 
 func (x *MetricSample) SetRecommenderName(v string) {
 	x.xxx_hidden_RecommenderName = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 7)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 6)
 }
 
 func (x *MetricSample) SetLabels(v map[string]string) {
@@ -5546,20 +5561,27 @@ func (x *MetricSample) SetLabels(v map[string]string) {
 
 func (x *MetricSample) SetResourceName(v string) {
 	x.xxx_hidden_ResourceName = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 7)
-}
-
-func (x *MetricSample) SetValue(v float64) {
-	x.xxx_hidden_Value = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 4, 7)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 3, 6)
 }
 
 func (x *MetricSample) SetTimestamp(v *timestamppb.Timestamp) {
 	x.xxx_hidden_Timestamp = v
 }
 
+func (x *MetricSample) SetGauge(v float64) {
+	x.xxx_hidden_Data = &metricSample_Gauge{v}
+}
+
+func (x *MetricSample) SetCounter(v float64) {
+	x.xxx_hidden_Data = &metricSample_Counter{v}
+}
+
 func (x *MetricSample) SetHistogram(v *Histogram) {
-	x.xxx_hidden_Histogram = v
+	if v == nil {
+		x.xxx_hidden_Data = nil
+		return
+	}
+	x.xxx_hidden_Data = &metricSample_Histogram{v}
 }
 
 func (x *MetricSample) HasName() bool {
@@ -5583,13 +5605,6 @@ func (x *MetricSample) HasResourceName() bool {
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 3)
 }
 
-func (x *MetricSample) HasValue() bool {
-	if x == nil {
-		return false
-	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 4)
-}
-
 func (x *MetricSample) HasTimestamp() bool {
 	if x == nil {
 		return false
@@ -5597,11 +5612,35 @@ func (x *MetricSample) HasTimestamp() bool {
 	return x.xxx_hidden_Timestamp != nil
 }
 
+func (x *MetricSample) HasData() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Data != nil
+}
+
+func (x *MetricSample) HasGauge() bool {
+	if x == nil {
+		return false
+	}
+	_, ok := x.xxx_hidden_Data.(*metricSample_Gauge)
+	return ok
+}
+
+func (x *MetricSample) HasCounter() bool {
+	if x == nil {
+		return false
+	}
+	_, ok := x.xxx_hidden_Data.(*metricSample_Counter)
+	return ok
+}
+
 func (x *MetricSample) HasHistogram() bool {
 	if x == nil {
 		return false
 	}
-	return x.xxx_hidden_Histogram != nil
+	_, ok := x.xxx_hidden_Data.(*metricSample_Histogram)
+	return ok
 }
 
 func (x *MetricSample) ClearName() {
@@ -5619,17 +5658,51 @@ func (x *MetricSample) ClearResourceName() {
 	x.xxx_hidden_ResourceName = nil
 }
 
-func (x *MetricSample) ClearValue() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 4)
-	x.xxx_hidden_Value = 0
-}
-
 func (x *MetricSample) ClearTimestamp() {
 	x.xxx_hidden_Timestamp = nil
 }
 
+func (x *MetricSample) ClearData() {
+	x.xxx_hidden_Data = nil
+}
+
+func (x *MetricSample) ClearGauge() {
+	if _, ok := x.xxx_hidden_Data.(*metricSample_Gauge); ok {
+		x.xxx_hidden_Data = nil
+	}
+}
+
+func (x *MetricSample) ClearCounter() {
+	if _, ok := x.xxx_hidden_Data.(*metricSample_Counter); ok {
+		x.xxx_hidden_Data = nil
+	}
+}
+
 func (x *MetricSample) ClearHistogram() {
-	x.xxx_hidden_Histogram = nil
+	if _, ok := x.xxx_hidden_Data.(*metricSample_Histogram); ok {
+		x.xxx_hidden_Data = nil
+	}
+}
+
+const MetricSample_Data_not_set_case case_MetricSample_Data = 0
+const MetricSample_Gauge_case case_MetricSample_Data = 3
+const MetricSample_Counter_case case_MetricSample_Data = 6
+const MetricSample_Histogram_case case_MetricSample_Data = 5
+
+func (x *MetricSample) WhichData() case_MetricSample_Data {
+	if x == nil {
+		return MetricSample_Data_not_set_case
+	}
+	switch x.xxx_hidden_Data.(type) {
+	case *metricSample_Gauge:
+		return MetricSample_Gauge_case
+	case *metricSample_Counter:
+		return MetricSample_Counter_case
+	case *metricSample_Histogram:
+		return MetricSample_Histogram_case
+	default:
+		return MetricSample_Data_not_set_case
+	}
 }
 
 type MetricSample_builder struct {
@@ -5643,19 +5716,28 @@ type MetricSample_builder struct {
 	Labels map[string]string
 	// For resource metrics (e.g. "cpu" or "memory"), the resource name.
 	ResourceName *string
-	// The scalar value of the sample.
-	Value *float64
 	// Time at which the sample was measured by its source. Optional.
 	//
 	// Defaults to IngestMetricsRequest.timestamp when unset. Samples older than
 	// the last sample of their series are dropped as out of order, and samples
 	// timestamped more than 5 minutes after IngestMetricsRequest.timestamp are
 	// dropped as invalid. A sample carrying the same timestamp as the last one
-	// supersedes it, except in decaying distributions, which cannot replace an
-	// observation and ignore it.
+	// is ignored: the first sample wins.
 	Timestamp *timestamppb.Timestamp
+	// The data point itself: a gauge or a counter for scalars, or a histogram
+	// for distributions.
+
+	// Fields of oneof xxx_hidden_Data:
+	// The scalar value of the sample, which may go up or down (e.g. a queue
+	// depth).
+	Gauge *float64
+	// The cumulative value of the sample (e.g. a request count): a counter
+	// only increases, except when its source resets it (e.g. on restart).
+	// Rates account for such resets.
+	Counter *float64
 	// The histogram value of the sample (if its a distribution).
 	Histogram *Histogram
+	// -- end of xxx_hidden_Data
 }
 
 func (b0 MetricSample_builder) Build() *MetricSample {
@@ -5663,26 +5745,68 @@ func (b0 MetricSample_builder) Build() *MetricSample {
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.Name != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 7)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 6)
 		x.xxx_hidden_Name = b.Name
 	}
 	if b.RecommenderName != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 7)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 6)
 		x.xxx_hidden_RecommenderName = b.RecommenderName
 	}
 	x.xxx_hidden_Labels = b.Labels
 	if b.ResourceName != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 7)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 3, 6)
 		x.xxx_hidden_ResourceName = b.ResourceName
 	}
-	if b.Value != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 4, 7)
-		x.xxx_hidden_Value = *b.Value
-	}
 	x.xxx_hidden_Timestamp = b.Timestamp
-	x.xxx_hidden_Histogram = b.Histogram
+	if b.Gauge != nil {
+		x.xxx_hidden_Data = &metricSample_Gauge{*b.Gauge}
+	}
+	if b.Counter != nil {
+		x.xxx_hidden_Data = &metricSample_Counter{*b.Counter}
+	}
+	if b.Histogram != nil {
+		x.xxx_hidden_Data = &metricSample_Histogram{b.Histogram}
+	}
 	return m0
 }
+
+type case_MetricSample_Data protoreflect.FieldNumber
+
+func (x case_MetricSample_Data) String() string {
+	md := file_server_proto_msgTypes[42].Descriptor()
+	if x == 0 {
+		return "not set"
+	}
+	return protoimpl.X.MessageFieldStringOf(md, protoreflect.FieldNumber(x))
+}
+
+type isMetricSample_Data interface {
+	isMetricSample_Data()
+}
+
+type metricSample_Gauge struct {
+	// The scalar value of the sample, which may go up or down (e.g. a queue
+	// depth).
+	Gauge float64 `protobuf:"fixed64,3,opt,name=gauge,oneof"`
+}
+
+type metricSample_Counter struct {
+	// The cumulative value of the sample (e.g. a request count): a counter
+	// only increases, except when its source resets it (e.g. on restart).
+	// Rates account for such resets.
+	Counter float64 `protobuf:"fixed64,6,opt,name=counter,oneof"`
+}
+
+type metricSample_Histogram struct {
+	// The histogram value of the sample (if its a distribution).
+	Histogram *Histogram `protobuf:"bytes,5,opt,name=histogram,oneof"`
+}
+
+func (*metricSample_Gauge) isMetricSample_Data() {}
+
+func (*metricSample_Counter) isMetricSample_Data() {}
+
+func (*metricSample_Histogram) isMetricSample_Data() {}
 
 // A histogram (aka distribution) value.
 type Histogram struct {
@@ -6235,18 +6359,20 @@ const file_server_proto_rawDesc = "" +
 	"\vMetricBatch\x12\x19\n" +
 	"\bpod_name\x18\x01 \x01(\tR\apodName\x12%\n" +
 	"\x0econtainer_name\x18\x03 \x01(\tR\rcontainerName\x12:\n" +
-	"\asamples\x18\x02 \x03(\v2 .xas.server.v1alpha.MetricSampleR\asamples\"\x80\x03\n" +
+	"\asamples\x18\x02 \x03(\v2 .xas.server.v1alpha.MetricSampleR\asamples\"\xa8\x03\n" +
 	"\fMetricSample\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12)\n" +
 	"\x10recommender_name\x18\t \x01(\tR\x0frecommenderName\x12D\n" +
 	"\x06labels\x18\x02 \x03(\v2,.xas.server.v1alpha.MetricSample.LabelsEntryR\x06labels\x12#\n" +
-	"\rresource_name\x18\b \x01(\tR\fresourceName\x12\x14\n" +
-	"\x05value\x18\x03 \x01(\x01R\x05value\x128\n" +
-	"\ttimestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12;\n" +
-	"\thistogram\x18\x05 \x01(\v2\x1d.xas.server.v1alpha.HistogramR\thistogram\x1a9\n" +
+	"\rresource_name\x18\b \x01(\tR\fresourceName\x128\n" +
+	"\ttimestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x16\n" +
+	"\x05gauge\x18\x03 \x01(\x01H\x00R\x05gauge\x12\x1a\n" +
+	"\acounter\x18\x06 \x01(\x01H\x00R\acounter\x12=\n" +
+	"\thistogram\x18\x05 \x01(\v2\x1d.xas.server.v1alpha.HistogramH\x00R\thistogram\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb5\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x06\n" +
+	"\x04data\"\xb5\x01\n" +
 	"\tHistogram\x12D\n" +
 	"\abuckets\x18\x01 \x03(\v2*.xas.server.v1alpha.Histogram.BucketsEntryR\abuckets\x12\x10\n" +
 	"\x03sum\x18\x02 \x01(\x01R\x03sum\x12\x14\n" +
@@ -6462,6 +6588,11 @@ func init() { file_server_proto_init() }
 func file_server_proto_init() {
 	if File_server_proto != nil {
 		return
+	}
+	file_server_proto_msgTypes[42].OneofWrappers = []any{
+		(*metricSample_Gauge)(nil),
+		(*metricSample_Counter)(nil),
+		(*metricSample_Histogram)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

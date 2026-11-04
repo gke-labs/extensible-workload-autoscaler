@@ -66,6 +66,23 @@ func TestMetricCalculations(t *testing.T) {
 			want: map[string]float64{"requests": 6.0},
 		},
 		{
+			name: "Counters: Rate Calculation (Reset)",
+			metrics: []*pb.MetricDefinition{
+				pb.MetricDefinition_builder{Name: proto.String("requests"), Rate: pb.Rate_builder{Window: durationpb.New(time.Minute), Aggregation: proto.String("Sum")}.Build()}.Build(),
+			},
+			workload: []*pb.PodState{pb.PodState_builder{Name: proto.String("p1"), IsReady: proto.Bool(true)}.Build()},
+			ingest: func(s *MemoryStore, clk *clock.FakeClock, ns, pol string) {
+				ingestCounter(s, clk.Now().Unix(), ns, pol, "p1", "requests", 100)
+				clk.Advance(10 * time.Second)
+				// p1 restarted: its counter counts from zero again.
+				ingestCounter(s, clk.Now().Unix(), ns, pol, "p1", "requests", 20)
+				clk.Advance(10 * time.Second)
+				ingestCounter(s, clk.Now().Unix(), ns, pol, "p1", "requests", 60)
+			},
+			// (20 + 40) in 20s = 3.0 req/s, rather than (60 - 100) / 20s.
+			want: map[string]float64{"requests": 3.0},
+		},
+		{
 			name: "Gauges: Max Aggregation",
 			metrics: []*pb.MetricDefinition{
 				pb.MetricDefinition_builder{Name: proto.String("queue_depth"), Gauge: pb.Gauge_builder{Aggregation: proto.String("Max")}.Build()}.Build(),
@@ -161,13 +178,13 @@ func TestMetricCalculations(t *testing.T) {
 			ingest: func(s *MemoryStore, clk *clock.FakeClock, ns, pol string) {
 				t0 := clk.Now().Unix()
 				ingest(s, t0, ns, pol, "p1", "reqs", 100)
-				ingest(s, t0, ns, pol, "p1", "reqs", 150) // Same timestamp, should update LastRaw.Value to 150
+				ingest(s, t0, ns, pol, "p1", "reqs", 150) // Same timestamp: ignored, the first sample wins.
 
 				clk.Advance(10 * time.Second)
 				t1 := clk.Now().Unix()
-				ingest(s, t1, ns, pol, "p1", "reqs", 250) // diff = 250 - 150 = 100. rate = 100/10 = 10
+				ingest(s, t1, ns, pol, "p1", "reqs", 250) // diff = 250 - 100 = 150. rate = 150/10 = 15
 			},
-			want: map[string]float64{"reqs": 10.0},
+			want: map[string]float64{"reqs": 15.0},
 		},
 		{
 			name: "Readiness: Ignore NotReady Pods",
@@ -273,25 +290,32 @@ func ingest(s *MemoryStore, ts int64, ns, pol, pod, metric string, val float64) 
 }
 
 func ingestWithLabels(s *MemoryStore, ts int64, ns, pol, pod, metric string, val float64, labels map[string]string) {
-	s.AddBatch(pb.IngestMetricsRequest_builder{
-		ClusterName: proto.String("default"),
-		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
-		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
-			Namespace: proto.String(ns), Name: proto.String(pol),
-			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{
-				PodName: proto.String(pod),
-				Samples: []*pb.MetricSample{pb.MetricSample_builder{
-					Name:      proto.String(metric),
-					Value:     proto.Float64(val),
-					Labels:    labels,
-					Timestamp: timestamppb.New(time.Unix(ts, 0)),
-				}.Build()},
-			}.Build()},
-		}.Build()},
+	addBatchSample(s, ts, ns, pol, pod, pb.MetricSample_builder{
+		Name:      proto.String(metric),
+		Gauge:     proto.Float64(val),
+		Labels:    labels,
+		Timestamp: timestamppb.New(time.Unix(ts, 0)),
+	}.Build())
+}
+
+func ingestCounter(s *MemoryStore, ts int64, ns, pol, pod, metric string, val float64) {
+	addBatchSample(s, ts, ns, pol, pod, pb.MetricSample_builder{
+		Name:      proto.String(metric),
+		Counter:   proto.Float64(val),
+		Timestamp: timestamppb.New(time.Unix(ts, 0)),
 	}.Build())
 }
 
 func ingestHist(s *MemoryStore, ts int64, ns, pol, pod, metric string, buckets map[string]uint64) {
+	addBatchSample(s, ts, ns, pol, pod, pb.MetricSample_builder{
+		Name:      proto.String(metric),
+		Histogram: pb.Histogram_builder{Buckets: buckets}.Build(),
+		Timestamp: timestamppb.New(time.Unix(ts, 0)),
+	}.Build())
+}
+
+// addBatchSample ingests a single sample, reported by pod at ts.
+func addBatchSample(s *MemoryStore, ts int64, ns, pol, pod string, sample *pb.MetricSample) {
 	s.AddBatch(pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("default"),
 		Timestamp:   timestamppb.New(time.Unix(ts, 0)),
@@ -299,11 +323,7 @@ func ingestHist(s *MemoryStore, ts int64, ns, pol, pod, metric string, buckets m
 			Namespace: proto.String(ns), Name: proto.String(pol),
 			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{
 				PodName: proto.String(pod),
-				Samples: []*pb.MetricSample{pb.MetricSample_builder{
-					Name:      proto.String(metric),
-					Histogram: pb.Histogram_builder{Buckets: buckets}.Build(),
-					Timestamp: timestamppb.New(time.Unix(ts, 0)),
-				}.Build()},
+				Samples: []*pb.MetricSample{sample},
 			}.Build()},
 		}.Build()},
 	}.Build())
@@ -409,7 +429,7 @@ func TestDump(t *testing.T) {
 			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{
 				PodName: proto.String("p1"),
 				Samples: []*pb.MetricSample{pb.MetricSample_builder{
-					Name: proto.String("cpu"), Value: proto.Float64(1.0), Timestamp: timestamppb.New(time.Unix(1000, 0)),
+					Name: proto.String("cpu"), Gauge: proto.Float64(1.0), Timestamp: timestamppb.New(time.Unix(1000, 0)),
 				}.Build()},
 			}.Build()},
 		}.Build()},
@@ -482,6 +502,7 @@ func TestDump(t *testing.T) {
               "ContainerName": "",
               "ResourceName": "",
               "Labels": null,
+              "Type": "Gauge",
               "LastRaw": {
                 "Timestamp": "1970-01-01T00:16:40Z",
                 "Value": 1,
@@ -736,14 +757,14 @@ func TestMultiTenantIsolation(t *testing.T) {
 		ClusterName: proto.String("cluster-A"), Timestamp: timestamppb.New(time.Unix(1000, 0)),
 		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
 			Namespace: proto.String(ns), Name: proto.String(name),
-			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("pod-a"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(1000, 0))}.Build()}}.Build()},
+			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("pod-a"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Gauge: proto.Float64(100), Timestamp: timestamppb.New(time.Unix(1000, 0))}.Build()}}.Build()},
 		}.Build()},
 	}.Build())
 	s.AddBatch(pb.IngestMetricsRequest_builder{
 		ClusterName: proto.String("cluster-B"), Timestamp: timestamppb.New(time.Unix(1000, 0)),
 		PolicyMetrics: []*pb.PolicyMetricBatch{pb.PolicyMetricBatch_builder{
 			Namespace: proto.String(ns), Name: proto.String(name),
-			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("pod-b"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Value: proto.Float64(200), Timestamp: timestamppb.New(time.Unix(1000, 0))}.Build()}}.Build()},
+			Batches: []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("pod-b"), Samples: []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("m"), Gauge: proto.Float64(200), Timestamp: timestamppb.New(time.Unix(1000, 0))}.Build()}}.Build()},
 		}.Build()},
 	}.Build())
 
@@ -1138,7 +1159,7 @@ func ingestResource(s *MemoryStore, ts int64, ns, pol, pod, container, metric, r
 				Samples: []*pb.MetricSample{pb.MetricSample_builder{
 					Name:         proto.String(metric),
 					ResourceName: proto.String(resourceName),
-					Value:        proto.Float64(val),
+					Gauge:        proto.Float64(val),
 					Timestamp:    timestamppb.New(time.Unix(ts, 0)),
 				}.Build()},
 			}.Build()},
@@ -1158,7 +1179,7 @@ func ingestOwned(s *MemoryStore, ts int64, ns, pol, pod, owner, metric string, v
 				Samples: []*pb.MetricSample{pb.MetricSample_builder{
 					Name:            proto.String(metric),
 					RecommenderName: proto.String(owner),
-					Value:           proto.Float64(val),
+					Gauge:           proto.Float64(val),
 					Timestamp:       timestamppb.New(time.Unix(ts, 0)),
 				}.Build()},
 			}.Build()},

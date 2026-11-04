@@ -3,7 +3,6 @@ package model
 import (
 	"fmt"
 	"hash/fnv"
-	"reflect"
 	"sort"
 	"time"
 )
@@ -25,6 +24,20 @@ const (
 	ScopeContainer = "Container"
 )
 
+// SampleType is the type of the samples of a series, which all share it.
+type SampleType string
+
+const (
+	// SampleTypeGauge is a scalar that may go up or down (e.g. a queue depth).
+	SampleTypeGauge SampleType = "Gauge"
+	// SampleTypeCounter is a cumulative scalar (e.g. a request count) that
+	// only increases, except when its source resets it (e.g. on restart).
+	SampleTypeCounter SampleType = "Counter"
+	// SampleTypeHistogram is a distribution: the cumulative buckets reported
+	// by the source.
+	SampleTypeHistogram SampleType = "Histogram"
+)
+
 // Sample represents the raw data from the source
 type Sample struct {
 	// Source Timestamp.
@@ -43,14 +56,12 @@ type TimeWindow interface {
 	// Apply returns the aggregate, reporting false when there is nothing to
 	// report (e.g. no sample in the window).
 	Apply() (Sample, bool)
-	AddSample(sample Sample, now time.Time)
-	// Supersedes reports whether a sample carrying the same timestamp as the
-	// previous one replaces it in the window. Windows that accumulate every
-	// sample as a distinct observation and cannot replace one once added
-	// (e.g. decaying histograms) report false: Series do not feed them such a
-	// sample, which they would count twice, so the first sample wins, as in
-	// the VPA recommender.
-	Supersedes() bool
+	// AddSample feeds sample to the window, which advances on the sample
+	// timestamp (the clock of the series' source) rather than on the time
+	// the sample was ingested, so that a source lagging behind by more than
+	// the window duration still fills its window. The samples of a series
+	// are fed in strictly increasing timestamp order (see Series.AddSample).
+	AddSample(sample Sample)
 }
 
 // Series holds the state of a single metric stream
@@ -63,6 +74,10 @@ type Series struct {
 	// The name of the resource this metric describes (e.g. "cpu or "memory").
 	ResourceName string
 	Labels       map[string]string
+	// Type is the type of the samples of the series: all of them are of the
+	// type of the sample the series was created with, which its time window
+	// is built for (e.g. the rate of a counter accounts for its resets).
+	Type SampleType
 
 	// LastRaw is the most recent sample recorded in the time window of the
 	// series. Its timestamp is the time at which the sample was measured by
@@ -82,59 +97,42 @@ type Series struct {
 	TimeWindow TimeWindow `json:"-"`
 }
 
-// NewSeries returns a series reported by the given container of the given pod
-// with the given labels, whose samples are aggregated over time by window.
-func NewSeries(podName, containerName, resourceName string, labels map[string]string, window TimeWindow) *Series {
+// NewSeries returns a series of samples of type typ reported by the given
+// container of the given pod with the given labels, whose samples are
+// aggregated over time by window.
+func NewSeries(podName, containerName, resourceName string, labels map[string]string, typ SampleType, window TimeWindow) *Series {
 	return &Series{
 		PodName:       podName,
 		ContainerName: containerName,
 		ResourceName:  resourceName,
 		Labels:        labels,
+		Type:          typ,
 		TimeWindow:    window,
 	}
 }
 
 // AddSample feeds sample, reported at ingestTime, to the time window of the
-// series and records it as the latest raw sample.
+// series and records it as the latest raw sample. ingestTime only tracks the
+// liveness of the series: the time window advances on the sample timestamp
+// (see TimeWindow.AddSample).
 //
-// The time window is advanced on the clock of the series' source (the sample
-// timestamp) rather than on ingestTime, so that a source lagging behind by
-// more than the window duration still fills its window.
-//
-// A sample identical to the last one (e.g. a source re-reporting its last
-// value) only shows that the series is still being reported. A sample carrying
-// the same timestamp as the last one with a new value (e.g. a re-scrape of a
-// source within the same second) supersedes it in the time window, unless the
-// window cannot supersede a sample (see TimeWindow.Supersedes), in which case
-// the sample is not recorded: the window keeps the sample it already holds.
+// A sample carrying the same timestamp as the last one (e.g. a source
+// re-reporting its last value, or a re-scrape of a source within the same
+// second) is ignored: the first sample wins, as in the VPA recommender. It
+// only shows that the series is still being reported.
 func (s *Series) AddSample(sample Sample, ingestTime time.Time) {
 	// Requests may be delivered out of order.
 	if ingestTime.After(s.LastIngested) {
 		s.LastIngested = ingestTime
 	}
-	if s.isRepeat(sample) {
+	if !s.LastRaw.Timestamp.IsZero() && sample.Timestamp.Equal(s.LastRaw.Timestamp) {
 		return
 	}
-	sameTimestamp := !s.LastRaw.Timestamp.IsZero() && sample.Timestamp.Equal(s.LastRaw.Timestamp)
-	if sameTimestamp && !s.TimeWindow.Supersedes() {
-		return
-	}
-	s.TimeWindow.AddSample(sample, sample.Timestamp)
-	// A superseding sample was measured over the same interval as the sample
-	// it supersedes.
-	if !s.LastRaw.Timestamp.IsZero() && !sameTimestamp {
+	s.TimeWindow.AddSample(sample)
+	if !s.LastRaw.Timestamp.IsZero() {
 		s.LastRawWindow = sample.Timestamp.Sub(s.LastRaw.Timestamp)
 	}
 	s.LastRaw = sample
-}
-
-// isRepeat reports whether sample is identical to the last sample of the
-// series.
-func (s *Series) isRepeat(sample Sample) bool {
-	return !s.LastRaw.Timestamp.IsZero() &&
-		sample.Timestamp.Equal(s.LastRaw.Timestamp) &&
-		sample.Value == s.LastRaw.Value &&
-		reflect.DeepEqual(sample.Distribution, s.LastRaw.Distribution)
 }
 
 // SeriesID identifies a timeseries within a metric. It's composed of the pod,
