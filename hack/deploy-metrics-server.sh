@@ -10,11 +10,11 @@ set -o pipefail
 #        version: The metrics-server release version (defaults to "latest").
 
 VERSION=${1:-"latest"}
-KIND_CLUSTER_NAME="${KIND_CLUSTER_NAME:-xas-e2e}"
-KUBE_CONTEXT="kind-${KIND_CLUSTER_NAME}"
+CLUSTER_NAME="${CLUSTER_NAME:-xas-e2e}"
+KUBE_CONTEXT="kind-${CLUSTER_NAME}"
 
 if ! kubectl config get-contexts "${KUBE_CONTEXT}" >/dev/null 2>&1; then
-  echo "Error: kubectl context '${KUBE_CONTEXT}' not found. Is KinD cluster '${KIND_CLUSTER_NAME}' running?" >&2
+  echo "Error: kubectl context '${KUBE_CONTEXT}' not found. Is KinD cluster '${CLUSTER_NAME}' running?" >&2
   exit 1
 fi
 
