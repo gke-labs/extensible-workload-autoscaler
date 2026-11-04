@@ -3,11 +3,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+export CLUSTER_NAME="${CLUSTER_NAME:-xas-e2e}"
+IMAGE_TAG="e2e"
+
 # 1. Create Cluster
 ./hack/create-kind-cluster.sh
-
-CLUSTER_NAME="xas-e2e"
-IMAGE_TAG="e2e"
 
 echo "=========================================================="
 echo "Setting up xAS on Kind..."
