@@ -84,9 +84,9 @@ func (a *CoreNodeMetricsProvider) scrapePod(ip string, port string, path string,
 			case dto.MetricType_COUNTER:
 				if m.Counter != nil && wantBase {
 					samples = append(samples, pb.MetricSample_builder{
-						Name:   proto.String(name),
-						Labels: labels,
-						Gauge:  proto.Float64(m.Counter.GetValue()),
+						Name:    proto.String(name),
+						Labels:  labels,
+						Counter: proto.Float64(m.Counter.GetValue()),
 					}.Build())
 				}
 			case dto.MetricType_HISTOGRAM:
@@ -112,19 +112,23 @@ func (a *CoreNodeMetricsProvider) scrapePod(ip string, port string, path string,
 						}.Build())
 					}
 
+					// The sum and the count of the observations of a
+					// histogram are cumulative, like counters: they only
+					// increase (the sum, as long as no observation is
+					// negative), except when the source resets them.
 					if wantSum {
 						samples = append(samples, pb.MetricSample_builder{
-							Name:   proto.String(name + "_sum"),
-							Labels: labels,
-							Gauge:  proto.Float64(m.Histogram.GetSampleSum()),
+							Name:    proto.String(name + "_sum"),
+							Labels:  labels,
+							Counter: proto.Float64(m.Histogram.GetSampleSum()),
 						}.Build())
 					}
 
 					if wantCount {
 						samples = append(samples, pb.MetricSample_builder{
-							Name:   proto.String(name + "_count"),
-							Labels: labels,
-							Gauge:  proto.Float64(float64(m.Histogram.GetSampleCount())),
+							Name:    proto.String(name + "_count"),
+							Labels:  labels,
+							Counter: proto.Float64(float64(m.Histogram.GetSampleCount())),
 						}.Build())
 					}
 				}

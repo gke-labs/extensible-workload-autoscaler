@@ -173,35 +173,18 @@ func (a *CoreNodeMetricsProvider) processKubeletMetric(pod corev1.Pod, m *pb.Met
 	batches := make([]*pb.MetricBatch, 0, len(podStats.Containers))
 
 	for cName, cStats := range podStats.Containers {
-		val, ts, ok := a.containerUsage(pod, cName, cStats, metricType, m.GetName(), seenKeys)
+		sample, ok := a.containerSample(pod, cName, cStats, metricType, metricMode, m.GetName(), seenKeys)
 		if !ok {
 			continue
 		}
-
-		if metricMode == "utilization" {
-			// Utilization is a per-container ratio: the container usage over
-			// the request of that very same container. A container without a
-			// request for this resource has no meaningful ratio, so it is
-			// skipped.
-			req, ok := getContainerRequest(&pod, cName, metricType)
-			if !ok || req <= 0 {
-				continue
-			}
-			val /= req
-		}
+		sample.SetName(m.GetName())
+		sample.SetRecommenderName(m.GetRecommenderName())
+		sample.SetResourceName(metricType)
 
 		batches = append(batches, pb.MetricBatch_builder{
 			PodName:       proto.String(pod.Name),
 			ContainerName: proto.String(cName),
-			Samples: []*pb.MetricSample{
-				pb.MetricSample_builder{
-					Name:            proto.String(m.GetName()),
-					RecommenderName: proto.String(m.GetRecommenderName()),
-					ResourceName:    proto.String(metricType),
-					Gauge:           proto.Float64(val),
-					Timestamp:       timestamppb.New(time.Unix(ts, 0)),
-				}.Build(),
-			},
+			Samples:       []*pb.MetricSample{sample},
 		}.Build())
 	}
 
@@ -214,11 +197,57 @@ func (a *CoreNodeMetricsProvider) processKubeletMetric(pod corev1.Pod, m *pb.Met
 	return batches
 }
 
+// containerSample returns the sample of a single container for the given
+// metric type and mode, reporting false when there is nothing to report.
+//
+// CPU usage is reported as a counter: the raw kubelet counter, i.e. the
+// cumulative CPU time of the container in seconds, timestamped as measured by
+// the kubelet. The Server derives the usage rate (cores) from consecutive
+// samples, accounting for the resets of the counter (container restarts).
+//
+// Every other sample is a gauge of the current usage of the container (see
+// containerUsage). A utilization is a per-container ratio: the container
+// usage over the request of that very same container. A container without a
+// request for the resource has no meaningful ratio, so it is skipped.
+func (a *CoreNodeMetricsProvider) containerSample(pod corev1.Pod, containerName string, cStats *KubeletContainerMetrics, metricType, metricMode, metricName string, seenKeys map[string]bool) (*pb.MetricSample, bool) {
+	if metricType == "cpu" && metricMode != "utilization" {
+		if cStats.CPUUsageSeconds == nil {
+			return nil, false
+		}
+		ts := time.Now()
+		if cStats.Timestamp != nil {
+			ts = time.UnixMilli(*cStats.Timestamp)
+		}
+		return pb.MetricSample_builder{
+			Counter:   cStats.CPUUsageSeconds,
+			Timestamp: timestamppb.New(ts),
+		}.Build(), true
+	}
+
+	val, ts, ok := a.containerUsage(pod, containerName, cStats, metricType, metricName, seenKeys)
+	if !ok {
+		return nil, false
+	}
+	if metricMode == "utilization" {
+		req, ok := getContainerRequest(&pod, containerName, metricType)
+		if !ok || req <= 0 {
+			return nil, false
+		}
+		val /= req
+	}
+	return pb.MetricSample_builder{
+		Gauge:     proto.Float64(val),
+		Timestamp: timestamppb.New(time.Unix(ts, 0)),
+	}.Build(), true
+}
+
 // containerUsage returns the current usage of a single container for the given
-// metric type, along with the timestamp of the sample (in seconds).
+// metric type as a gauge, along with the timestamp of the sample (in seconds).
 //
 // For "cpu" the raw kubelet counter is converted into a rate (cores) using the
 // previously scraped sample, so no value is reported on the very first scrape.
+// This only serves the CPU utilization: the CPU usage itself is reported as a
+// counter, see containerSample.
 // For "memory" the working set gauge is reported as is (bytes).
 func (a *CoreNodeMetricsProvider) containerUsage(pod corev1.Pod, containerName string, cStats *KubeletContainerMetrics, metricType, metricName string, seenKeys map[string]bool) (float64, int64, bool) {
 	timestamp := func() int64 {

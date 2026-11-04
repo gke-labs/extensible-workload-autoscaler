@@ -66,7 +66,9 @@ spec:
       provider: "kubelet"
       params:
         type: "cpu"
+        mode: "usage"
       decayingDistribution:
+        rate: "0s" # CPU usage is a counter (cumulative CPU seconds): its instantaneous rate is the usage in cores
         percentile: "p95"
         halfLife: "12h"
         bucketSize: "0.05"

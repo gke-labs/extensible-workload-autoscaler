@@ -69,7 +69,8 @@ spec:
       params:
         type: "cpu"
         mode: "usage"
-      gauge:
+      rate: # CPU usage is a counter (cumulative CPU seconds): its instantaneous rate is the usage in cores
+        window: "0s"
         aggregation: "Avg"
 
   scaling:

@@ -56,20 +56,21 @@ func TestProcessKubeletMetric(t *testing.T) {
 		want     []*pb.MetricBatch
 	}{
 		{
-			name: "CPU Rate (Cores) - Per Container",
+			// CPU usage is the raw kubelet counter (cumulative CPU seconds),
+			// reported as is: the Server derives the usage rate (cores) from
+			// consecutive samples. Nothing is computed from the previous
+			// scrape: its samples were reported on their own.
+			name: "CPU Usage (Counter) - Per Container",
 			def: pb.MetricDefinition_builder{
-				Name:     proto.String("cpu_cores"),
+				Name:     proto.String("cpu_usage"),
 				Provider: proto.String("kubelet"),
-				Params:   map[string]string{"type": "cpu"},
+				Params:   map[string]string{"type": "cpu", "mode": "usage"},
 			}.Build(),
 			metrics1: &KubeletPodMetrics{Containers: map[string]*KubeletContainerMetrics{
 				"main":    {CPUUsageSeconds: floatPtr(10.0), Timestamp: intPtr(1000000000)},
 				"sidecar": {CPUUsageSeconds: floatPtr(5.0), Timestamp: intPtr(1000000000)},
 			}},
 			metrics2: &KubeletPodMetrics{Containers: map[string]*KubeletContainerMetrics{
-				// Main: +1.0s in 10s -> 0.1 cores.
-				// Sidecar: +0.5s in 10s -> 0.05 cores.
-				// The Server sums them back to 0.15 cores for the pod.
 				"main":    {CPUUsageSeconds: floatPtr(11.0), Timestamp: intPtr(1000010000)},
 				"sidecar": {CPUUsageSeconds: floatPtr(5.5), Timestamp: intPtr(1000010000)},
 			}},
@@ -77,14 +78,69 @@ func TestProcessKubeletMetric(t *testing.T) {
 				pb.MetricBatch_builder{
 					PodName:       proto.String("test-pod"),
 					ContainerName: proto.String("main"),
-					Samples:       []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_cores"), ResourceName: proto.String("cpu"), Gauge: proto.Float64(0.1), Timestamp: timestamppb.New(time.Unix(1000010, 0))}.Build()},
+					Samples:       []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_usage"), ResourceName: proto.String("cpu"), Counter: proto.Float64(11.0), Timestamp: timestamppb.New(time.UnixMilli(1000010000))}.Build()},
 				}.Build(),
 				pb.MetricBatch_builder{
 					PodName:       proto.String("test-pod"),
 					ContainerName: proto.String("sidecar"),
-					Samples:       []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_cores"), ResourceName: proto.String("cpu"), Gauge: proto.Float64(0.05), Timestamp: timestamppb.New(time.Unix(1000010, 0))}.Build()},
+					Samples:       []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_usage"), ResourceName: proto.String("cpu"), Counter: proto.Float64(5.5), Timestamp: timestamppb.New(time.UnixMilli(1000010000))}.Build()},
 				}.Build(),
 			},
+		},
+		{
+			// Unlike a rate, a counter needs no previous sample: it is
+			// reported from the very first scrape. The kubelet timestamp is
+			// kept to the millisecond, as the rate the Server derives is only
+			// as accurate as the time elapsed between two samples.
+			name: "CPU Usage (Counter) - First Scrape",
+			def: pb.MetricDefinition_builder{
+				Name:     proto.String("cpu_usage"),
+				Provider: proto.String("kubelet"),
+				Params:   map[string]string{"type": "cpu"}, // Usage is the default mode.
+			}.Build(),
+			metrics1: &KubeletPodMetrics{Containers: map[string]*KubeletContainerMetrics{
+				"main": {CPUUsageSeconds: floatPtr(10.25), Timestamp: intPtr(1000000250)},
+			}},
+			want: []*pb.MetricBatch{pb.MetricBatch_builder{
+				PodName:       proto.String("test-pod"),
+				ContainerName: proto.String("main"),
+				Samples:       []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_usage"), ResourceName: proto.String("cpu"), Counter: proto.Float64(10.25), Timestamp: timestamppb.New(time.UnixMilli(1000000250))}.Build()},
+			}.Build()},
+		},
+		{
+			// A counter reset (container restart) is reported as is too: the
+			// Server accounts for it when it derives the rate.
+			name: "CPU Usage (Counter) - Reset",
+			def: pb.MetricDefinition_builder{
+				Name:     proto.String("cpu_usage"),
+				Provider: proto.String("kubelet"),
+				Params:   map[string]string{"type": "cpu", "mode": "usage"},
+			}.Build(),
+			metrics1: &KubeletPodMetrics{Containers: map[string]*KubeletContainerMetrics{
+				"main": {CPUUsageSeconds: floatPtr(10.0), Timestamp: intPtr(1000000000)},
+			}},
+			metrics2: &KubeletPodMetrics{Containers: map[string]*KubeletContainerMetrics{
+				"main": {CPUUsageSeconds: floatPtr(0.5), Timestamp: intPtr(1000010000)},
+			}},
+			want: []*pb.MetricBatch{pb.MetricBatch_builder{
+				PodName:       proto.String("test-pod"),
+				ContainerName: proto.String("main"),
+				Samples:       []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_usage"), ResourceName: proto.String("cpu"), Counter: proto.Float64(0.5), Timestamp: timestamppb.New(time.UnixMilli(1000010000))}.Build()},
+			}.Build()},
+		},
+		{
+			// The CPU utilization is unchanged: a gauge, the usage rate since
+			// the previous scrape over the container request.
+			name: "CPU Utilization (%) - First Scrape",
+			def: pb.MetricDefinition_builder{
+				Name:     proto.String("cpu_util"),
+				Provider: proto.String("kubelet"),
+				Params:   map[string]string{"type": "cpu", "mode": "utilization"},
+			}.Build(),
+			metrics1: &KubeletPodMetrics{Containers: map[string]*KubeletContainerMetrics{
+				"main": {CPUUsageSeconds: floatPtr(10.0), Timestamp: intPtr(1000000000)},
+			}},
+			want: nil, // A rate needs a previous sample.
 		},
 		{
 			name: "CPU Utilization (%) - From Class",
@@ -156,18 +212,21 @@ func TestProcessKubeletMetric(t *testing.T) {
 			}.Build()},
 		},
 		{
-			name: "Uneven Per-Container Rates",
+			// The utilization rate is computed per container, each against its
+			// own request.
+			name: "Uneven Per-Container Utilization",
 			def: pb.MetricDefinition_builder{
-				Name:     proto.String("cpu_per_container"),
+				Name:     proto.String("cpu_util_per_container"),
 				Provider: proto.String("kubelet"),
-				Params:   map[string]string{"type": "cpu"},
+				Params:   map[string]string{"type": "cpu", "mode": "utilization"},
 			}.Build(),
 			metrics1: &KubeletPodMetrics{Containers: map[string]*KubeletContainerMetrics{
 				"main":    {CPUUsageSeconds: floatPtr(10.0), Timestamp: intPtr(1000000000)},
 				"sidecar": {CPUUsageSeconds: floatPtr(5.0), Timestamp: intPtr(1000000000)},
 			}},
 			metrics2: &KubeletPodMetrics{Containers: map[string]*KubeletContainerMetrics{
-				// Main: +10s in 10s -> 1 core. Sidecar: +0.1s in 10s -> 0.01 cores.
+				// Main: +10s in 10s -> 1 core / 0.1 request -> 1000%.
+				// Sidecar: +0.1s in 10s -> 0.01 cores / 0.05 request -> 20%.
 				"main":    {CPUUsageSeconds: floatPtr(20.0), Timestamp: intPtr(1000010000)},
 				"sidecar": {CPUUsageSeconds: floatPtr(5.1), Timestamp: intPtr(1000010000)},
 			}},
@@ -175,12 +234,12 @@ func TestProcessKubeletMetric(t *testing.T) {
 				pb.MetricBatch_builder{
 					PodName:       proto.String("test-pod"),
 					ContainerName: proto.String("main"),
-					Samples:       []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_per_container"), ResourceName: proto.String("cpu"), Gauge: proto.Float64(1.0), Timestamp: timestamppb.New(time.Unix(1000010, 0))}.Build()},
+					Samples:       []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_util_per_container"), ResourceName: proto.String("cpu"), Gauge: proto.Float64(10.0), Timestamp: timestamppb.New(time.Unix(1000010, 0))}.Build()},
 				}.Build(),
 				pb.MetricBatch_builder{
 					PodName:       proto.String("test-pod"),
 					ContainerName: proto.String("sidecar"),
-					Samples:       []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_per_container"), ResourceName: proto.String("cpu"), Gauge: proto.Float64(0.01), Timestamp: timestamppb.New(time.Unix(1000010, 0))}.Build()},
+					Samples:       []*pb.MetricSample{pb.MetricSample_builder{Name: proto.String("cpu_util_per_container"), ResourceName: proto.String("cpu"), Gauge: proto.Float64(0.2), Timestamp: timestamppb.New(time.Unix(1000010, 0))}.Build()},
 				}.Build(),
 			},
 		},
@@ -209,7 +268,8 @@ func TestProcessKubeletMetric(t *testing.T) {
 			path := getParam(tc.def, tc.class, "path")
 			cfgKey := fmt.Sprintf("%s|%s", port, path)
 
-			// T0 (Initialization for Rate)
+			// T0: a previous scrape, which a rate (utilization) needs. The
+			// samples it reports are not checked.
 			if tc.metrics2 != nil {
 				metricsMap := map[string]map[string]*KubeletPodMetrics{
 					cfgKey: {"default/test-pod": tc.metrics1},
