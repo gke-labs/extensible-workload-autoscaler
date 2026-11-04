@@ -77,9 +77,7 @@ func (p *CoreClusterMetricsProvider) scrapeAndSend() {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	resp, err := p.grpcClient.ListPolicies(ctx, pb.ListPoliciesRequest_builder{
-		ClusterName: proto.String(p.clusterName),
-	}.Build())
+	pols, err := policy.ListAll(ctx, p.grpcClient, p.clusterName)
 	if err != nil {
 		slog.Error("Error listing policies", "error", err)
 		return
@@ -87,7 +85,7 @@ func (p *CoreClusterMetricsProvider) scrapeAndSend() {
 
 	var policyBatches []*pb.PolicyMetricBatch
 
-	for _, pol := range resp.GetPolicies() {
+	for _, pol := range pols {
 		var policyMetrics []*pb.MetricBatch
 
 		for _, m := range policy.MetricDefinitions(pol) {

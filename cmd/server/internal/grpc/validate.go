@@ -129,6 +129,9 @@ func validateListPoliciesRequest(req *pb.ListPoliciesRequest) error {
 	if req == nil {
 		return status.Errorf(codes.InvalidArgument, "request is nil")
 	}
+	if req.GetPageSize() < 0 {
+		return status.Errorf(codes.InvalidArgument, "page size must not be negative, got %d", req.GetPageSize())
+	}
 	return validateClusterName(req.GetClusterName())
 }
 
