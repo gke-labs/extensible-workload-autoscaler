@@ -67,9 +67,9 @@ http_requests_total 10
 				PodName: proto.String("pod-1"),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:   proto.String("req_count"),
-						Labels: map[string]string{},
-						Gauge:  proto.Float64(10),
+						Name:    proto.String("req_count"),
+						Labels:  map[string]string{},
+						Counter: proto.Float64(10),
 					}.Build(),
 				},
 			}.Build()},
@@ -94,9 +94,9 @@ custom 10
 				PodName: proto.String("pod-1"),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:   proto.String("custom"),
-						Labels: map[string]string{},
-						Gauge:  proto.Float64(10),
+						Name:    proto.String("custom"),
+						Labels:  map[string]string{},
+						Counter: proto.Float64(10),
 					}.Build(),
 				},
 			}.Build()},
@@ -126,9 +126,9 @@ class_path 10
 				PodName: proto.String("pod-1"),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:   proto.String("class_path"),
-						Labels: map[string]string{},
-						Gauge:  proto.Float64(10),
+						Name:    proto.String("class_path"),
+						Labels:  map[string]string{},
+						Counter: proto.Float64(10),
 					}.Build(),
 				},
 			}.Build()},
@@ -158,9 +158,9 @@ override 10
 				PodName: proto.String("pod-1"),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:   proto.String("override"),
-						Labels: map[string]string{},
-						Gauge:  proto.Float64(10),
+						Name:    proto.String("override"),
+						Labels:  map[string]string{},
+						Counter: proto.Float64(10),
 					}.Build(),
 				},
 			}.Build()},
@@ -181,14 +181,14 @@ http_requests_total{method="post",code="400"}    3 1395066363000
 				PodName: proto.String("pod-1"),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:   proto.String("req_count"),
-						Labels: map[string]string{"method": "post", "code": "200"},
-						Gauge:  proto.Float64(1027),
+						Name:    proto.String("req_count"),
+						Labels:  map[string]string{"method": "post", "code": "200"},
+						Counter: proto.Float64(1027),
 					}.Build(),
 					pb.MetricSample_builder{
-						Name:   proto.String("req_count"),
-						Labels: map[string]string{"method": "post", "code": "400"},
-						Gauge:  proto.Float64(3),
+						Name:    proto.String("req_count"),
+						Labels:  map[string]string{"method": "post", "code": "400"},
+						Counter: proto.Float64(3),
 					}.Build(),
 				},
 			}.Build()},
@@ -243,6 +243,60 @@ lat_count 15
 							Sum:   proto.Float64(2.5),
 							Count: proto.Uint64(15),
 						}.Build(),
+					}.Build(),
+				},
+			}.Build()},
+		},
+		{
+			// The count of the observations of a histogram is cumulative: it
+			// is reported as a counter, like the "_total" of a Prometheus
+			// counter, so that a rate accounts for its resets.
+			name: "Histogram Count as Counter",
+			mockBody: `# HELP lat Latency.
+# TYPE lat histogram
+lat_bucket{le="0.1"} 10
+lat_bucket{le="+Inf"} 15
+lat_sum 2.5
+lat_count 15
+`,
+			def: pb.MetricDefinition_builder{
+				Name:     proto.String("req_count"),
+				Provider: proto.String("prometheus"),
+				Params:   map[string]string{"metric": "lat_count"},
+			}.Build(),
+			want: []*pb.MetricBatch{pb.MetricBatch_builder{
+				PodName: proto.String("pod-1"),
+				Samples: []*pb.MetricSample{
+					pb.MetricSample_builder{
+						Name:    proto.String("req_count"),
+						Labels:  map[string]string{},
+						Counter: proto.Float64(15),
+					}.Build(),
+				},
+			}.Build()},
+		},
+		{
+			// So is the sum of the observations.
+			name: "Histogram Sum as Counter",
+			mockBody: `# HELP lat Latency.
+# TYPE lat histogram
+lat_bucket{le="0.1"} 10
+lat_bucket{le="+Inf"} 15
+lat_sum 2.5
+lat_count 15
+`,
+			def: pb.MetricDefinition_builder{
+				Name:     proto.String("total_latency"),
+				Provider: proto.String("prometheus"),
+				Params:   map[string]string{"metric": "lat_sum"},
+			}.Build(),
+			want: []*pb.MetricBatch{pb.MetricBatch_builder{
+				PodName: proto.String("pod-1"),
+				Samples: []*pb.MetricSample{
+					pb.MetricSample_builder{
+						Name:    proto.String("total_latency"),
+						Labels:  map[string]string{},
+						Counter: proto.Float64(2.5),
 					}.Build(),
 				},
 			}.Build()},
