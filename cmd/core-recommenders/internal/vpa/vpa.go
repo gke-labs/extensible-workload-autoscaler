@@ -66,13 +66,17 @@ type resourceSpec struct {
 	defaultBucketSize string
 	defaultMargin     float64
 	unit              string
+	// counter reports whether the kubelet reports the usage of the resource
+	// as a counter (e.g. cumulative CPU seconds) rather than as a gauge: the
+	// default metric then samples its instantaneous rate (e.g. cores).
+	counter bool
 	// value returns the recommended value of the resource, in unit, for the
 	// max value of the metric across all pods.
 	value func(podMetrics map[string]*pb.ContainerMetrics, containerName, metric string, safetyMargin float64) (int64, bool)
 }
 
 var resources = []resourceSpec{
-	{name: "cpu", paramPrefix: "cpu", defaultBucketSize: defaultCPUBucket, defaultMargin: defaultCPUSafetyMarginFloat, unit: "m", value: cpuMilliFor},
+	{name: "cpu", paramPrefix: "cpu", defaultBucketSize: defaultCPUBucket, defaultMargin: defaultCPUSafetyMarginFloat, unit: "m", counter: true, value: cpuMilliFor},
 	{name: "memory", paramPrefix: "mem", defaultBucketSize: defaultMemBucket, defaultMargin: defaultMemSafetyMarginFloat, unit: "Mi", value: memMiBFor},
 }
 
@@ -176,6 +180,11 @@ func (r *VPARecommender) OwnedMetrics(def *pb.RecommenderDefinition, policyMetri
 					BucketSize: proto.String(res.defaultBucketSize),
 				}.Build(),
 			}.Build()
+			if res.counter {
+				// The usage of the resource is the instantaneous rate of
+				// the counter, between two consecutive samples.
+				template.GetDecayingDistribution().SetRate(durationpb.New(0))
+			}
 		}
 
 		for sl := range numSlots {

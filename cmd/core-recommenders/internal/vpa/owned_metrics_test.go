@@ -28,7 +28,8 @@ func decaying(name, typ, percentile string, halfLife time.Duration, bucketSize s
 }
 
 // defaultOwned returns an owned metric definition with the defaults, which
-// consider the startup samples.
+// consider the startup samples. The kubelet reports the CPU usage as a counter,
+// whose instantaneous rate the default CPU metrics sample.
 func defaultOwned(resource, slotSuffix, percentile string) *pb.MetricDefinition {
 	bucket := defaultCPUBucket
 	if resource == "memory" {
@@ -36,6 +37,9 @@ func defaultOwned(resource, slotSuffix, percentile string) *pb.MetricDefinition 
 	}
 	m := decaying(resource+slotSuffix, resource, percentile, defaultHalfLife, bucket)
 	m.SetEligibility(pb.MetricDefinition_Eligibility_builder{StartupSamples: proto.Bool(true)}.Build())
+	if resource == "cpu" {
+		m.GetDecayingDistribution().SetRate(durationpb.New(0))
+	}
 	return m
 }
 
