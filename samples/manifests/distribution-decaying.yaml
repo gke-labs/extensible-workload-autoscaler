@@ -53,6 +53,7 @@ spec:
       provider: "kubelet"
       params:
         type: "cpu"
+        mode: "usage"
       decayingDistribution:
         halfLife: "24h"
         bucketSize: "0.1"
