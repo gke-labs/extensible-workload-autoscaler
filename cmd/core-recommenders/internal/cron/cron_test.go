@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
@@ -28,8 +27,8 @@ func TestCronRecommend(t *testing.T) {
 		{
 			name: "Active Window (9am-5pm)",
 			def: pb.RecommenderDefinition_builder{
-				Name:        proto.String("work_hours"),
-				Recommender: proto.String("Cron"),
+				Name:        new("work_hours"),
+				Recommender: new("Cron"),
 				Params: map[string]string{
 					"start":    "0 9 * * *",
 					"end":      "0 17 * * *",
@@ -38,15 +37,15 @@ func TestCronRecommend(t *testing.T) {
 				},
 			}.Build(),
 			want: pb.Recommendation_builder{
-				IsActive: proto.Bool(true),
-				Replicas: proto.Int32(5),
+				IsActive: new(true),
+				Replicas: new(int32(5)),
 			}.Build(),
 		},
 		{
 			name: "Inactive Window (11pm-7am)",
 			def: pb.RecommenderDefinition_builder{
-				Name:        proto.String("night_shift"),
-				Recommender: proto.String("Cron"),
+				Name:        new("night_shift"),
+				Recommender: new("Cron"),
 				Params: map[string]string{
 					"start":    "0 23 * * *",
 					"end":      "0 7 * * *",
@@ -55,15 +54,15 @@ func TestCronRecommend(t *testing.T) {
 				},
 			}.Build(),
 			want: pb.Recommendation_builder{
-				IsActive: proto.Bool(false),
-				Replicas: proto.Int32(0),
+				IsActive: new(false),
+				Replicas: new(int32(0)),
 			}.Build(),
 		},
 		{
 			name: "Activation only (no replicas param)",
 			def: pb.RecommenderDefinition_builder{
-				Name:        proto.String("activation_only"),
-				Recommender: proto.String("Cron"),
+				Name:        new("activation_only"),
+				Recommender: new("Cron"),
 				Params: map[string]string{
 					"start":    "0 9 * * *",
 					"end":      "0 17 * * *",
@@ -71,21 +70,21 @@ func TestCronRecommend(t *testing.T) {
 				},
 			}.Build(),
 			want: pb.Recommendation_builder{
-				IsActive: proto.Bool(true),
+				IsActive: new(true),
 			}.Build(),
 		},
 		{
 			name: "Invalid Cron",
 			def: pb.RecommenderDefinition_builder{
-				Name:        proto.String("bad"),
-				Recommender: proto.String("Cron"),
+				Name:        new("bad"),
+				Recommender: new("Cron"),
 				Params: map[string]string{
 					"start": "invalid",
 					"end":   "* * * * *",
 				},
 			}.Build(),
 			want: pb.Recommendation_builder{
-				Message: proto.String("expected exactly 5 fields, found 1: [invalid]"),
+				Message: new("expected exactly 5 fields, found 1: [invalid]"),
 			}.Build(),
 		},
 	}

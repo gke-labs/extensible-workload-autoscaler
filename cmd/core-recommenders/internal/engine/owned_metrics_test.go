@@ -93,23 +93,23 @@ func newTestEngine(t *testing.T, client pb.XASServerClient, classes map[string]s
 }
 
 func cpuMetric(owner string) *pb.MetricDefinition {
-	return pb.MetricDefinition_builder{Name: proto.String("cpu"), RecommenderName: proto.String(owner), Gauge: pb.Gauge_builder{Aggregation: proto.String("Max")}.Build()}.Build()
+	return pb.MetricDefinition_builder{Name: new("cpu"), RecommenderName: new(owner), Gauge: pb.Gauge_builder{Aggregation: new("Max")}.Build()}.Build()
 }
 
 func memoryMetric(owner string) *pb.MetricDefinition {
-	return pb.MetricDefinition_builder{Name: proto.String("memory"), RecommenderName: proto.String(owner), Gauge: pb.Gauge_builder{Aggregation: proto.String("Max")}.Build()}.Build()
+	return pb.MetricDefinition_builder{Name: new("memory"), RecommenderName: new(owner), Gauge: pb.Gauge_builder{Aggregation: new("Max")}.Build()}.Build()
 }
 
 func TestSyncRecommenderMetrics(t *testing.T) {
-	id := pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("web")}.Build()
+	id := pb.PolicyId_builder{ClusterName: new("default"), Namespace: new("prod"), Name: new("web")}.Build()
 	// "vpa" is backed by a recommender that owns metrics, "hpa" by one that does
 	// not, and "custom" by a class this engine does not know about.
 	classes := map[string]string{"owning-class": "Owning", "plain-class": "Plain", "third-party-class": "ThirdParty"}
 	scaling := []*pb.RecommenderDefinition{
-		pb.RecommenderDefinition_builder{Name: proto.String("vpa"), Recommender: proto.String("owning-class")}.Build(),
-		pb.RecommenderDefinition_builder{Name: proto.String("hpa"), Recommender: proto.String("plain-class")}.Build(),
-		pb.RecommenderDefinition_builder{Name: proto.String("custom"), Recommender: proto.String("third-party-class")}.Build(),
-		pb.RecommenderDefinition_builder{Name: proto.String("ghost"), Recommender: proto.String("missing-class")}.Build(),
+		pb.RecommenderDefinition_builder{Name: new("vpa"), Recommender: new("owning-class")}.Build(),
+		pb.RecommenderDefinition_builder{Name: new("hpa"), Recommender: new("plain-class")}.Build(),
+		pb.RecommenderDefinition_builder{Name: new("custom"), Recommender: new("third-party-class")}.Build(),
+		pb.RecommenderDefinition_builder{Name: new("ghost"), Recommender: new("missing-class")}.Build(),
 	}
 
 	tests := []struct {
@@ -215,8 +215,8 @@ func TestSyncRecommenderMetrics(t *testing.T) {
 		{
 			name: "Stamps the owner on the returned metrics",
 			owned: map[string][]*pb.MetricDefinition{"vpa": {
-				pb.MetricDefinition_builder{Name: proto.String("cpu"), Gauge: pb.Gauge_builder{Aggregation: proto.String("Max")}.Build()}.Build(),
-				pb.MetricDefinition_builder{Name: proto.String("memory"), RecommenderName: proto.String("someone-else"), Gauge: pb.Gauge_builder{Aggregation: proto.String("Max")}.Build()}.Build(),
+				pb.MetricDefinition_builder{Name: new("cpu"), Gauge: pb.Gauge_builder{Aggregation: new("Max")}.Build()}.Build(),
+				pb.MetricDefinition_builder{Name: new("memory"), RecommenderName: new("someone-else"), Gauge: pb.Gauge_builder{Aggregation: new("Max")}.Build()}.Build(),
 			}},
 			policy: pb.Policy_builder{Id: id, Scaling: scaling}.Build(),
 			wantRequests: []*pb.UpdatePolicyRequest{pb.UpdatePolicyRequest_builder{
@@ -231,14 +231,14 @@ func TestSyncRecommenderMetrics(t *testing.T) {
 		{
 			name:       "Sends the listed ETag and returns the policy with the new one",
 			owned:      map[string][]*pb.MetricDefinition{"vpa": {cpuMetric("vpa")}},
-			policy:     pb.Policy_builder{Id: id, Scaling: scaling, Etag: proto.String("listed")}.Build(),
+			policy:     pb.Policy_builder{Id: id, Scaling: scaling, Etag: new("listed")}.Build(),
 			serverEtag: "after-write",
 			wantRequests: []*pb.UpdatePolicyRequest{pb.UpdatePolicyRequest_builder{
-				Policy: pb.Policy_builder{Id: id, Scaling: scaling, Etag: proto.String("listed"), RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+				Policy: pb.Policy_builder{Id: id, Scaling: scaling, Etag: new("listed"), RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 					"vpa": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{cpuMetric("vpa")}}.Build(),
 				}}.Build(),
 			}.Build()},
-			wantPolicy: pb.Policy_builder{Id: id, Scaling: scaling, Etag: proto.String("after-write"), RecommenderMetrics: map[string]*pb.MetricDefinitionList{
+			wantPolicy: pb.Policy_builder{Id: id, Scaling: scaling, Etag: new("after-write"), RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 				"vpa": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{cpuMetric("vpa")}}.Build(),
 			}}.Build(),
 		},
@@ -280,7 +280,7 @@ func TestSyncRecommenderMetrics(t *testing.T) {
 // recommender's metrics changed, the entries of the other recommenders the
 // engine manages are sent back as they were, not dropped or rewritten.
 func TestSyncRecommenderMetricsKeepsUpToDateEntries(t *testing.T) {
-	id := pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("web")}.Build()
+	id := pb.PolicyId_builder{ClusterName: new("default"), Namespace: new("prod"), Name: new("web")}.Build()
 	client := &fakeXASServerClient{}
 	e := newTestEngine(t, client,
 		map[string]string{"owning-class": "Owning"},
@@ -293,8 +293,8 @@ func TestSyncRecommenderMetricsKeepsUpToDateEntries(t *testing.T) {
 	pol := pb.Policy_builder{
 		Id: id,
 		Scaling: []*pb.RecommenderDefinition{
-			pb.RecommenderDefinition_builder{Name: proto.String("vpa"), Recommender: proto.String("owning-class")}.Build(),
-			pb.RecommenderDefinition_builder{Name: proto.String("vpa2"), Recommender: proto.String("owning-class")}.Build(),
+			pb.RecommenderDefinition_builder{Name: new("vpa"), Recommender: new("owning-class")}.Build(),
+			pb.RecommenderDefinition_builder{Name: new("vpa2"), Recommender: new("owning-class")}.Build(),
 		},
 		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 			// Already up to date.
@@ -327,7 +327,7 @@ func TestSyncRecommenderMetricsKeepsUpToDateEntries(t *testing.T) {
 // returned is not modified in place: the caller keeps using it if the update
 // fails.
 func TestSyncRecommenderMetricsDoesNotMutateInput(t *testing.T) {
-	id := pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("web")}.Build()
+	id := pb.PolicyId_builder{ClusterName: new("default"), Namespace: new("prod"), Name: new("web")}.Build()
 	client := &fakeXASServerClient{}
 	e := newTestEngine(t, client,
 		map[string]string{"owning-class": "Owning"},
@@ -338,7 +338,7 @@ func TestSyncRecommenderMetricsDoesNotMutateInput(t *testing.T) {
 
 	pol := pb.Policy_builder{
 		Id:      id,
-		Scaling: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("vpa"), Recommender: proto.String("owning-class")}.Build()},
+		Scaling: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: new("vpa"), Recommender: new("owning-class")}.Build()},
 		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 			"custom": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{cpuMetric("custom")}}.Build(),
 		},
@@ -356,7 +356,7 @@ func TestSyncRecommenderMetricsDoesNotMutateInput(t *testing.T) {
 // activation phase can own metrics too, matching the Server garbage
 // collection, which keeps the metrics of both phases.
 func TestSyncRecommenderMetricsActivation(t *testing.T) {
-	id := pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("web")}.Build()
+	id := pb.PolicyId_builder{ClusterName: new("default"), Namespace: new("prod"), Name: new("web")}.Build()
 	client := &fakeXASServerClient{}
 	e := newTestEngine(t, client,
 		map[string]string{"owning-class": "Owning"},
@@ -364,7 +364,7 @@ func TestSyncRecommenderMetricsActivation(t *testing.T) {
 			"gate": {cpuMetric("gate")},
 		}}},
 	)
-	pol := pb.Policy_builder{Id: id, Activation: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("gate"), Recommender: proto.String("owning-class")}.Build()}}.Build()
+	pol := pb.Policy_builder{Id: id, Activation: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: new("gate"), Recommender: new("owning-class")}.Build()}}.Build()
 
 	got, _ := e.syncRecommenderMetrics(pol)
 
@@ -377,11 +377,11 @@ func TestSyncRecommenderMetricsActivation(t *testing.T) {
 // TestSyncRecommenderMetricsPassesPolicyMetrics checks that OwnedMetrics gets
 // the policy-wide metrics.
 func TestSyncRecommenderMetricsPassesPolicyMetrics(t *testing.T) {
-	id := pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("web")}.Build()
+	id := pb.PolicyId_builder{ClusterName: new("default"), Namespace: new("prod"), Name: new("web")}.Build()
 	rec := &owningRecommender{}
 	e := newTestEngine(t, &fakeXASServerClient{}, map[string]string{"owning-class": "Owning"}, map[string]Recommender{"Owning": rec})
 	policyMetrics := []*pb.MetricDefinition{cpuMetric("")}
-	pol := pb.Policy_builder{Id: id, Metrics: policyMetrics, Scaling: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("vpa"), Recommender: proto.String("owning-class")}.Build()}}.Build()
+	pol := pb.Policy_builder{Id: id, Metrics: policyMetrics, Scaling: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: new("vpa"), Recommender: new("owning-class")}.Build()}}.Build()
 
 	e.syncRecommenderMetrics(pol)
 
@@ -394,7 +394,7 @@ func TestSyncRecommenderMetricsPassesPolicyMetrics(t *testing.T) {
 // every misconfigured recommender are returned, joined, and that the metrics
 // they owned are dropped while those of the valid recommenders are kept.
 func TestSyncRecommenderMetricsConfigError(t *testing.T) {
-	id := pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("web")}.Build()
+	id := pb.PolicyId_builder{ClusterName: new("default"), Namespace: new("prod"), Name: new("web")}.Build()
 	client := &fakeXASServerClient{}
 	badErr := errors.New("cpu-metric \"gauge\" is not a decaying distribution")
 	worseErr := errors.New("memory-metric \"mem\" is not defined in the policy metrics")
@@ -408,9 +408,9 @@ func TestSyncRecommenderMetricsConfigError(t *testing.T) {
 	pol := pb.Policy_builder{
 		Id: id,
 		Scaling: []*pb.RecommenderDefinition{
-			pb.RecommenderDefinition_builder{Name: proto.String("ok"), Recommender: proto.String("owning-class")}.Build(),
-			pb.RecommenderDefinition_builder{Name: proto.String("bad"), Recommender: proto.String("owning-class")}.Build(),
-			pb.RecommenderDefinition_builder{Name: proto.String("worse"), Recommender: proto.String("owning-class")}.Build(),
+			pb.RecommenderDefinition_builder{Name: new("ok"), Recommender: new("owning-class")}.Build(),
+			pb.RecommenderDefinition_builder{Name: new("bad"), Recommender: new("owning-class")}.Build(),
+			pb.RecommenderDefinition_builder{Name: new("worse"), Recommender: new("owning-class")}.Build(),
 		},
 		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 			"bad":   pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{cpuMetric("bad")}}.Build(),
@@ -435,12 +435,12 @@ func TestSyncRecommenderMetricsConfigError(t *testing.T) {
 // when every recommender is well configured, so that the caller can rely on
 // it to skip the policy.
 func TestSyncRecommenderMetricsNoConfigError(t *testing.T) {
-	id := pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("web")}.Build()
+	id := pb.PolicyId_builder{ClusterName: new("default"), Namespace: new("prod"), Name: new("web")}.Build()
 	e := newTestEngine(t, &fakeXASServerClient{},
 		map[string]string{"owning-class": "Owning"},
 		map[string]Recommender{"Owning": &owningRecommender{metrics: map[string][]*pb.MetricDefinition{"vpa": {cpuMetric("vpa")}}}},
 	)
-	pol := pb.Policy_builder{Id: id, Scaling: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("vpa"), Recommender: proto.String("owning-class")}.Build()}}.Build()
+	pol := pb.Policy_builder{Id: id, Scaling: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: new("vpa"), Recommender: new("owning-class")}.Build()}}.Build()
 
 	if _, err := e.syncRecommenderMetrics(pol); err != nil {
 		t.Errorf("syncRecommenderMetrics() error = %v, want nil", err)

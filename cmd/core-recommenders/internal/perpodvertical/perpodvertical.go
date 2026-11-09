@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"google.golang.org/protobuf/proto"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
@@ -57,18 +56,18 @@ func (r *PerPodVerticalRecommender) Recommend(def *pb.RecommenderDefinition, sta
 	cfg, err := parseConfig(def)
 	if err != nil {
 		return pb.Recommendation_builder{
-			Message: proto.String(err.Error()),
+			Message: new(err.Error()),
 		}.Build()
 	}
 
 	if state == nil || len(state.GetPodContainerMetrics()) == 0 {
 		if state != nil && hasPodLevelMetric(state, cfg.metric) {
 			return pb.Recommendation_builder{
-				Message: proto.String(fmt.Sprintf("metric %q has no per-container data: define it with scope \"PodContainer\"", cfg.metric)),
+				Message: new(fmt.Sprintf("metric %q has no per-container data: define it with scope \"PodContainer\"", cfg.metric)),
 			}.Build()
 		}
 		return pb.Recommendation_builder{
-			Message: proto.String("no pod container metrics available"),
+			Message: new("no pod container metrics available"),
 		}.Build()
 	}
 
@@ -85,10 +84,10 @@ func (r *PerPodVerticalRecommender) Recommend(def *pb.RecommenderDefinition, sta
 		requests, limits := cfg.resources(desiredVal)
 
 		podRecs = append(podRecs, pb.PodContainerResource_builder{
-			PodName: proto.String(podName),
+			PodName: new(podName),
 			ContainerResources: pb.ContainerResource_builder{
 				// Empty for LevelPod: targets the pod-level resources.
-				ContainerName: proto.String(cfg.container),
+				ContainerName: new(cfg.container),
 				Requests:      requests,
 				Limits:        limits,
 			}.Build(),
@@ -96,7 +95,7 @@ func (r *PerPodVerticalRecommender) Recommend(def *pb.RecommenderDefinition, sta
 	}
 
 	return pb.Recommendation_builder{
-		IsActive:              proto.Bool(true),
+		IsActive:              new(true),
 		PodContainerResources: podRecs,
 	}.Build()
 }

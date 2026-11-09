@@ -5,8 +5,6 @@ import (
 	"math"
 	"strconv"
 
-	"google.golang.org/protobuf/proto"
-
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 )
 
@@ -21,14 +19,14 @@ func (r *LinearRecommender) Recommend(def *pb.RecommenderDefinition, state, _ *p
 	cfg, err := parseConfig(def)
 	if err != nil {
 		return pb.Recommendation_builder{
-			Message: proto.String(err.Error()),
+			Message: new(err.Error()),
 		}.Build()
 	}
 
 	val, ok := state.GetValues()[cfg.metric]
 	if !ok {
 		return pb.Recommendation_builder{
-			Message: proto.String(fmt.Sprintf("metric '%s' not found", cfg.metric)),
+			Message: new(fmt.Sprintf("metric '%s' not found", cfg.metric)),
 		}.Build()
 	}
 
@@ -37,7 +35,7 @@ func (r *LinearRecommender) Recommend(def *pb.RecommenderDefinition, state, _ *p
 
 	return pb.Recommendation_builder{
 		Replicas: &desired,
-		IsActive: proto.Bool(true),
+		IsActive: new(true),
 	}.Build()
 }
 

@@ -6,7 +6,6 @@ import (
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 	"github.com/google/go-cmp/cmp"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 )
 
@@ -28,7 +27,7 @@ func TestRecommend(t *testing.T) {
 			}.Build(),
 			state: nil, // not required here
 			want: pb.Recommendation_builder{
-				IsActive: proto.Bool(false),
+				IsActive: new(false),
 			}.Build(),
 			wantMsgContains: "Unable to parse recommender configuration",
 		},
@@ -42,7 +41,7 @@ func TestRecommend(t *testing.T) {
 			}.Build(),
 			state: &pb.ControlMetrics{},
 			want: pb.Recommendation_builder{
-				IsActive: proto.Bool(false),
+				IsActive: new(false),
 			}.Build(),
 			wantMsgContains: "container is undefined",
 		},
@@ -70,7 +69,7 @@ func TestRecommend(t *testing.T) {
 				},
 			}.Build(),
 			want: pb.Recommendation_builder{
-				IsActive: proto.Bool(false),
+				IsActive: new(false),
 			}.Build(),
 			wantMsgContains: "No Recommendations generated",
 		},
@@ -90,7 +89,7 @@ func TestRecommend(t *testing.T) {
 				},
 			}.Build(),
 			want: pb.Recommendation_builder{
-				IsActive: proto.Bool(false),
+				IsActive: new(false),
 			}.Build(),
 			wantMsgContains: "PodMetrics is empty",
 		},
@@ -105,7 +104,7 @@ func TestRecommend(t *testing.T) {
 			}.Build(),
 			state: nil, //purposefully omitted here
 			want: pb.Recommendation_builder{
-				IsActive: proto.Bool(false),
+				IsActive: new(false),
 			}.Build(),
 			wantMsgContains: "ControlMetrics is missing",
 		},
@@ -120,7 +119,7 @@ func TestRecommend(t *testing.T) {
 			}.Build(),
 			state: &pb.ControlMetrics{},
 			want: pb.Recommendation_builder{
-				IsActive: proto.Bool(false),
+				IsActive: new(false),
 			}.Build(),
 			wantMsgContains: "PodMetrics is empty",
 		},
@@ -149,10 +148,10 @@ func TestRecommend(t *testing.T) {
 				},
 			}.Build(),
 			want: pb.Recommendation_builder{
-				IsActive: proto.Bool(true),
+				IsActive: new(true),
 				WorkloadResources: []*pb.ContainerResource{
 					pb.ContainerResource_builder{
-						ContainerName: proto.String("app"),
+						ContainerName: new("app"),
 						Requests: map[string]string{
 							"memory": "282Mi",
 						},
@@ -190,10 +189,10 @@ func TestRecommend(t *testing.T) {
 				},
 			}.Build(),
 			want: pb.Recommendation_builder{
-				IsActive: proto.Bool(true),
+				IsActive: new(true),
 				WorkloadResources: []*pb.ContainerResource{
 					pb.ContainerResource_builder{
-						ContainerName: proto.String("app"),
+						ContainerName: new("app"),
 						Requests: map[string]string{
 							"cpu": "550m",
 						},
@@ -231,7 +230,7 @@ func TestRecommend(t *testing.T) {
 				},
 			}.Build(),
 			want: pb.Recommendation_builder{
-				IsActive:          proto.Bool(false),
+				IsActive:          new(false),
 				WorkloadResources: nil,
 			}.Build(),
 			wantMsgContains: "Unable to create recommendation as no value memory or cpu values were found",
@@ -278,10 +277,10 @@ func TestRecommend(t *testing.T) {
 				},
 			}.Build(),
 			want: pb.Recommendation_builder{
-				IsActive: proto.Bool(true),
+				IsActive: new(true),
 				WorkloadResources: []*pb.ContainerResource{
 					pb.ContainerResource_builder{
-						ContainerName: proto.String("app"),
+						ContainerName: new("app"),
 						Requests: map[string]string{
 							"cpu":    "550m",
 							"memory": "282Mi",
@@ -321,10 +320,10 @@ func TestRecommend(t *testing.T) {
 				},
 			}.Build(),
 			want: pb.Recommendation_builder{
-				IsActive: proto.Bool(true),
+				IsActive: new(true),
 				WorkloadResources: []*pb.ContainerResource{
 					pb.ContainerResource_builder{
-						ContainerName: proto.String("app"),
+						ContainerName: new("app"),
 						Requests: map[string]string{
 							"cpu":    "10m",
 							"memory": "10Mi",
@@ -345,8 +344,8 @@ func TestRecommend(t *testing.T) {
 	// the recommended limits equal the recommended requests.
 	current := map[string]string{"cpu": "1m", "memory": "1Mi"}
 	workload := pb.Workload_builder{Pods: []*pb.PodState{pb.PodState_builder{
-		Name:       proto.String("pod-1"),
-		Containers: []*pb.ContainerState{pb.ContainerState_builder{Name: proto.String("app"), Requests: current, Limits: current}.Build()},
+		Name:       new("pod-1"),
+		Containers: []*pb.ContainerState{pb.ContainerState_builder{Name: new("app"), Requests: current, Limits: current}.Build()},
 	}.Build()}}.Build()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

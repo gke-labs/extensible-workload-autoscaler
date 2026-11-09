@@ -79,20 +79,20 @@ func TestPushPolicy(t *testing.T) {
 	}
 	selector := "app=web"
 
-	id := pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("web")}.Build()
+	id := pb.PolicyId_builder{ClusterName: new("default"), Namespace: new("prod"), Name: new("web")}.Build()
 	// fromCRD is what pushPolicy builds from sp alone.
 	fromCRD := func() *pb.Policy {
 		return pb.Policy_builder{
 			Id:          id,
-			Workload:    pb.WorkloadRef_builder{Group: proto.String("apps"), Version: proto.String("v1"), Kind: proto.String("Deployment"), Name: proto.String("web"), Namespace: proto.String("prod")}.Build(),
-			MinReplicas: proto.Int32(2),
-			MaxReplicas: proto.Int32(10),
-			Scaling:     []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("linear"), Recommender: proto.String("linear-class"), Type: proto.String("Linear")}.Build()},
-			Selector:    proto.String("app=web"),
+			Workload:    pb.WorkloadRef_builder{Group: new("apps"), Version: new("v1"), Kind: new("Deployment"), Name: new("web"), Namespace: new("prod")}.Build(),
+			MinReplicas: new(int32(2)),
+			MaxReplicas: new(int32(10)),
+			Scaling:     []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: new("linear"), Recommender: new("linear-class"), Type: new("Linear")}.Build()},
+			Selector:    new("app=web"),
 		}.Build()
 	}
 	engineMetrics := map[string]*pb.MetricDefinitionList{
-		"vpa": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: proto.String("cpu"), RecommenderName: proto.String("vpa")}.Build()}}.Build(),
+		"vpa": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: new("cpu"), RecommenderName: new("vpa")}.Build()}}.Build(),
 	}
 
 	tests := []struct {
@@ -106,28 +106,28 @@ func TestPushPolicy(t *testing.T) {
 		{
 			name: "Creates the policy with an empty ETag when the Server does not have it",
 			serverHas: []*pb.Policy{
-				pb.Policy_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("other")}.Build(), Etag: proto.String("other-etag")}.Build(),
+				pb.Policy_builder{Id: pb.PolicyId_builder{ClusterName: new("default"), Namespace: new("prod"), Name: new("other")}.Build(), Etag: new("other-etag")}.Build(),
 			},
-			wantRequests: []*pb.UpdatePolicyRequest{pb.UpdatePolicyRequest_builder{Policy: fromCRD(), AllowMissing: proto.Bool(true)}.Build()},
+			wantRequests: []*pb.UpdatePolicyRequest{pb.UpdatePolicyRequest_builder{Policy: fromCRD(), AllowMissing: new(true)}.Build()},
 		},
 		{
 			name: "Sends the stored ETag and keeps the engine's metrics when the policy exists",
 			serverHas: []*pb.Policy{
-				pb.Policy_builder{Id: pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("other")}.Build(), Etag: proto.String("other-etag")}.Build(),
+				pb.Policy_builder{Id: pb.PolicyId_builder{ClusterName: new("default"), Namespace: new("prod"), Name: new("other")}.Build(), Etag: new("other-etag")}.Build(),
 				pb.Policy_builder{
 					Id: id,
 					// Outdated CRD fields: overwritten by the ScalingPolicy.
-					MaxReplicas:        proto.Int32(3),
-					Selector:           proto.String("app=old"),
+					MaxReplicas:        new(int32(3)),
+					Selector:           new("app=old"),
 					RecommenderMetrics: engineMetrics,
-					Etag:               proto.String("v1"),
+					Etag:               new("v1"),
 				}.Build(),
 			},
 			wantRequests: func() []*pb.UpdatePolicyRequest {
 				want := fromCRD()
 				want.SetRecommenderMetrics(engineMetrics)
 				want.SetEtag("v1")
-				return []*pb.UpdatePolicyRequest{pb.UpdatePolicyRequest_builder{Policy: want, AllowMissing: proto.Bool(true)}.Build()}
+				return []*pb.UpdatePolicyRequest{pb.UpdatePolicyRequest_builder{Policy: want, AllowMissing: new(true)}.Build()}
 			}(),
 		},
 		{
@@ -139,7 +139,7 @@ func TestPushPolicy(t *testing.T) {
 			name:         "Returns the error of a rejected write so the policy is requeued",
 			updateErr:    errors.New("etag mismatch"),
 			wantErr:      true,
-			wantRequests: []*pb.UpdatePolicyRequest{pb.UpdatePolicyRequest_builder{Policy: fromCRD(), AllowMissing: proto.Bool(true)}.Build()},
+			wantRequests: []*pb.UpdatePolicyRequest{pb.UpdatePolicyRequest_builder{Policy: fromCRD(), AllowMissing: new(true)}.Build()},
 		},
 	}
 
@@ -197,14 +197,14 @@ func (c *storeClient) UpdatePolicy(_ context.Context, req *pb.UpdatePolicyReques
 // recommender from the ScalingPolicy drops the metrics it owns on the Server,
 // although pushPolicy copies all the owned metrics from the Server's copy.
 func TestPushPolicyRemovedRecommenderOwnedMetrics(t *testing.T) {
-	id := pb.PolicyId_builder{ClusterName: proto.String("default"), Namespace: proto.String("prod"), Name: proto.String("web")}.Build()
+	id := pb.PolicyId_builder{ClusterName: new("default"), Namespace: new("prod"), Name: new("web")}.Build()
 	owned := func(owner string) *pb.MetricDefinitionList {
-		return pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: proto.String("cpu-target"), RecommenderName: proto.String(owner)}.Build()}}.Build()
+		return pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: new("cpu-target"), RecommenderName: new(owner)}.Build()}}.Build()
 	}
 	// The Server has the policy with a vpa recommender and the metrics it owns.
 	s := &storeClient{policy: pb.Policy_builder{
 		Id:      id,
-		Scaling: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("linear")}.Build(), pb.RecommenderDefinition_builder{Name: proto.String("vpa-sizing")}.Build()},
+		Scaling: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: new("linear")}.Build(), pb.RecommenderDefinition_builder{Name: new("vpa-sizing")}.Build()},
 		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 			"linear":     owned("linear"),
 			"vpa-sizing": owned("vpa-sizing"),

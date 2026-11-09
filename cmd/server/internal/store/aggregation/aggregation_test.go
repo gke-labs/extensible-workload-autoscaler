@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
@@ -99,7 +98,7 @@ func TestDecayingDistributionAggregation_InstantaneousRate(t *testing.T) {
 	// A zero rate window feeds the histogram with the instantaneous rates.
 	def := pb.DecayingDistribution_builder{
 		HalfLife:   durationpb.New(time.Hour),
-		BucketSize: proto.String("1"),
+		BucketSize: new("1"),
 		Rate:       durationpb.New(0),
 	}.Build()
 	d := NewDecayingDistributionAggregation(def, model.SampleTypeCounter)
@@ -133,7 +132,7 @@ func TestDecayingDistributionAggregation_InstantaneousRate(t *testing.T) {
 func TestNewDecayingDistributionAggregation_NoRate(t *testing.T) {
 	def := pb.DecayingDistribution_builder{
 		HalfLife:   durationpb.New(time.Hour),
-		BucketSize: proto.String("1"),
+		BucketSize: new("1"),
 	}.Build()
 	if d := NewDecayingDistributionAggregation(def, model.SampleTypeGauge); d.rate != nil {
 		t.Errorf("got a rate window without a rate configured")

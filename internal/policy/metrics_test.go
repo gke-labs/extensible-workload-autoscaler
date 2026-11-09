@@ -5,7 +5,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
@@ -21,29 +20,29 @@ func TestMetrics(t *testing.T) {
 		{
 			name: "Policy-wide metrics only",
 			policy: pb.Policy_builder{
-				Metrics: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: proto.String("cpu")}.Build(), pb.MetricDefinition_builder{Name: proto.String("rps")}.Build()},
+				Metrics: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: new("cpu")}.Build(), pb.MetricDefinition_builder{Name: new("rps")}.Build()},
 			}.Build(),
-			want: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: proto.String("cpu")}.Build(), pb.MetricDefinition_builder{Name: proto.String("rps")}.Build()},
+			want: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: new("cpu")}.Build(), pb.MetricDefinition_builder{Name: new("rps")}.Build()},
 		},
 		{
 			name: "Policy-wide and recommender-owned metrics",
 			policy: pb.Policy_builder{
-				Metrics: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: proto.String("rps")}.Build()},
+				Metrics: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: new("rps")}.Build()},
 				RecommenderMetrics: map[string]*pb.MetricDefinitionList{
 					"vpa": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{
-						pb.MetricDefinition_builder{Name: proto.String("cpu"), RecommenderName: proto.String("vpa")}.Build(),
-						pb.MetricDefinition_builder{Name: proto.String("memory"), RecommenderName: proto.String("vpa")}.Build(),
+						pb.MetricDefinition_builder{Name: new("cpu"), RecommenderName: new("vpa")}.Build(),
+						pb.MetricDefinition_builder{Name: new("memory"), RecommenderName: new("vpa")}.Build(),
 					}}.Build(),
 					"hpa": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{
-						pb.MetricDefinition_builder{Name: proto.String("cpu"), RecommenderName: proto.String("hpa")}.Build(),
+						pb.MetricDefinition_builder{Name: new("cpu"), RecommenderName: new("hpa")}.Build(),
 					}}.Build(),
 				},
 			}.Build(),
 			want: []*pb.MetricDefinition{
-				pb.MetricDefinition_builder{Name: proto.String("rps")}.Build(),
-				pb.MetricDefinition_builder{Name: proto.String("cpu"), RecommenderName: proto.String("hpa")}.Build(),
-				pb.MetricDefinition_builder{Name: proto.String("cpu"), RecommenderName: proto.String("vpa")}.Build(),
-				pb.MetricDefinition_builder{Name: proto.String("memory"), RecommenderName: proto.String("vpa")}.Build(),
+				pb.MetricDefinition_builder{Name: new("rps")}.Build(),
+				pb.MetricDefinition_builder{Name: new("cpu"), RecommenderName: new("hpa")}.Build(),
+				pb.MetricDefinition_builder{Name: new("cpu"), RecommenderName: new("vpa")}.Build(),
+				pb.MetricDefinition_builder{Name: new("memory"), RecommenderName: new("vpa")}.Build(),
 			},
 		},
 	}

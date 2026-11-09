@@ -63,11 +63,11 @@ func (r *recordingRecommender) Recommend(def *pb.RecommenderDefinition, metrics,
 		r.got = make(map[string]recommenderInput)
 	}
 	r.got[def.GetName()] = recommenderInput{metrics: metrics, ownedMetrics: ownedMetrics, readyReplicas: readyReplicas, workload: workload}
-	return pb.Recommendation_builder{IsActive: proto.Bool(true)}.Build()
+	return pb.Recommendation_builder{IsActive: new(true)}.Build()
 }
 
 func policyID(cluster, ns, name string) *pb.PolicyId {
-	return pb.PolicyId_builder{ClusterName: proto.String(cluster), Namespace: proto.String(ns), Name: proto.String(name)}.Build()
+	return pb.PolicyId_builder{ClusterName: new(cluster), Namespace: new(ns), Name: new(name)}.Build()
 }
 
 // testPolicy returns a policy with an activation recommender "act" and a
@@ -75,14 +75,14 @@ func policyID(cluster, ns, name string) *pb.PolicyId {
 func testPolicy(id *pb.PolicyId) *pb.Policy {
 	return pb.Policy_builder{
 		Id:         id,
-		Activation: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("act"), Recommender: proto.String("rec-class")}.Build()},
-		Scaling:    []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("vpa"), Recommender: proto.String("rec-class")}.Build()},
+		Activation: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: new("act"), Recommender: new("rec-class")}.Build()},
+		Scaling:    []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: new("vpa"), Recommender: new("rec-class")}.Build()},
 	}.Build()
 }
 
 func testWorkload(pod string) *pb.Workload {
 	return pb.Workload_builder{Pods: []*pb.PodState{
-		pb.PodState_builder{Name: proto.String(pod), Containers: []*pb.ContainerState{pb.ContainerState_builder{Name: proto.String("app"), Requests: map[string]string{"cpu": "100m"}}.Build()}}.Build(),
+		pb.PodState_builder{Name: new(pod), Containers: []*pb.ContainerState{pb.ContainerState_builder{Name: new("app"), Requests: map[string]string{"cpu": "100m"}}.Build()}}.Build(),
 	}}.Build()
 }
 
@@ -214,7 +214,7 @@ func TestHandleControlMetricsUpdate(t *testing.T) {
 		Id:                        id,
 		ControlMetrics:            policyWide,
 		RecommenderControlMetrics: map[string]*pb.ControlMetrics{"vpa": vpaOwned},
-		ReadyReplicas:             proto.Int32(3),
+		ReadyReplicas:             new(int32(3)),
 	}.Build()
 
 	// newEngine builds an engine that knows the policy, backed by rec.
@@ -249,10 +249,10 @@ func TestHandleControlMetricsUpdate(t *testing.T) {
 
 		e.handleControlMetricsUpdate(context.Background(), update)
 
-		active := pb.Recommendation_builder{IsActive: proto.Bool(true)}.Build()
+		active := pb.Recommendation_builder{IsActive: new(true)}.Build()
 		want := []*pb.UpdateRecommenderStateRequest{
-			pb.UpdateRecommenderStateRequest_builder{Id: id, RecommenderName: proto.String("act"), Recommendation: active}.Build(),
-			pb.UpdateRecommenderStateRequest_builder{Id: id, RecommenderName: proto.String("vpa"), Recommendation: active}.Build(),
+			pb.UpdateRecommenderStateRequest_builder{Id: id, RecommenderName: new("act"), Recommendation: active}.Build(),
+			pb.UpdateRecommenderStateRequest_builder{Id: id, RecommenderName: new("vpa"), Recommendation: active}.Build(),
 		}
 		if diff := cmp.Diff(want, client.pushed, protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 			t.Errorf("pushed recommendations mismatch (-want +got):\n%s", diff)
@@ -304,22 +304,22 @@ func TestHandleControlMetricsUpdate(t *testing.T) {
 			Id: id,
 			Activation: []*pb.RecommenderDefinition{
 				pb.RecommenderDefinition_builder{
-					Name:        proto.String("unknown-type"),
-					Recommender: proto.String("third-party-class"),
+					Name:        new("unknown-type"),
+					Recommender: new("third-party-class"),
 				}.Build(),
 				pb.RecommenderDefinition_builder{
-					Name:        proto.String("act"),
-					Recommender: proto.String("rec-class"),
+					Name:        new("act"),
+					Recommender: new("rec-class"),
 				}.Build(),
 			},
 			Scaling: []*pb.RecommenderDefinition{
 				pb.RecommenderDefinition_builder{
-					Name:        proto.String("vpa"),
-					Recommender: proto.String("rec-class"),
+					Name:        new("vpa"),
+					Recommender: new("rec-class"),
 				}.Build(),
 				pb.RecommenderDefinition_builder{
-					Name:        proto.String("missing-class"),
-					Recommender: proto.String("nonexistent-class"),
+					Name:        new("missing-class"),
+					Recommender: new("nonexistent-class"),
 				}.Build(),
 			},
 		}.Build()

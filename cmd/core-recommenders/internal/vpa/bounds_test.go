@@ -6,7 +6,6 @@ import (
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 	"github.com/google/go-cmp/cmp"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 )
 
@@ -61,7 +60,7 @@ func podWith(name string, requests ...string) *pb.PodState {
 // podWithLimits returns a pod whose "app" container has the given requests and
 // limits.
 func podWithLimits(name string, requests, limits map[string]string) *pb.PodState {
-	return pb.PodState_builder{Name: proto.String(name), Containers: []*pb.ContainerState{pb.ContainerState_builder{Name: proto.String("app"), Requests: requests, Limits: limits}.Build()}}.Build()
+	return pb.PodState_builder{Name: new(name), Containers: []*pb.ContainerState{pb.ContainerState_builder{Name: new("app"), Requests: requests, Limits: limits}.Build()}}.Build()
 }
 
 // TestRecommendBounds checks the bounds computed around the target, reported
@@ -126,7 +125,7 @@ func TestRecommendBounds(t *testing.T) {
 func TestRecommendWorkload(t *testing.T) {
 	resources := func(cpu, mem string) []*pb.ContainerResource {
 		reqs := map[string]string{"cpu": cpu, "memory": mem}
-		return []*pb.ContainerResource{pb.ContainerResource_builder{ContainerName: proto.String("app"), Requests: reqs, Limits: reqs}.Build()}
+		return []*pb.ContainerResource{pb.ContainerResource_builder{ContainerName: new("app"), Requests: reqs, Limits: reqs}.Build()}
 	}
 	target := resources("200m", "200Mi")
 
@@ -207,7 +206,7 @@ func TestRecommendWorkload(t *testing.T) {
 			wantActive: true,
 			// Without a memory request, there's no ratio for the memory limit.
 			want: []*pb.ContainerResource{pb.ContainerResource_builder{
-				ContainerName: proto.String("app"),
+				ContainerName: new("app"),
 				Requests:      map[string]string{"cpu": "200m", "memory": "200Mi"},
 				Limits:        map[string]string{"cpu": "200m"},
 			}.Build()},
@@ -217,7 +216,7 @@ func TestRecommendWorkload(t *testing.T) {
 			name:   "pods without the container are ignored",
 			params: boundsParams(allBounds...),
 			pods: []*pb.PodState{
-				pb.PodState_builder{Name: proto.String("other"), Containers: []*pb.ContainerState{pb.ContainerState_builder{Name: proto.String("sidecar"), Requests: map[string]string{"cpu": "1m"}}.Build()}}.Build(),
+				pb.PodState_builder{Name: new("other"), Containers: []*pb.ContainerState{pb.ContainerState_builder{Name: new("sidecar"), Requests: map[string]string{"cpu": "1m"}}.Build()}}.Build(),
 				podWith("pod-1", "cpu", "190m", "memory", "210Mi"),
 			},
 			wantActive: true,
@@ -226,7 +225,7 @@ func TestRecommendWorkload(t *testing.T) {
 		{
 			name:            "no pod has the container",
 			params:          boundsParams(allBounds...),
-			pods:            []*pb.PodState{pb.PodState_builder{Name: proto.String("other"), Containers: []*pb.ContainerState{pb.ContainerState_builder{Name: proto.String("sidecar")}.Build()}}.Build()},
+			pods:            []*pb.PodState{pb.PodState_builder{Name: new("other"), Containers: []*pb.ContainerState{pb.ContainerState_builder{Name: new("sidecar")}.Build()}}.Build()},
 			wantActive:      false,
 			wantMsgContains: `no pod of the workload has the container "app"`,
 		},
@@ -346,7 +345,7 @@ func TestRecommendLimits(t *testing.T) {
 			if !got.GetIsActive() {
 				t.Fatalf("Recommend() inactive: %s", got.GetMessage())
 			}
-			want := []*pb.ContainerResource{pb.ContainerResource_builder{ContainerName: proto.String("app"), Requests: tt.wantReqs, Limits: tt.wantLimits}.Build()}
+			want := []*pb.ContainerResource{pb.ContainerResource_builder{ContainerName: new("app"), Requests: tt.wantReqs, Limits: tt.wantLimits}.Build()}
 			if diff := cmp.Diff(want, got.GetWorkloadResources(), protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 				t.Errorf("Recommend() WorkloadResources mismatch (-want +got):\n%s", diff)
 			}

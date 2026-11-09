@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	corev1 "k8s.io/api/core/v1"
@@ -164,14 +163,14 @@ func TestIsCPUSampleEligible(t *testing.T) {
 func TestIsPodEligible(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	workload := map[string]*pb.PodState{
-		"ready":       pb.PodState_builder{Phase: proto.String("Running"), StartTime: timestamppb.New(start), IsReady: proto.Bool(true), ReadyLastTransitionTime: timestamppb.New(start.Add(time.Minute))}.Build(),
-		"never-ready": pb.PodState_builder{Phase: proto.String("Running"), StartTime: timestamppb.New(start), ReadyLastTransitionTime: timestamppb.New(start.Add(time.Second))}.Build(),
-		"no-start":    pb.PodState_builder{IsReady: proto.Bool(true)}.Build(),
+		"ready":       pb.PodState_builder{Phase: new("Running"), StartTime: timestamppb.New(start), IsReady: new(true), ReadyLastTransitionTime: timestamppb.New(start.Add(time.Minute))}.Build(),
+		"never-ready": pb.PodState_builder{Phase: new("Running"), StartTime: timestamppb.New(start), ReadyLastTransitionTime: timestamppb.New(start.Add(time.Second))}.Build(),
+		"no-start":    pb.PodState_builder{IsReady: new(true)}.Build(),
 	}
 	grace := 10 * time.Minute
 	defaults := (*pb.MetricDefinition_Eligibility)(nil)
 	withGrace := pb.MetricDefinition_Eligibility_builder{StartupGracePeriod: durationpb.New(grace)}.Build()
-	startupSamples := pb.MetricDefinition_Eligibility_builder{StartupSamples: proto.Bool(true)}.Build()
+	startupSamples := pb.MetricDefinition_Eligibility_builder{StartupSamples: new(true)}.Build()
 	tests := []struct {
 		name        string
 		pod         string
@@ -224,8 +223,8 @@ func TestFromPodState(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	transition := start.Add(time.Minute)
 	p := pb.PodState_builder{
-		Phase:                   proto.String("Running"),
-		IsReady:                 proto.Bool(true),
+		Phase:                   new("Running"),
+		IsReady:                 new(true),
 		StartTime:               timestamppb.New(start),
 		ReadyLastTransitionTime: timestamppb.New(transition),
 		DeletionTimestamp:       timestamppb.New(transition.Add(time.Hour)),

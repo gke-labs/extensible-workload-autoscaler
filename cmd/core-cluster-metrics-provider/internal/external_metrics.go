@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"time"
 
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -64,17 +63,17 @@ func (p *CoreClusterMetricsProvider) processExternalMetric(namespace string, m *
 		}
 
 		samples = append(samples, pb.MetricSample_builder{
-			Name:            proto.String(m.GetName()),
-			RecommenderName: proto.String(m.GetRecommenderName()),
+			Name:            new(m.GetName()),
+			RecommenderName: new(m.GetRecommenderName()),
 			Labels:          item.MetricLabels,
-			Gauge:           proto.Float64(val),
+			Gauge:           new(val),
 			Timestamp:       timestamppb.New(time.Unix(ts, 0)),
 		}.Build())
 	}
 
 	if len(samples) > 0 {
 		return []*pb.MetricBatch{pb.MetricBatch_builder{
-			PodName: proto.String(""), // Global / External metric scope
+			PodName: new(""), // Global / External metric scope
 			Samples: samples,
 		}.Build()}
 	}

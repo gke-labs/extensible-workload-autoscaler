@@ -15,22 +15,22 @@ import (
 // map entries, so that non-deterministic map ordering would show up.
 func etagTestPolicy() *pb.Policy {
 	return pb.Policy_builder{
-		Id:          pb.PolicyId_builder{ClusterName: proto.String("c"), Namespace: proto.String("ns"), Name: proto.String("pol")}.Build(),
-		Workload:    pb.WorkloadRef_builder{Kind: proto.String("Deployment"), Name: proto.String("web")}.Build(),
-		MinReplicas: proto.Int32(1),
-		MaxReplicas: proto.Int32(10),
-		Selector:    proto.String("app=web"),
+		Id:          pb.PolicyId_builder{ClusterName: new("c"), Namespace: new("ns"), Name: new("pol")}.Build(),
+		Workload:    pb.WorkloadRef_builder{Kind: new("Deployment"), Name: new("web")}.Build(),
+		MinReplicas: new(int32(1)),
+		MaxReplicas: new(int32(10)),
+		Selector:    new("app=web"),
 		Metrics: []*pb.MetricDefinition{pb.MetricDefinition_builder{
-			Name:   proto.String("rps"),
+			Name:   new("rps"),
 			Params: map[string]string{"a": "1", "b": "2", "c": "3", "d": "4"},
 		}.Build()},
-		Scaling:    []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("linear")}.Build()},
-		Activation: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("cron")}.Build()},
+		Scaling:    []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: new("linear")}.Build()},
+		Activation: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: new("cron")}.Build()},
 		RecommenderMetrics: map[string]*pb.MetricDefinitionList{
-			"vpa":  pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: proto.String("cpu")}.Build(), pb.MetricDefinition_builder{Name: proto.String("memory")}.Build()}}.Build(),
-			"hpa":  pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: proto.String("qps")}.Build()}}.Build(),
-			"cron": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: proto.String("tick")}.Build()}}.Build(),
-			"ml":   pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: proto.String("forecast")}.Build()}}.Build(),
+			"vpa":  pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: new("cpu")}.Build(), pb.MetricDefinition_builder{Name: new("memory")}.Build()}}.Build(),
+			"hpa":  pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: new("qps")}.Build()}}.Build(),
+			"cron": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: new("tick")}.Build()}}.Build(),
+			"ml":   pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: new("forecast")}.Build()}}.Build(),
 		},
 	}.Build()
 }

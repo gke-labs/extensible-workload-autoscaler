@@ -9,7 +9,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
@@ -141,7 +140,7 @@ func (s *Server) WatchControlMetrics(req *pb.WatchControlMetricsRequest, stream 
 			Id:                        evt.ID,
 			ControlMetrics:            evt.ControlMetrics,
 			RecommenderControlMetrics: evt.RecommenderControlMetrics,
-			ReadyReplicas:             proto.Int32(evt.ReadyReplicas),
+			ReadyReplicas:             new(evt.ReadyReplicas),
 		}.Build()
 	})
 }
@@ -227,7 +226,7 @@ func (s *Server) UpdateRecommenderState(ctx context.Context, req *pb.UpdateRecom
 	}
 
 	res := pb.RecommenderState_builder{
-		Name: proto.String(req.GetRecommenderName()),
+		Name: new(req.GetRecommenderName()),
 	}.Build()
 	// Note: We don't necessarily return the full enriched status here unless we fetch it from store
 	// For now, let's keep it simple or fetch it if needed by clients.
@@ -260,5 +259,5 @@ func (s *Server) IngestMetrics(ctx context.Context, req *pb.IngestMetricsRequest
 		}
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	return pb.IngestMetricsResponse_builder{Success: proto.Bool(true)}.Build(), nil
+	return pb.IngestMetricsResponse_builder{Success: new(true)}.Build(), nil
 }

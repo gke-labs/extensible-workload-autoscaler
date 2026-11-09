@@ -3,8 +3,6 @@ package store
 import (
 	"fmt"
 
-	"google.golang.org/protobuf/proto"
-
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 )
 
@@ -26,9 +24,9 @@ func newPolicyID(id *pb.PolicyId) policyID {
 // toProto returns the proto PolicyId identifying the policy.
 func (id policyID) toProto() *pb.PolicyId {
 	return pb.PolicyId_builder{
-		ClusterName: proto.String(id.cluster),
-		Namespace:   proto.String(id.ns),
-		Name:        proto.String(id.name),
+		ClusterName: new(id.cluster),
+		Namespace:   new(id.ns),
+		Name:        new(id.name),
 	}.Build()
 }
 

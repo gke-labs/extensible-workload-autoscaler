@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"time"
 
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -113,12 +112,12 @@ func (p *CoreClusterMetricsProvider) processCustomMetric(
 
 			podName := item.DescribedObject.Name
 			batches = append(batches, pb.MetricBatch_builder{
-				PodName: proto.String(podName),
+				PodName: new(podName),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:            proto.String(m.GetName()),
-						RecommenderName: proto.String(m.GetRecommenderName()),
-						Gauge:           proto.Float64(val),
+						Name:            new(m.GetName()),
+						RecommenderName: new(m.GetRecommenderName()),
+						Gauge:           new(val),
 						Timestamp:       timestamppb.New(time.Unix(ts, 0)),
 					}.Build(),
 				},
@@ -148,11 +147,11 @@ func (p *CoreClusterMetricsProvider) processCustomMetric(
 
 	return []*pb.MetricBatch{
 		pb.MetricBatch_builder{
-			PodName: proto.String(""),
+			PodName: new(""),
 			Samples: []*pb.MetricSample{
 				pb.MetricSample_builder{
-					Name:      proto.String(m.GetName()),
-					Gauge:     proto.Float64(val),
+					Name:      new(m.GetName()),
+					Gauge:     new(val),
 					Timestamp: timestamppb.New(time.Unix(ts, 0)),
 				}.Build(),
 			},
