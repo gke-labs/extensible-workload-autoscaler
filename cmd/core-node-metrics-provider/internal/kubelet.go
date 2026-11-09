@@ -11,7 +11,6 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	corev1 "k8s.io/api/core/v1"
 
@@ -182,8 +181,8 @@ func (a *CoreNodeMetricsProvider) processKubeletMetric(pod corev1.Pod, m *pb.Met
 		sample.SetResourceName(metricType)
 
 		batches = append(batches, pb.MetricBatch_builder{
-			PodName:       proto.String(pod.Name),
-			ContainerName: proto.String(cName),
+			PodName:       new(pod.Name),
+			ContainerName: new(cName),
 			Samples:       []*pb.MetricSample{sample},
 		}.Build())
 	}
@@ -236,7 +235,7 @@ func (a *CoreNodeMetricsProvider) containerSample(pod corev1.Pod, containerName 
 		val /= req
 	}
 	return pb.MetricSample_builder{
-		Gauge:     proto.Float64(val),
+		Gauge:     new(val),
 		Timestamp: timestamppb.New(time.Unix(ts, 0)),
 	}.Build(), true
 }

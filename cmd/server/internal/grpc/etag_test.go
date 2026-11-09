@@ -6,7 +6,6 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
@@ -21,7 +20,7 @@ var ignoreEtag = protocmp.IgnoreFields(&pb.Policy{}, "etag")
 // policy, whose etag must be echoed back on the next update.
 func mustUpdatePolicy(t *testing.T, client pb.XASServerClient, p *pb.Policy) *pb.Policy {
 	t.Helper()
-	stored, err := client.UpdatePolicy(context.Background(), pb.UpdatePolicyRequest_builder{Policy: p, AllowMissing: proto.Bool(true)}.Build())
+	stored, err := client.UpdatePolicy(context.Background(), pb.UpdatePolicyRequest_builder{Policy: p, AllowMissing: new(true)}.Build())
 	if err != nil {
 		t.Fatalf("UpdatePolicy(%s) failed: %v", p.GetId().GetName(), err)
 	}
@@ -42,7 +41,7 @@ func getPolicy(t *testing.T, client pb.XASServerClient, id *pb.PolicyId) *pb.Pol
 // TestUpdatePolicyEtagCodesGRPC checks the gRPC code returned for each ETag
 // case of UpdatePolicy.
 func TestUpdatePolicyEtagCodesGRPC(t *testing.T) {
-	id := pb.PolicyId_builder{ClusterName: proto.String("c1"), Namespace: proto.String("ns"), Name: proto.String("p1")}.Build()
+	id := pb.PolicyId_builder{ClusterName: new("c1"), Namespace: new("ns"), Name: new("p1")}.Build()
 
 	tests := []struct {
 		name         string
@@ -65,12 +64,12 @@ func TestUpdatePolicyEtagCodesGRPC(t *testing.T) {
 
 			var stored *pb.Policy
 			if tt.existing {
-				stored = mustUpdatePolicy(t, client, pb.Policy_builder{Id: id, MaxReplicas: proto.Int32(10)}.Build())
+				stored = mustUpdatePolicy(t, client, pb.Policy_builder{Id: id, MaxReplicas: new(int32(10))}.Build())
 			}
 
 			resp, err := client.UpdatePolicy(context.Background(), pb.UpdatePolicyRequest_builder{
-				Policy:       pb.Policy_builder{Id: id, MaxReplicas: proto.Int32(20), Etag: proto.String(tt.etag(stored.GetEtag()))}.Build(),
-				AllowMissing: proto.Bool(tt.allowMissing),
+				Policy:       pb.Policy_builder{Id: id, MaxReplicas: new(int32(20)), Etag: new(tt.etag(stored.GetEtag()))}.Build(),
+				AllowMissing: new(tt.allowMissing),
 			}.Build())
 			if got := status.Code(err); got != tt.wantCode {
 				t.Fatalf("UpdatePolicy() code = %v, want %v (err: %v)", got, tt.wantCode, err)
@@ -93,14 +92,14 @@ func TestUpdatePolicyEtagCodesGRPC(t *testing.T) {
 func TestUpdatePolicyEtagLifecycleGRPC(t *testing.T) {
 	_, client, cleanup := setupFunctionalGRPCServer(t, clock.RealClock{})
 	defer cleanup()
-	id := pb.PolicyId_builder{ClusterName: proto.String("c1"), Namespace: proto.String("ns"), Name: proto.String("p1")}.Build()
+	id := pb.PolicyId_builder{ClusterName: new("c1"), Namespace: new("ns"), Name: new("p1")}.Build()
 
-	v1 := mustUpdatePolicy(t, client, pb.Policy_builder{Id: id, MaxReplicas: proto.Int32(10)}.Build())
+	v1 := mustUpdatePolicy(t, client, pb.Policy_builder{Id: id, MaxReplicas: new(int32(10))}.Build())
 	if got := getPolicy(t, client, id).GetEtag(); got != v1.GetEtag() {
 		t.Fatalf("ListPolicies() etag = %q, want %q", got, v1.GetEtag())
 	}
 
-	v2 := mustUpdatePolicy(t, client, pb.Policy_builder{Id: id, MaxReplicas: proto.Int32(20), Etag: proto.String(v1.GetEtag())}.Build())
+	v2 := mustUpdatePolicy(t, client, pb.Policy_builder{Id: id, MaxReplicas: new(int32(20)), Etag: new(v1.GetEtag())}.Build())
 	if v2.GetEtag() == v1.GetEtag() {
 		t.Fatalf("etag did not change after a content change: %q", v2.GetEtag())
 	}
@@ -110,7 +109,7 @@ func TestUpdatePolicyEtagLifecycleGRPC(t *testing.T) {
 
 	// The first etag is now stale.
 	_, err := client.UpdatePolicy(context.Background(), pb.UpdatePolicyRequest_builder{
-		Policy: pb.Policy_builder{Id: id, MaxReplicas: proto.Int32(30), Etag: proto.String(v1.GetEtag())}.Build(),
+		Policy: pb.Policy_builder{Id: id, MaxReplicas: new(int32(30)), Etag: new(v1.GetEtag())}.Build(),
 	}.Build())
 	if status.Code(err) != codes.Aborted {
 		t.Errorf("UpdatePolicy(old etag) code = %v, want Aborted", status.Code(err))
@@ -126,10 +125,10 @@ func TestUpdatePolicyEtagLifecycleGRPC(t *testing.T) {
 func TestUpdatePolicyReadModifyWriteGRPC(t *testing.T) {
 	_, client, cleanup := setupFunctionalGRPCServer(t, clock.RealClock{})
 	defer cleanup()
-	id := pb.PolicyId_builder{ClusterName: proto.String("c1"), Namespace: proto.String("ns"), Name: proto.String("p1")}.Build()
+	id := pb.PolicyId_builder{ClusterName: new("c1"), Namespace: new("ns"), Name: new("p1")}.Build()
 	mustUpdatePolicy(t, client, pb.Policy_builder{
-		Id: id, MinReplicas: proto.Int32(1), MaxReplicas: proto.Int32(10),
-		Scaling: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: proto.String("vpa"), Recommender: proto.String("vpa")}.Build()},
+		Id: id, MinReplicas: new(int32(1)), MaxReplicas: new(int32(10)),
+		Scaling: []*pb.RecommenderDefinition{pb.RecommenderDefinition_builder{Name: new("vpa"), Recommender: new("vpa")}.Build()},
 	}.Build())
 
 	// Both writers read the same version.
@@ -142,7 +141,7 @@ func TestUpdatePolicyReadModifyWriteGRPC(t *testing.T) {
 
 	// The recommender changes its own field from the stale copy: rejected.
 	recommenderCopy.SetRecommenderMetrics(map[string]*pb.MetricDefinitionList{
-		"vpa": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: proto.String("cpu"), RecommenderName: proto.String("vpa"), Gauge: pb.Gauge_builder{Aggregation: proto.String("Avg")}.Build()}.Build()}}.Build(),
+		"vpa": pb.MetricDefinitionList_builder{Definitions: []*pb.MetricDefinition{pb.MetricDefinition_builder{Name: new("cpu"), RecommenderName: new("vpa"), Gauge: pb.Gauge_builder{Aggregation: new("Avg")}.Build()}.Build()}}.Build(),
 	})
 	_, err := client.UpdatePolicy(context.Background(), pb.UpdatePolicyRequest_builder{Policy: recommenderCopy}.Build())
 	if status.Code(err) != codes.Aborted {

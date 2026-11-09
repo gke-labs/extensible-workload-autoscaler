@@ -549,15 +549,15 @@ func (c *Controller) pushPolicy(p *xasv1.ScalingPolicy, selector string) error {
 	var metrics []*pb.MetricDefinition
 	for _, m := range p.Spec.Metrics {
 		pm := pb.MetricDefinition_builder{
-			Name:     proto.String(m.Name),
-			Provider: proto.String(m.Provider),
+			Name:     new(m.Name),
+			Provider: new(m.Provider),
 			Params:   m.Params,
 			Filter:   m.Filter,
-			Scope:    proto.String(m.Scope),
+			Scope:    new(m.Scope),
 		}.Build()
 		if m.Eligibility != nil {
 			e := pb.MetricDefinition_Eligibility_builder{
-				StartupSamples: proto.Bool(m.Eligibility.StartupSamples),
+				StartupSamples: new(m.Eligibility.StartupSamples),
 			}.Build()
 			if m.Eligibility.StartupGracePeriod != nil {
 				e.SetStartupGracePeriod(durationpb.New(m.Eligibility.StartupGracePeriod.Duration))
@@ -568,26 +568,26 @@ func (c *Controller) pushPolicy(p *xasv1.ScalingPolicy, selector string) error {
 		// Sync Intents
 		if m.Gauge != nil {
 			pm.SetGauge(pb.Gauge_builder{
-				Aggregation: proto.String(m.Gauge.Aggregation),
+				Aggregation: new(m.Gauge.Aggregation),
 			}.Build())
 		}
 		if m.Rate != nil {
 			pm.SetRate(pb.Rate_builder{
 				Window:      durationpb.New(m.Rate.Window.Duration),
-				Aggregation: proto.String(m.Rate.Aggregation),
+				Aggregation: new(m.Rate.Aggregation),
 			}.Build())
 		}
 		if m.Distribution != nil {
 			pm.SetDistribution(pb.Distribution_builder{
-				Percentile:  proto.String(m.Distribution.Percentile),
-				Aggregation: proto.String(m.Distribution.Aggregation),
+				Percentile:  new(m.Distribution.Percentile),
+				Aggregation: new(m.Distribution.Aggregation),
 			}.Build())
 		}
 		if m.DecayingDistribution != nil {
 			pm.SetDecayingDistribution(pb.DecayingDistribution_builder{
 				HalfLife:   durationpb.New(m.DecayingDistribution.HalfLife.Duration),
-				BucketSize: proto.String(m.DecayingDistribution.BucketSize),
-				Percentile: proto.String(m.DecayingDistribution.Percentile),
+				BucketSize: new(m.DecayingDistribution.BucketSize),
+				Percentile: new(m.DecayingDistribution.Percentile),
 			}.Build())
 			if m.DecayingDistribution.Rate != nil {
 				pm.GetDecayingDistribution().SetRate(durationpb.New(m.DecayingDistribution.Rate.Duration))
@@ -604,11 +604,11 @@ func (c *Controller) pushPolicy(p *xasv1.ScalingPolicy, selector string) error {
 			recType = class.Spec.Type
 		}
 		activation = append(activation, pb.RecommenderDefinition_builder{
-			Recommender: proto.String(r.Recommender),
-			Name:        proto.String(r.Name),
-			Mode:        proto.String(r.Mode),
+			Recommender: new(r.Recommender),
+			Name:        new(r.Name),
+			Mode:        new(r.Mode),
 			Params:      r.Params,
-			Type:        proto.String(recType),
+			Type:        new(recType),
 		}.Build())
 	}
 
@@ -619,11 +619,11 @@ func (c *Controller) pushPolicy(p *xasv1.ScalingPolicy, selector string) error {
 			recType = class.Spec.Type
 		}
 		scaling = append(scaling, pb.RecommenderDefinition_builder{
-			Recommender: proto.String(r.Recommender),
-			Name:        proto.String(r.Name),
-			Mode:        proto.String(r.Mode),
+			Recommender: new(r.Recommender),
+			Name:        new(r.Name),
+			Mode:        new(r.Mode),
 			Params:      r.Params,
-			Type:        proto.String(recType),
+			Type:        new(recType),
 		}.Build())
 	}
 
@@ -641,18 +641,18 @@ func (c *Controller) pushPolicy(p *xasv1.ScalingPolicy, selector string) error {
 	pol := pb.Policy_builder{
 		Id: policyId,
 		Workload: pb.WorkloadRef_builder{
-			Group:     proto.String(group),
-			Version:   proto.String(version),
-			Kind:      proto.String(p.Spec.ScaleTargetRef.Kind),
-			Name:      proto.String(p.Spec.ScaleTargetRef.Name),
-			Namespace: proto.String(p.Namespace),
+			Group:     new(group),
+			Version:   new(version),
+			Kind:      new(p.Spec.ScaleTargetRef.Kind),
+			Name:      new(p.Spec.ScaleTargetRef.Name),
+			Namespace: new(p.Namespace),
 		}.Build(),
-		MinReplicas: proto.Int32(1),
-		MaxReplicas: proto.Int32(p.Spec.MaxReplicas),
+		MinReplicas: new(int32(1)),
+		MaxReplicas: new(p.Spec.MaxReplicas),
 		Metrics:     metrics,
 		Activation:  activation,
 		Scaling:     scaling,
-		Selector:    proto.String(selector),
+		Selector:    new(selector),
 	}.Build()
 	if err == nil {
 		pol.SetEtag(sp.GetEtag())
@@ -664,7 +664,7 @@ func (c *Controller) pushPolicy(p *xasv1.ScalingPolicy, selector string) error {
 
 	updatePolicyRequest := pb.UpdatePolicyRequest_builder{
 		Policy:       pol,
-		AllowMissing: proto.Bool(true),
+		AllowMissing: new(true),
 	}.Build()
 
 	_, err = c.grpcClient.UpdatePolicy(ctx, updatePolicyRequest)
@@ -753,7 +753,7 @@ func buildContainerStates(pod *corev1.Pod) []*pb.ContainerState {
 	containers := make([]*pb.ContainerState, 0, len(pod.Spec.Containers))
 	for _, container := range pod.Spec.Containers {
 		state := pb.ContainerState_builder{
-			Name:     proto.String(container.Name),
+			Name:     new(container.Name),
 			Requests: resourceListStrings(container.Resources.Requests),
 			Limits:   resourceListStrings(container.Resources.Limits),
 		}.Build()

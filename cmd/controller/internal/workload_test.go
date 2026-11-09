@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	corev1 "k8s.io/api/core/v1"
@@ -23,9 +22,9 @@ func TestBuildContainerStates(t *testing.T) {
 		withContainer("empty", nil, nil),
 	)
 	want := []*pb.ContainerState{
-		pb.ContainerState_builder{Name: proto.String("app"), Requests: map[string]string{"cpu": "100m", "memory": "128Mi"}, Limits: map[string]string{"cpu": "500m", "memory": "512Mi"}}.Build(),
-		pb.ContainerState_builder{Name: proto.String("sidecar"), Requests: map[string]string{"cpu": "10m"}}.Build(),
-		pb.ContainerState_builder{Name: proto.String("empty")}.Build(),
+		pb.ContainerState_builder{Name: new("app"), Requests: map[string]string{"cpu": "100m", "memory": "128Mi"}, Limits: map[string]string{"cpu": "500m", "memory": "512Mi"}}.Build(),
+		pb.ContainerState_builder{Name: new("sidecar"), Requests: map[string]string{"cpu": "10m"}}.Build(),
+		pb.ContainerState_builder{Name: new("empty")}.Build(),
 	}
 	if diff := cmp.Diff(want, buildContainerStates(pod), protocmp.Transform(), protocmp.IgnoreDefaultScalars()); diff != "" {
 		t.Errorf("buildContainerStates() mismatch (-want +got):\n%s", diff)
@@ -55,9 +54,9 @@ func TestBuildPodState(t *testing.T) {
 				},
 			},
 			want: pb.PodState_builder{
-				Phase:                   proto.String("Running"),
+				Phase:                   new("Running"),
 				StartTime:               timestamppb.New(start),
-				IsReady:                 proto.Bool(true),
+				IsReady:                 new(true),
 				ReadyLastTransitionTime: timestamppb.New(transition),
 			}.Build(),
 		},
@@ -71,7 +70,7 @@ func TestBuildPodState(t *testing.T) {
 				},
 			},
 			want: pb.PodState_builder{
-				Phase:                   proto.String("Running"),
+				Phase:                   new("Running"),
 				StartTime:               timestamppb.New(start),
 				ReadyLastTransitionTime: timestamppb.New(transition),
 			}.Build(),
@@ -79,7 +78,7 @@ func TestBuildPodState(t *testing.T) {
 		{
 			name:   "pending, not acknowledged by the kubelet yet",
 			status: corev1.PodStatus{Phase: corev1.PodPending},
-			want:   pb.PodState_builder{Phase: proto.String("Pending")}.Build(),
+			want:   pb.PodState_builder{Phase: new("Pending")}.Build(),
 		},
 		{
 			name:     "terminating",
@@ -92,9 +91,9 @@ func TestBuildPodState(t *testing.T) {
 				},
 			},
 			want: pb.PodState_builder{
-				Phase:                   proto.String("Running"),
+				Phase:                   new("Running"),
 				StartTime:               timestamppb.New(start),
-				IsReady:                 proto.Bool(true),
+				IsReady:                 new(true),
 				ReadyLastTransitionTime: timestamppb.New(transition),
 				DeletionTimestamp:       timestamppb.New(transition.Add(time.Hour)),
 			}.Build(),

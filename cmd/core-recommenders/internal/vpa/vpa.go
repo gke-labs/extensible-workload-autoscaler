@@ -170,14 +170,14 @@ func (r *VPARecommender) OwnedMetrics(def *pb.RecommenderDefinition, policyMetri
 		}
 		if template == nil {
 			template = pb.MetricDefinition_builder{
-				Provider: proto.String(defaultProvider),
+				Provider: new(defaultProvider),
 				Params:   map[string]string{"type": res.name},
-				Scope:    proto.String(defaultScope),
+				Scope:    new(defaultScope),
 				// Size the pods for their whole life, startup included.
-				Eligibility: pb.MetricDefinition_Eligibility_builder{StartupSamples: proto.Bool(true)}.Build(),
+				Eligibility: pb.MetricDefinition_Eligibility_builder{StartupSamples: new(true)}.Build(),
 				DecayingDistribution: pb.DecayingDistribution_builder{
 					HalfLife:   durationpb.New(defaultHalfLife),
-					BucketSize: proto.String(res.defaultBucketSize),
+					BucketSize: new(res.defaultBucketSize),
 				}.Build(),
 			}.Build()
 			if res.counter {
@@ -194,17 +194,17 @@ func (r *VPARecommender) OwnedMetrics(def *pb.RecommenderDefinition, policyMetri
 			}
 			tdd := template.GetDecayingDistribution()
 			owned = append(owned, pb.MetricDefinition_builder{
-				Name:        proto.String(ref.name),
-				Provider:    proto.String(template.GetProvider()),
+				Name:        new(ref.name),
+				Provider:    new(template.GetProvider()),
 				Params:      maps.Clone(template.GetParams()),
 				Filter:      maps.Clone(template.GetFilter()),
-				Scope:       proto.String(template.GetScope()),
+				Scope:       new(template.GetScope()),
 				Eligibility: proto.CloneOf(template.GetEligibility()),
 				DecayingDistribution: pb.DecayingDistribution_builder{
 					HalfLife:   proto.CloneOf(tdd.GetHalfLife()),
-					BucketSize: proto.String(tdd.GetBucketSize()),
+					BucketSize: new(tdd.GetBucketSize()),
 					Rate:       proto.CloneOf(tdd.GetRate()),
-					Percentile: proto.String(slots[sl].percentile),
+					Percentile: new(slots[sl].percentile),
 				}.Build(),
 			}.Build())
 		}
@@ -231,21 +231,21 @@ func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, ownedMe
 	// If parsing fails, return a Recommendation with the error message in the Message field.
 	if err != nil {
 		return pb.Recommendation_builder{
-			IsActive: proto.Bool(false),
-			Message:  proto.String(fmt.Sprintf("Unable to parse recommender configuration: %v", err)),
+			IsActive: new(false),
+			Message:  new(fmt.Sprintf("Unable to parse recommender configuration: %v", err)),
 		}.Build()
 	}
 
 	if state == nil && ownedMetrics == nil {
 		return pb.Recommendation_builder{
-			IsActive: proto.Bool(false),
-			Message:  proto.String("ControlMetrics is missing"),
+			IsActive: new(false),
+			Message:  new("ControlMetrics is missing"),
 		}.Build()
 	}
 	if len(state.GetPodContainerMetrics()) == 0 && len(ownedMetrics.GetPodContainerMetrics()) == 0 {
 		return pb.Recommendation_builder{
-			IsActive: proto.Bool(false),
-			Message:  proto.String("PodMetrics is empty (ensure metrics are configured with scope: PodContainer)"),
+			IsActive: new(false),
+			Message:  new("PodMetrics is empty (ensure metrics are configured with scope: PodContainer)"),
 		}.Build()
 	}
 
@@ -311,16 +311,16 @@ func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, ownedMe
 		warnings = append(warnings, "Unable to create recommendation as no value memory or cpu values were found")
 
 		return pb.Recommendation_builder{
-			IsActive: proto.Bool(false),
-			Message:  proto.String(fmt.Sprintf("No Recommendations generated: %s", strings.Join(warnings, "; "))),
+			IsActive: new(false),
+			Message:  new(fmt.Sprintf("No Recommendations generated: %s", strings.Join(warnings, "; "))),
 		}.Build()
 	}
 
 	// Without the pods' current requests, every pod would be resized.
 	if len(workload.GetPods()) == 0 {
 		return pb.Recommendation_builder{
-			IsActive: proto.Bool(false),
-			Message:  proto.String(fmt.Sprintf("%s; no pods reported for the workload yet", strings.Join(summary, "; "))),
+			IsActive: new(false),
+			Message:  new(fmt.Sprintf("%s; no pods reported for the workload yet", strings.Join(summary, "; "))),
 		}.Build()
 	}
 	var containers []*pb.ContainerState
@@ -334,8 +334,8 @@ func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, ownedMe
 	}
 	if len(current) == 0 {
 		return pb.Recommendation_builder{
-			IsActive: proto.Bool(false),
-			Message:  proto.String(fmt.Sprintf("%s; no pod of the workload has the container %q", strings.Join(summary, "; "), cfg.containerName)),
+			IsActive: new(false),
+			Message:  new(fmt.Sprintf("%s; no pod of the workload has the container %q", strings.Join(summary, "; "), cfg.containerName)),
 		}.Build()
 	}
 
@@ -368,13 +368,13 @@ func (r *VPARecommender) Recommend(def *pb.RecommenderDefinition, state, ownedMe
 		msg += fmt.Sprintf("; warnings: %s", strings.Join(warnings, "; "))
 	}
 	return pb.Recommendation_builder{
-		IsActive: proto.Bool(true),
+		IsActive: new(true),
 		WorkloadResources: []*pb.ContainerResource{pb.ContainerResource_builder{
-			ContainerName: proto.String(cfg.containerName),
+			ContainerName: new(cfg.containerName),
 			Requests:      requests,
 			Limits:        limits,
 		}.Build()},
-		Message: proto.String(msg),
+		Message: new(msg),
 	}.Build()
 }
 

@@ -10,7 +10,6 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/proto"
 
 	corelisters "k8s.io/client-go/listers/core/v1"
 
@@ -182,7 +181,7 @@ func (e *Engine) fetchPolicies() ([]*pb.Policy, error) {
 	defer cancel()
 
 	resp, err := e.client.ListPolicies(ctx, pb.ListPoliciesRequest_builder{
-		ClusterName: proto.String(e.clusterName),
+		ClusterName: new(e.clusterName),
 	}.Build())
 	if err != nil {
 		return nil, err
@@ -197,7 +196,7 @@ func (e *Engine) fetchWorkload(ns, name string) (*pb.Workload, error) {
 	defer cancel()
 
 	return e.client.GetWorkload(ctx, pb.GetWorkloadRequest_builder{
-		Id: pb.PolicyId_builder{ClusterName: proto.String(e.clusterName), Namespace: proto.String(ns), Name: proto.String(name)}.Build(),
+		Id: pb.PolicyId_builder{ClusterName: new(e.clusterName), Namespace: new(ns), Name: new(name)}.Build(),
 	}.Build())
 }
 
@@ -212,8 +211,8 @@ func (e *Engine) pushRecommendations(ctx context.Context, policy *pb.Policy, rec
 
 	for _, r := range recommendations {
 		req := pb.UpdateRecommenderStateRequest_builder{
-			Id:              pb.PolicyId_builder{ClusterName: proto.String(e.clusterName), Namespace: proto.String(policy.GetId().GetNamespace()), Name: proto.String(policy.GetId().GetName())}.Build(),
-			RecommenderName: proto.String(r.name),
+			Id:              pb.PolicyId_builder{ClusterName: new(e.clusterName), Namespace: new(policy.GetId().GetNamespace()), Name: new(policy.GetId().GetName())}.Build(),
+			RecommenderName: new(r.name),
 			Recommendation:  r.recommendation,
 		}.Build()
 		if r.recommendation != nil && r.recommendation.HasReplicas() {

@@ -7,7 +7,6 @@ import (
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 	"github.com/google/go-cmp/cmp"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
@@ -15,14 +14,14 @@ import (
 // decaying returns a decaying distribution metric definition.
 func decaying(name, typ, percentile string, halfLife time.Duration, bucketSize string) *pb.MetricDefinition {
 	return pb.MetricDefinition_builder{
-		Name:     proto.String(name),
-		Provider: proto.String("kubelet"),
+		Name:     new(name),
+		Provider: new("kubelet"),
 		Params:   map[string]string{"type": typ},
-		Scope:    proto.String("PodContainer"),
+		Scope:    new("PodContainer"),
 		DecayingDistribution: pb.DecayingDistribution_builder{
-			Percentile: proto.String(percentile),
+			Percentile: new(percentile),
 			HalfLife:   durationpb.New(halfLife),
-			BucketSize: proto.String(bucketSize),
+			BucketSize: new(bucketSize),
 		}.Build(),
 	}.Build()
 }
@@ -36,7 +35,7 @@ func defaultOwned(resource, slotSuffix, percentile string) *pb.MetricDefinition 
 		bucket = defaultMemBucket
 	}
 	m := decaying(resource+slotSuffix, resource, percentile, defaultHalfLife, bucket)
-	m.SetEligibility(pb.MetricDefinition_Eligibility_builder{StartupSamples: proto.Bool(true)}.Build())
+	m.SetEligibility(pb.MetricDefinition_Eligibility_builder{StartupSamples: new(true)}.Build())
 	if resource == "cpu" {
 		m.GetDecayingDistribution().SetRate(durationpb.New(0))
 	}
@@ -53,33 +52,33 @@ func TestOwnedMetrics(t *testing.T) {
 
 	// A user CPU metric with its own source, filter, half-life and bucket size.
 	userCPU := pb.MetricDefinition_builder{
-		Name:     proto.String("cpu_p95"),
-		Provider: proto.String("prometheus"),
+		Name:     new("cpu_p95"),
+		Provider: new("prometheus"),
 		Params:   map[string]string{"query": "container_cpu"},
 		Filter:   map[string]string{"env": "prod"},
-		Scope:    proto.String("PodContainer"),
+		Scope:    new("PodContainer"),
 		// Explicitly without the startup samples, unlike the defaults.
-		Eligibility: pb.MetricDefinition_Eligibility_builder{StartupSamples: proto.Bool(false)}.Build(),
+		Eligibility: pb.MetricDefinition_Eligibility_builder{StartupSamples: new(false)}.Build(),
 		DecayingDistribution: pb.DecayingDistribution_builder{
-			Percentile: proto.String("p95"),
+			Percentile: new("p95"),
 			HalfLife:   durationpb.New(12 * time.Hour),
-			BucketSize: proto.String("0.01"),
+			BucketSize: new("0.01"),
 		}.Build(),
 	}.Build()
 	// The owned metrics copied from the user's metric follow its
 	// eligibility setting.
 	copied := func(name, percentile string) *pb.MetricDefinition {
 		return pb.MetricDefinition_builder{
-			Name:        proto.String(name),
-			Provider:    proto.String("prometheus"),
+			Name:        new(name),
+			Provider:    new("prometheus"),
 			Params:      map[string]string{"query": "container_cpu"},
 			Filter:      map[string]string{"env": "prod"},
-			Scope:       proto.String("PodContainer"),
-			Eligibility: pb.MetricDefinition_Eligibility_builder{StartupSamples: proto.Bool(false)}.Build(),
+			Scope:       new("PodContainer"),
+			Eligibility: pb.MetricDefinition_Eligibility_builder{StartupSamples: new(false)}.Build(),
 			DecayingDistribution: pb.DecayingDistribution_builder{
-				Percentile: proto.String(percentile),
+				Percentile: new(percentile),
 				HalfLife:   durationpb.New(12 * time.Hour),
-				BucketSize: proto.String("0.01"),
+				BucketSize: new("0.01"),
 			}.Build(),
 		}.Build()
 	}
@@ -144,8 +143,8 @@ func TestOwnedMetrics(t *testing.T) {
 			name:   "configured metric that isn't a decaying distribution",
 			params: map[string]string{"cpu-metric": "cpu_gauge"},
 			policyMetrics: []*pb.MetricDefinition{pb.MetricDefinition_builder{
-				Name: proto.String("cpu_gauge"), Provider: proto.String("kubelet"), Scope: proto.String("PodContainer"),
-				Gauge: pb.Gauge_builder{Aggregation: proto.String("Max")}.Build(),
+				Name: new("cpu_gauge"), Provider: new("kubelet"), Scope: new("PodContainer"),
+				Gauge: pb.Gauge_builder{Aggregation: new("Max")}.Build(),
 			}.Build()},
 			wantErr: `cpu-metric "cpu_gauge" must be a decayingDistribution metric`,
 		},
@@ -186,7 +185,7 @@ func TestOwnedMetrics(t *testing.T) {
 				params[k] = v
 			}
 			r := &VPARecommender{}
-			got, err := r.OwnedMetrics(pb.RecommenderDefinition_builder{Name: proto.String("vpa-sizing"), Params: params}.Build(), tt.policyMetrics)
+			got, err := r.OwnedMetrics(pb.RecommenderDefinition_builder{Name: new("vpa-sizing"), Params: params}.Build(), tt.policyMetrics)
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 					t.Fatalf("OwnedMetrics() error = %v, want it to contain %q", err, tt.wantErr)
@@ -243,7 +242,7 @@ func TestRecommendOwnedMetrics(t *testing.T) {
 			params: with(),
 			owned:  owned,
 			want: pb.ContainerResource_builder{
-				ContainerName: proto.String("app"),
+				ContainerName: new("app"),
 				Requests:      map[string]string{"cpu": "200m", "memory": "200Mi"},
 				Limits:        map[string]string{"cpu": "200m", "memory": "200Mi"},
 			}.Build(),
@@ -255,7 +254,7 @@ func TestRecommendOwnedMetrics(t *testing.T) {
 			state:  podMetrics(map[string]float64{"cpu_p95": 0.3}),
 			owned:  owned,
 			want: pb.ContainerResource_builder{
-				ContainerName: proto.String("app"),
+				ContainerName: new("app"),
 				Requests:      map[string]string{"cpu": "300m", "memory": "200Mi"},
 				Limits:        map[string]string{"cpu": "300m", "memory": "200Mi"},
 			}.Build(),
@@ -267,7 +266,7 @@ func TestRecommendOwnedMetrics(t *testing.T) {
 			state:  podMetrics(map[string]float64{"mem_max": 800 * mib}),
 			owned:  owned,
 			want: pb.ContainerResource_builder{
-				ContainerName: proto.String("app"),
+				ContainerName: new("app"),
 				Requests:      map[string]string{"memory": "200Mi"},
 				Limits:        map[string]string{"memory": "200Mi"},
 			}.Build(),
@@ -279,7 +278,7 @@ func TestRecommendOwnedMetrics(t *testing.T) {
 			state:  nil,
 			owned:  owned,
 			want: pb.ContainerResource_builder{
-				ContainerName: proto.String("app"),
+				ContainerName: new("app"),
 				Requests:      map[string]string{"cpu": "200m"},
 				Limits:        map[string]string{"cpu": "200m"},
 			}.Build(),
@@ -292,8 +291,8 @@ func TestRecommendOwnedMetrics(t *testing.T) {
 	// equal the recommended requests.
 	current := map[string]string{"cpu": "1m", "memory": "1Mi"}
 	workload := pb.Workload_builder{Pods: []*pb.PodState{pb.PodState_builder{
-		Name:       proto.String("pod-1"),
-		Containers: []*pb.ContainerState{pb.ContainerState_builder{Name: proto.String("app"), Requests: current, Limits: current}.Build()},
+		Name:       new("pod-1"),
+		Containers: []*pb.ContainerState{pb.ContainerState_builder{Name: new("app"), Requests: current, Limits: current}.Build()},
 	}.Build()}}.Build()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

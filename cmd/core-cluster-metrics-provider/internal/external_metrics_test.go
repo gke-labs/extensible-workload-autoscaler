@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -55,8 +54,8 @@ func TestProcessExternalMetric(t *testing.T) {
 			name:      "Valid External Metric Query",
 			namespace: "default",
 			def: pb.MetricDefinition_builder{
-				Name:     proto.String("queue_depth"),
-				Provider: proto.String("k8s-external-metrics"),
+				Name:     new("queue_depth"),
+				Provider: new("k8s-external-metrics"),
 				Params: map[string]string{
 					"metric":   "pubsub_messages",
 					"selector": "sub=task-sub",
@@ -72,12 +71,12 @@ func TestProcessExternalMetric(t *testing.T) {
 			},
 			want: []*pb.MetricBatch{
 				pb.MetricBatch_builder{
-					PodName: proto.String(""),
+					PodName: new(""),
 					Samples: []*pb.MetricSample{
 						pb.MetricSample_builder{
-							Name:      proto.String("queue_depth"),
+							Name:      new("queue_depth"),
 							Labels:    map[string]string{"sub": "task-sub"},
-							Gauge:     proto.Float64(150),
+							Gauge:     new(float64(150)),
 							Timestamp: timestamppb.New(time.Unix(1720000000, 0)),
 						}.Build(),
 					},
@@ -88,8 +87,8 @@ func TestProcessExternalMetric(t *testing.T) {
 			name:      "Missing Metric Param",
 			namespace: "default",
 			def: pb.MetricDefinition_builder{
-				Name:     proto.String("queue_depth"),
-				Provider: proto.String("k8s-external-metrics"),
+				Name:     new("queue_depth"),
+				Provider: new("k8s-external-metrics"),
 				Params:   map[string]string{},
 			}.Build(),
 			items: nil,

@@ -354,13 +354,13 @@ func (s *MemoryStore) UpdateRecommenderState(req *pb.UpdateRecommenderStateReque
 
 	// Create enriched status
 	status := pb.RecommenderStatus_builder{
-		Name:              proto.String(req.GetRecommenderName()),
-		Type:              proto.String(def.GetType()),
-		Phase:             proto.String(phase),
-		Mode:              proto.String(def.GetMode()),
+		Name:              new(req.GetRecommenderName()),
+		Type:              new(def.GetType()),
+		Phase:             new(phase),
+		Mode:              new(def.GetMode()),
 		Replicas:          proto.ValueOrNil(req.GetRecommendation().HasReplicas(), req.GetRecommendation().GetReplicas),
-		IsActive:          proto.Bool(req.GetRecommendation().GetIsActive()),
-		Message:           proto.String(req.GetRecommendation().GetMessage()),
+		IsActive:          new(req.GetRecommendation().GetIsActive()),
+		Message:           new(req.GetRecommendation().GetMessage()),
 		LastUpdated:       timestamppb.New(s.clock.Now()),
 		WorkloadResources: req.GetRecommendation().GetWorkloadResources(),
 		PodResources:      req.GetRecommendation().GetPodContainerResources(),
@@ -455,7 +455,7 @@ func metricStatus(name, owner string, cm *pb.ControlMetrics, ts *timestamppb.Tim
 		displayName = owner + "/" + name
 	}
 	status := pb.MetricStatus_builder{
-		Name:      proto.String(displayName),
+		Name:      new(displayName),
 		Timestamp: ts,
 	}.Build()
 	if val, ok := cm.GetValues()[name]; ok {
@@ -538,7 +538,7 @@ func calculatePolicyControlMetrics(ps *PolicyState, now time.Time) *pb.GetContro
 	}
 	return pb.GetControlMetricsResponse_builder{
 		Timestamp:                 timestamppb.New(now),
-		ReadyReplicas:             proto.Int32(readyReplicasCount(workload)),
+		ReadyReplicas:             new(readyReplicasCount(workload)),
 		ControlMetrics:            cm,
 		RecommenderControlMetrics: rcm,
 	}.Build()
@@ -695,7 +695,7 @@ func (s *MemoryStore) calculateArbitratedResources(ps *PolicyState, isActive boo
 					newLims[k] = v
 				}
 				workloadMap[cName] = pb.ContainerResource_builder{
-					ContainerName: proto.String(cName),
+					ContainerName: new(cName),
 					Requests:      newReqs,
 					Limits:        newLims,
 				}.Build()
@@ -726,9 +726,9 @@ func (s *MemoryStore) calculateArbitratedResources(ps *PolicyState, isActive boo
 					newLims[k] = v
 				}
 				podMap[key] = pb.PodContainerResource_builder{
-					PodName: proto.String(pr.GetPodName()),
+					PodName: new(pr.GetPodName()),
 					ContainerResources: pb.ContainerResource_builder{
-						ContainerName: proto.String(cName),
+						ContainerName: new(cName),
 						Requests:      newReqs,
 						Limits:        newLims,
 					}.Build(),

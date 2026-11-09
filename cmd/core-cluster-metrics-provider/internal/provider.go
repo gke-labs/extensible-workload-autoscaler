@@ -8,7 +8,6 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/client-go/kubernetes"
 	customclient "k8s.io/metrics/pkg/client/custom_metrics"
@@ -78,7 +77,7 @@ func (p *CoreClusterMetricsProvider) scrapeAndSend() {
 	defer cancel()
 
 	resp, err := p.grpcClient.ListPolicies(ctx, pb.ListPoliciesRequest_builder{
-		ClusterName: proto.String(p.clusterName),
+		ClusterName: new(p.clusterName),
 	}.Build())
 	if err != nil {
 		slog.Error("Error listing policies", "error", err)
@@ -113,8 +112,8 @@ func (p *CoreClusterMetricsProvider) scrapeAndSend() {
 
 		if len(policyMetrics) > 0 {
 			policyBatches = append(policyBatches, pb.PolicyMetricBatch_builder{
-				Namespace: proto.String(pol.GetId().GetNamespace()),
-				Name:      proto.String(pol.GetId().GetName()),
+				Namespace: new(pol.GetId().GetNamespace()),
+				Name:      new(pol.GetId().GetName()),
 				Batches:   policyMetrics,
 			}.Build())
 		}
@@ -122,7 +121,7 @@ func (p *CoreClusterMetricsProvider) scrapeAndSend() {
 
 	if len(policyBatches) > 0 {
 		req := pb.IngestMetricsRequest_builder{
-			ClusterName:   proto.String(p.clusterName),
+			ClusterName:   new(p.clusterName),
 			Timestamp:     timestamppb.Now(),
 			PolicyMetrics: policyBatches,
 		}.Build()

@@ -8,7 +8,6 @@ import (
 	"github.com/gke-labs/extensible-workload-autoscaler/cmd/server/internal/store/model"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -29,14 +28,14 @@ func at(d time.Duration) time.Time {
 func readyPods(names ...string) map[string]*pb.PodState {
 	workload := make(map[string]*pb.PodState, len(names))
 	for _, name := range names {
-		workload[name] = pb.PodState_builder{Name: proto.String(name), IsReady: proto.Bool(true)}.Build()
+		workload[name] = pb.PodState_builder{Name: new(name), IsReady: new(true)}.Build()
 	}
 	return workload
 }
 
 // newSample returns a gauge sample measured at ts.
 func newSample(name string, ts time.Time, val float64) *pb.MetricSample {
-	b := pb.MetricSample_builder{Name: proto.String(name), Gauge: proto.Float64(val)}
+	b := pb.MetricSample_builder{Name: new(name), Gauge: new(val)}
 	if !ts.IsZero() {
 		b.Timestamp = timestamppb.New(ts)
 	}
@@ -45,7 +44,7 @@ func newSample(name string, ts time.Time, val float64) *pb.MetricSample {
 
 // newCounterSample returns a counter sample measured at ts.
 func newCounterSample(name string, ts time.Time, val float64) *pb.MetricSample {
-	b := pb.MetricSample_builder{Name: proto.String(name), Counter: proto.Float64(val)}
+	b := pb.MetricSample_builder{Name: new(name), Counter: new(val)}
 	if !ts.IsZero() {
 		b.Timestamp = timestamppb.New(ts)
 	}
@@ -55,7 +54,7 @@ func newCounterSample(name string, ts time.Time, val float64) *pb.MetricSample {
 // ingestSample ingests m, as reported by pod-a at ingestTime.
 func ingestSample(t *testing.T, ms *MetricStore, policy *pb.Policy, m *pb.MetricSample, ingestTime time.Time) {
 	t.Helper()
-	batches := []*pb.MetricBatch{pb.MetricBatch_builder{PodName: proto.String("pod-a"), Samples: []*pb.MetricSample{m}}.Build()}
+	batches := []*pb.MetricBatch{pb.MetricBatch_builder{PodName: new("pod-a"), Samples: []*pb.MetricSample{m}}.Build()}
 	if err := ms.IngestMetrics(policy, readyPods("pod-a"), batches, ingestTime); err != nil {
 		t.Fatalf("IngestMetrics() = %v", err)
 	}
@@ -94,22 +93,22 @@ func newRatePolicy(name string) *pb.Policy {
 // over the given window.
 func newRateWindowPolicy(name string, window time.Duration) *pb.Policy {
 	return pb.Policy_builder{Metrics: []*pb.MetricDefinition{
-		pb.MetricDefinition_builder{Name: proto.String(name), Rate: pb.Rate_builder{Window: durationpb.New(window)}.Build()}.Build(),
+		pb.MetricDefinition_builder{Name: new(name), Rate: pb.Rate_builder{Window: durationpb.New(window)}.Build()}.Build(),
 	}}.Build()
 }
 
 func newGaugePolicy(name string) *pb.Policy {
 	return pb.Policy_builder{Metrics: []*pb.MetricDefinition{
-		pb.MetricDefinition_builder{Name: proto.String(name), Gauge: pb.Gauge_builder{}.Build()}.Build(),
+		pb.MetricDefinition_builder{Name: new(name), Gauge: pb.Gauge_builder{}.Build()}.Build(),
 	}}.Build()
 }
 
 func newDecayingDistributionPolicy(name string) *pb.Policy {
 	return pb.Policy_builder{Metrics: []*pb.MetricDefinition{pb.MetricDefinition_builder{
-		Name: proto.String(name),
+		Name: new(name),
 		DecayingDistribution: pb.DecayingDistribution_builder{
 			HalfLife:   durationpb.New(time.Hour),
-			BucketSize: proto.String("0.1"),
+			BucketSize: new("0.1"),
 		}.Build(),
 	}.Build()}}.Build()
 }
@@ -238,11 +237,11 @@ func TestIngest_CounterDecayingDistributionReset(t *testing.T) {
 	// A decaying distribution of the rate of a counter accounts for its
 	// resets too.
 	policy := pb.Policy_builder{Metrics: []*pb.MetricDefinition{pb.MetricDefinition_builder{
-		Name: proto.String("reqs"),
+		Name: new("reqs"),
 		DecayingDistribution: pb.DecayingDistribution_builder{
 			HalfLife:   durationpb.New(time.Hour),
-			BucketSize: proto.String("1"),
-			Percentile: proto.String("p50"),
+			BucketSize: new("1"),
+			Percentile: new("p50"),
 			Rate:       durationpb.New(time.Minute),
 		}.Build(),
 	}.Build()}}.Build()
@@ -270,7 +269,7 @@ func TestIngest_SampleWithoutDataIsDropped(t *testing.T) {
 	ms := NewMetricStore()
 
 	// A sample without data has no effect: it does not even create its series.
-	ingestSample(t, ms, policy, pb.MetricSample_builder{Name: proto.String("queue"), Timestamp: timestamppb.New(t0)}.Build(), t0)
+	ingestSample(t, ms, policy, pb.MetricSample_builder{Name: new("queue"), Timestamp: timestamppb.New(t0)}.Build(), t0)
 	if metric := ms.Series[metricID{name: "queue"}]; !metric.isEmpty() {
 		t.Errorf("got %v for a sample without data, want no series", metric)
 	}
@@ -318,12 +317,12 @@ func TestIngest_SampleOfAnotherTypeIsDropped(t *testing.T) {
 
 func TestIngest_HistogramDefaultsToIngestTime(t *testing.T) {
 	policy := pb.Policy_builder{Metrics: []*pb.MetricDefinition{
-		pb.MetricDefinition_builder{Name: proto.String("latency"), Distribution: pb.Distribution_builder{Percentile: proto.String("p90")}.Build()}.Build(),
+		pb.MetricDefinition_builder{Name: new("latency"), Distribution: pb.Distribution_builder{Percentile: new("p90")}.Build()}.Build(),
 	}}.Build()
 	ms := NewMetricStore()
 
 	hist := func(count uint64) *pb.MetricSample {
-		return pb.MetricSample_builder{Name: proto.String("latency"), Histogram: pb.Histogram_builder{Buckets: map[string]uint64{"1": count}}.Build()}.Build()
+		return pb.MetricSample_builder{Name: new("latency"), Histogram: pb.Histogram_builder{Buckets: map[string]uint64{"1": count}}.Build()}.Build()
 	}
 	ingestSample(t, ms, policy, hist(0), t0)
 	ingestSample(t, ms, policy, hist(100), at(10*time.Second))
@@ -516,8 +515,8 @@ func TestIngest_SharedDecayingDistributionRepeats(t *testing.T) {
 	ingestPods := func(ingestTime time.Time) {
 		t.Helper()
 		batches := []*pb.MetricBatch{
-			pb.MetricBatch_builder{PodName: proto.String("pod-a"), Samples: []*pb.MetricSample{newSample("cpu", t0, 1)}}.Build(),
-			pb.MetricBatch_builder{PodName: proto.String("pod-b"), Samples: []*pb.MetricSample{newSample("cpu", t0, 2)}}.Build(),
+			pb.MetricBatch_builder{PodName: new("pod-a"), Samples: []*pb.MetricSample{newSample("cpu", t0, 1)}}.Build(),
+			pb.MetricBatch_builder{PodName: new("pod-b"), Samples: []*pb.MetricSample{newSample("cpu", t0, 2)}}.Build(),
 		}
 		if err := ms.IngestMetrics(policy, readyPods("pod-a", "pod-b"), batches, ingestTime); err != nil {
 			t.Fatalf("IngestMetrics() = %v", err)

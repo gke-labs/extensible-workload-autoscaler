@@ -8,7 +8,6 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
-	"google.golang.org/protobuf/proto"
 	corev1 "k8s.io/api/core/v1"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
@@ -76,17 +75,17 @@ func (a *CoreNodeMetricsProvider) scrapePod(ip string, port string, path string,
 			case dto.MetricType_GAUGE:
 				if m.Gauge != nil && wantBase {
 					samples = append(samples, pb.MetricSample_builder{
-						Name:   proto.String(name),
+						Name:   new(name),
 						Labels: labels,
-						Gauge:  proto.Float64(m.Gauge.GetValue()),
+						Gauge:  new(m.Gauge.GetValue()),
 					}.Build())
 				}
 			case dto.MetricType_COUNTER:
 				if m.Counter != nil && wantBase {
 					samples = append(samples, pb.MetricSample_builder{
-						Name:    proto.String(name),
+						Name:    new(name),
 						Labels:  labels,
-						Counter: proto.Float64(m.Counter.GetValue()),
+						Counter: new(m.Counter.GetValue()),
 					}.Build())
 				}
 			case dto.MetricType_HISTOGRAM:
@@ -102,12 +101,12 @@ func (a *CoreNodeMetricsProvider) scrapePod(ip string, port string, path string,
 						count := m.Histogram.GetSampleCount()
 
 						samples = append(samples, pb.MetricSample_builder{
-							Name:   proto.String(name),
+							Name:   new(name),
 							Labels: labels,
 							Histogram: pb.Histogram_builder{
 								Buckets: buckets,
-								Sum:     proto.Float64(sum),
-								Count:   proto.Uint64(count),
+								Sum:     new(sum),
+								Count:   new(count),
 							}.Build(),
 						}.Build())
 					}
@@ -118,17 +117,17 @@ func (a *CoreNodeMetricsProvider) scrapePod(ip string, port string, path string,
 					// negative), except when the source resets them.
 					if wantSum {
 						samples = append(samples, pb.MetricSample_builder{
-							Name:    proto.String(name + "_sum"),
+							Name:    new(name + "_sum"),
 							Labels:  labels,
-							Counter: proto.Float64(m.Histogram.GetSampleSum()),
+							Counter: new(m.Histogram.GetSampleSum()),
 						}.Build())
 					}
 
 					if wantCount {
 						samples = append(samples, pb.MetricSample_builder{
-							Name:    proto.String(name + "_count"),
+							Name:    new(name + "_count"),
 							Labels:  labels,
-							Counter: proto.Float64(float64(m.Histogram.GetSampleCount())),
+							Counter: new(float64(m.Histogram.GetSampleCount())),
 						}.Build())
 					}
 				}
@@ -172,7 +171,7 @@ func (a *CoreNodeMetricsProvider) processPrometheusMetric(pod corev1.Pod, m *pb.
 
 	if len(samples) > 0 {
 		return []*pb.MetricBatch{pb.MetricBatch_builder{
-			PodName: proto.String(pod.Name),
+			PodName: new(pod.Name),
 			Samples: samples,
 		}.Build()}
 	}

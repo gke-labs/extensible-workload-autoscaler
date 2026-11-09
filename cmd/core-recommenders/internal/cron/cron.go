@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
-	"google.golang.org/protobuf/proto"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/clock"
@@ -27,14 +26,14 @@ func (r *Recommender) Recommend(def *pb.RecommenderDefinition, _, _ *pb.ControlM
 	cfg, err := parseConfig(def)
 	if err != nil {
 		return pb.Recommendation_builder{
-			Message: proto.String(err.Error()),
+			Message: new(err.Error()),
 		}.Build()
 	}
 
 	isActive, err := checkCron(cfg.start, cfg.end, cfg.location, r.now())
 	if err != nil {
 		return pb.Recommendation_builder{
-			Message: proto.String(err.Error()),
+			Message: new(err.Error()),
 		}.Build()
 	}
 
@@ -48,7 +47,7 @@ func (r *Recommender) Recommend(def *pb.RecommenderDefinition, _, _ *pb.ControlM
 	}
 
 	return pb.Recommendation_builder{
-		IsActive: proto.Bool(isActive),
+		IsActive: new(isActive),
 		Replicas: replicas,
 	}.Build()
 }

@@ -16,7 +16,6 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
@@ -99,7 +98,7 @@ func (a *CoreNodeMetricsProvider) scrapeAndSend() {
 	defer cancel()
 
 	resp, err := a.grpcClient.ListPolicies(ctx, pb.ListPoliciesRequest_builder{
-		ClusterName: proto.String(a.clusterName),
+		ClusterName: new(a.clusterName),
 	}.Build())
 	if err != nil {
 		slog.Error("Error listing policies", "error", err)
@@ -237,8 +236,8 @@ func (a *CoreNodeMetricsProvider) processGroupedPolicy(policy *groupedPolicy, ku
 			Timestamp: timestamppb.Now(),
 			PolicyMetrics: []*pb.PolicyMetricBatch{
 				pb.PolicyMetricBatch_builder{
-					Namespace: proto.String(policy.Namespace),
-					Name:      proto.String(policy.Name),
+					Namespace: new(policy.Namespace),
+					Name:      new(policy.Name),
 					Batches:   podMetrics,
 				}.Build(),
 			},

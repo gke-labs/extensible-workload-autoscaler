@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,8 +53,8 @@ func TestProcessPrometheusMetric(t *testing.T) {
 http_requests_total 10
 `,
 			def: pb.MetricDefinition_builder{
-				Name:     proto.String("req_count"),
-				Provider: proto.String("prometheus"),
+				Name:     new("req_count"),
+				Provider: new("prometheus"),
 				Params:   map[string]string{"metric": "http_requests_total"},
 			}.Build(),
 			verify: func(req *http.Request) {
@@ -64,12 +63,12 @@ http_requests_total 10
 				}
 			},
 			want: []*pb.MetricBatch{pb.MetricBatch_builder{
-				PodName: proto.String("pod-1"),
+				PodName: new("pod-1"),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:    proto.String("req_count"),
+						Name:    new("req_count"),
 						Labels:  map[string]string{},
-						Counter: proto.Float64(10),
+						Counter: new(float64(10)),
 					}.Build(),
 				},
 			}.Build()},
@@ -81,8 +80,8 @@ http_requests_total 10
 custom 10
 `,
 			def: pb.MetricDefinition_builder{
-				Name:     proto.String("custom"),
-				Provider: proto.String("prometheus"),
+				Name:     new("custom"),
+				Provider: new("prometheus"),
 				Params:   map[string]string{"metric": "custom", "path": "/custom_path"},
 			}.Build(),
 			verify: func(req *http.Request) {
@@ -91,12 +90,12 @@ custom 10
 				}
 			},
 			want: []*pb.MetricBatch{pb.MetricBatch_builder{
-				PodName: proto.String("pod-1"),
+				PodName: new("pod-1"),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:    proto.String("custom"),
+						Name:    new("custom"),
 						Labels:  map[string]string{},
-						Counter: proto.Float64(10),
+						Counter: new(float64(10)),
 					}.Build(),
 				},
 			}.Build()},
@@ -108,8 +107,8 @@ custom 10
 class_path 10
 `,
 			def: pb.MetricDefinition_builder{
-				Name:     proto.String("class_path"),
-				Provider: proto.String("prometheus"),
+				Name:     new("class_path"),
+				Provider: new("prometheus"),
 				Params:   map[string]string{"metric": "class_path"},
 			}.Build(),
 			class: &xasv1.MetricProviderClass{
@@ -123,12 +122,12 @@ class_path 10
 				}
 			},
 			want: []*pb.MetricBatch{pb.MetricBatch_builder{
-				PodName: proto.String("pod-1"),
+				PodName: new("pod-1"),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:    proto.String("class_path"),
+						Name:    new("class_path"),
 						Labels:  map[string]string{},
-						Counter: proto.Float64(10),
+						Counter: new(float64(10)),
 					}.Build(),
 				},
 			}.Build()},
@@ -140,8 +139,8 @@ class_path 10
 override 10
 `,
 			def: pb.MetricDefinition_builder{
-				Name:     proto.String("override"),
-				Provider: proto.String("prometheus"),
+				Name:     new("override"),
+				Provider: new("prometheus"),
 				Params:   map[string]string{"metric": "override", "path": "/def_path"},
 			}.Build(),
 			class: &xasv1.MetricProviderClass{
@@ -155,12 +154,12 @@ override 10
 				}
 			},
 			want: []*pb.MetricBatch{pb.MetricBatch_builder{
-				PodName: proto.String("pod-1"),
+				PodName: new("pod-1"),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:    proto.String("override"),
+						Name:    new("override"),
 						Labels:  map[string]string{},
-						Counter: proto.Float64(10),
+						Counter: new(float64(10)),
 					}.Build(),
 				},
 			}.Build()},
@@ -173,22 +172,22 @@ http_requests_total{method="post",code="200"} 1027 1395066363000
 http_requests_total{method="post",code="400"}    3 1395066363000
 `,
 			def: pb.MetricDefinition_builder{
-				Name:     proto.String("req_count"),
-				Provider: proto.String("prometheus"),
+				Name:     new("req_count"),
+				Provider: new("prometheus"),
 				Params:   map[string]string{"metric": "http_requests_total"},
 			}.Build(),
 			want: []*pb.MetricBatch{pb.MetricBatch_builder{
-				PodName: proto.String("pod-1"),
+				PodName: new("pod-1"),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:    proto.String("req_count"),
+						Name:    new("req_count"),
 						Labels:  map[string]string{"method": "post", "code": "200"},
-						Counter: proto.Float64(1027),
+						Counter: new(float64(1027)),
 					}.Build(),
 					pb.MetricSample_builder{
-						Name:    proto.String("req_count"),
+						Name:    new("req_count"),
 						Labels:  map[string]string{"method": "post", "code": "400"},
-						Counter: proto.Float64(3),
+						Counter: new(float64(3)),
 					}.Build(),
 				},
 			}.Build()},
@@ -200,17 +199,17 @@ http_requests_total{method="post",code="400"}    3 1395066363000
 queue_size 42
 `,
 			def: pb.MetricDefinition_builder{
-				Name:     proto.String("q_size"),
-				Provider: proto.String("prometheus"),
+				Name:     new("q_size"),
+				Provider: new("prometheus"),
 				Params:   map[string]string{"metric": "queue_size"},
 			}.Build(),
 			want: []*pb.MetricBatch{pb.MetricBatch_builder{
-				PodName: proto.String("pod-1"),
+				PodName: new("pod-1"),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:   proto.String("q_size"),
+						Name:   new("q_size"),
 						Labels: map[string]string{},
-						Gauge:  proto.Float64(42),
+						Gauge:  new(float64(42)),
 					}.Build(),
 				},
 			}.Build()},
@@ -225,23 +224,23 @@ lat_sum 2.5
 lat_count 15
 `,
 			def: pb.MetricDefinition_builder{
-				Name:     proto.String("latency"),
-				Provider: proto.String("prometheus"),
+				Name:     new("latency"),
+				Provider: new("prometheus"),
 				Params:   map[string]string{"metric": "lat"},
 			}.Build(),
 			want: []*pb.MetricBatch{pb.MetricBatch_builder{
-				PodName: proto.String("pod-1"),
+				PodName: new("pod-1"),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:   proto.String("latency"),
+						Name:   new("latency"),
 						Labels: map[string]string{},
 						Histogram: pb.Histogram_builder{
 							Buckets: map[string]uint64{
 								"0.1":  10,
 								"+Inf": 15,
 							},
-							Sum:   proto.Float64(2.5),
-							Count: proto.Uint64(15),
+							Sum:   new(2.5),
+							Count: new(uint64(15)),
 						}.Build(),
 					}.Build(),
 				},
@@ -260,17 +259,17 @@ lat_sum 2.5
 lat_count 15
 `,
 			def: pb.MetricDefinition_builder{
-				Name:     proto.String("req_count"),
-				Provider: proto.String("prometheus"),
+				Name:     new("req_count"),
+				Provider: new("prometheus"),
 				Params:   map[string]string{"metric": "lat_count"},
 			}.Build(),
 			want: []*pb.MetricBatch{pb.MetricBatch_builder{
-				PodName: proto.String("pod-1"),
+				PodName: new("pod-1"),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:    proto.String("req_count"),
+						Name:    new("req_count"),
 						Labels:  map[string]string{},
-						Counter: proto.Float64(15),
+						Counter: new(float64(15)),
 					}.Build(),
 				},
 			}.Build()},
@@ -286,17 +285,17 @@ lat_sum 2.5
 lat_count 15
 `,
 			def: pb.MetricDefinition_builder{
-				Name:     proto.String("total_latency"),
-				Provider: proto.String("prometheus"),
+				Name:     new("total_latency"),
+				Provider: new("prometheus"),
 				Params:   map[string]string{"metric": "lat_sum"},
 			}.Build(),
 			want: []*pb.MetricBatch{pb.MetricBatch_builder{
-				PodName: proto.String("pod-1"),
+				PodName: new("pod-1"),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:    proto.String("total_latency"),
+						Name:    new("total_latency"),
 						Labels:  map[string]string{},
-						Counter: proto.Float64(2.5),
+						Counter: new(2.5),
 					}.Build(),
 				},
 			}.Build()},
@@ -309,17 +308,17 @@ other 123
 requested 456
 `,
 			def: pb.MetricDefinition_builder{
-				Name:     proto.String("my_metric"),
-				Provider: proto.String("prometheus"),
+				Name:     new("my_metric"),
+				Provider: new("prometheus"),
 				Params:   map[string]string{"metric": "requested"},
 			}.Build(),
 			want: []*pb.MetricBatch{pb.MetricBatch_builder{
-				PodName: proto.String("pod-1"),
+				PodName: new("pod-1"),
 				Samples: []*pb.MetricSample{
 					pb.MetricSample_builder{
-						Name:   proto.String("my_metric"),
+						Name:   new("my_metric"),
 						Labels: map[string]string{},
-						Gauge:  proto.Float64(456),
+						Gauge:  new(float64(456)),
 					}.Build(),
 				},
 			}.Build()},
