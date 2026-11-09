@@ -7,6 +7,7 @@
 package v1alpha
 
 import (
+	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -549,7 +550,7 @@ func (x *ListPoliciesRequest) ClearClusterName() {
 type ListPoliciesRequest_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// The cluster to list policies for (required).
+	// The cluster to list policies for.
 	ClusterName *string
 }
 
@@ -1501,6 +1502,8 @@ type MetricDefinition_builder struct {
 	// Label filters to apply to raw samples before processing.
 	Filter map[string]string
 	// --- Intents ---
+	// Exactly one of gauge, rate, distribution or decaying_distribution is
+	// required.
 	Gauge                *Gauge
 	Rate                 *Rate
 	Distribution         *Distribution
@@ -5142,7 +5145,7 @@ type IngestMetricsRequest_builder struct {
 
 	// The cluster name where metrics originated.
 	ClusterName *string
-	// Time at which the metrics were collected (i.e. the scrape time). Required.
+	// Time at which the metrics were collected (i.e. the scrape time).
 	//
 	// This is the default timestamp of every MetricSample that does not set its
 	// own. The Server also uses it to track the freshness of each metric series:
@@ -5716,7 +5719,7 @@ type MetricSample_builder struct {
 	Labels map[string]string
 	// For resource metrics (e.g. "cpu" or "memory"), the resource name.
 	ResourceName *string
-	// Time at which the sample was measured by its source. Optional.
+	// Time at which the sample was measured by its source.
 	//
 	// Defaults to IngestMetricsRequest.timestamp when unset. Samples older than
 	// the last sample of their series are dropped as out of order, and samples
@@ -6122,129 +6125,129 @@ var File_server_proto protoreflect.FileDescriptor
 
 const file_server_proto_rawDesc = "" +
 	"\n" +
-	"\fserver.proto\x12\x12xas.server.v1alpha\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\"_\n" +
-	"\bPolicyId\x12!\n" +
-	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\x12\x1c\n" +
-	"\tnamespace\x18\x02 \x01(\tR\tnamespace\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\"I\n" +
-	"\x13CreatePolicyRequest\x122\n" +
-	"\x06policy\x18\x01 \x01(\v2\x1a.xas.server.v1alpha.PolicyR\x06policy\"n\n" +
-	"\x13UpdatePolicyRequest\x122\n" +
-	"\x06policy\x18\x01 \x01(\v2\x1a.xas.server.v1alpha.PolicyR\x06policy\x12#\n" +
-	"\rallow_missing\x18\x02 \x01(\bR\fallowMissing\"@\n" +
-	"\x10GetPolicyRequest\x12,\n" +
-	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdR\x02id\"C\n" +
-	"\x13DeletePolicyRequest\x12,\n" +
-	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdR\x02id\"8\n" +
-	"\x13ListPoliciesRequest\x12!\n" +
-	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\"N\n" +
+	"\fserver.proto\x12\x12xas.server.v1alpha\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\"q\n" +
+	"\bPolicyId\x12'\n" +
+	"\fcluster_name\x18\x01 \x01(\tB\x04\xe2A\x01\x02R\vclusterName\x12\"\n" +
+	"\tnamespace\x18\x02 \x01(\tB\x04\xe2A\x01\x02R\tnamespace\x12\x18\n" +
+	"\x04name\x18\x03 \x01(\tB\x04\xe2A\x01\x02R\x04name\"O\n" +
+	"\x13CreatePolicyRequest\x128\n" +
+	"\x06policy\x18\x01 \x01(\v2\x1a.xas.server.v1alpha.PolicyB\x04\xe2A\x01\x02R\x06policy\"z\n" +
+	"\x13UpdatePolicyRequest\x128\n" +
+	"\x06policy\x18\x01 \x01(\v2\x1a.xas.server.v1alpha.PolicyB\x04\xe2A\x01\x02R\x06policy\x12)\n" +
+	"\rallow_missing\x18\x02 \x01(\bB\x04\xe2A\x01\x01R\fallowMissing\"F\n" +
+	"\x10GetPolicyRequest\x122\n" +
+	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdB\x04\xe2A\x01\x02R\x02id\"I\n" +
+	"\x13DeletePolicyRequest\x122\n" +
+	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdB\x04\xe2A\x01\x02R\x02id\">\n" +
+	"\x13ListPoliciesRequest\x12'\n" +
+	"\fcluster_name\x18\x01 \x01(\tB\x04\xe2A\x01\x02R\vclusterName\"N\n" +
 	"\x14ListPoliciesResponse\x126\n" +
-	"\bpolicies\x18\x01 \x03(\v2\x1a.xas.server.v1alpha.PolicyR\bpolicies\"\x8f\x05\n" +
-	"\x06Policy\x12,\n" +
-	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdR\x02id\x12;\n" +
-	"\bworkload\x18\x03 \x01(\v2\x1f.xas.server.v1alpha.WorkloadRefR\bworkload\x12!\n" +
-	"\fmin_replicas\x18\x04 \x01(\x05R\vminReplicas\x12!\n" +
-	"\fmax_replicas\x18\x05 \x01(\x05R\vmaxReplicas\x12>\n" +
-	"\ametrics\x18\x06 \x03(\v2$.xas.server.v1alpha.MetricDefinitionR\ametrics\x12I\n" +
+	"\bpolicies\x18\x01 \x03(\v2\x1a.xas.server.v1alpha.PolicyR\bpolicies\"\xc5\x05\n" +
+	"\x06Policy\x122\n" +
+	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdB\x04\xe2A\x01\x02R\x02id\x12A\n" +
+	"\bworkload\x18\x03 \x01(\v2\x1f.xas.server.v1alpha.WorkloadRefB\x04\xe2A\x01\x01R\bworkload\x12'\n" +
+	"\fmin_replicas\x18\x04 \x01(\x05B\x04\xe2A\x01\x01R\vminReplicas\x12'\n" +
+	"\fmax_replicas\x18\x05 \x01(\x05B\x04\xe2A\x01\x01R\vmaxReplicas\x12D\n" +
+	"\ametrics\x18\x06 \x03(\v2$.xas.server.v1alpha.MetricDefinitionB\x04\xe2A\x01\x01R\ametrics\x12O\n" +
 	"\n" +
-	"activation\x18\a \x03(\v2).xas.server.v1alpha.RecommenderDefinitionR\n" +
-	"activation\x12C\n" +
-	"\ascaling\x18\b \x03(\v2).xas.server.v1alpha.RecommenderDefinitionR\ascaling\x12\x1a\n" +
-	"\bselector\x18\t \x01(\tR\bselector\x12c\n" +
+	"activation\x18\a \x03(\v2).xas.server.v1alpha.RecommenderDefinitionB\x04\xe2A\x01\x01R\n" +
+	"activation\x12I\n" +
+	"\ascaling\x18\b \x03(\v2).xas.server.v1alpha.RecommenderDefinitionB\x04\xe2A\x01\x01R\ascaling\x12 \n" +
+	"\bselector\x18\t \x01(\tB\x04\xe2A\x01\x01R\bselector\x12i\n" +
 	"\x13recommender_metrics\x18\n" +
-	" \x03(\v22.xas.server.v1alpha.Policy.RecommenderMetricsEntryR\x12recommenderMetrics\x12\x12\n" +
+	" \x03(\v22.xas.server.v1alpha.Policy.RecommenderMetricsEntryB\x04\xe2A\x01\x01R\x12recommenderMetrics\x12\x12\n" +
 	"\x04etag\x18\v \x01(\tR\x04etag\x1ao\n" +
 	"\x17RecommenderMetricsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12>\n" +
-	"\x05value\x18\x02 \x01(\v2(.xas.server.v1alpha.MetricDefinitionListR\x05value:\x028\x01\"^\n" +
-	"\x14MetricDefinitionList\x12F\n" +
-	"\vdefinitions\x18\x01 \x03(\v2$.xas.server.v1alpha.MetricDefinitionR\vdefinitions\"\x83\x01\n" +
-	"\vWorkloadRef\x12\x14\n" +
-	"\x05group\x18\x01 \x01(\tR\x05group\x12\x18\n" +
-	"\aversion\x18\x02 \x01(\tR\aversion\x12\x12\n" +
-	"\x04kind\x18\x03 \x01(\tR\x04kind\x12\x12\n" +
-	"\x04name\x18\x04 \x01(\tR\x04name\x12\x1c\n" +
-	"\tnamespace\x18\x05 \x01(\tR\tnamespace\"\xeb\x06\n" +
-	"\x10MetricDefinition\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12)\n" +
-	"\x10recommender_name\x18\x0f \x01(\tR\x0frecommenderName\x12\x1a\n" +
-	"\bprovider\x18\x02 \x01(\tR\bprovider\x12H\n" +
-	"\x06params\x18\x03 \x03(\v20.xas.server.v1alpha.MetricDefinition.ParamsEntryR\x06params\x12H\n" +
-	"\x06filter\x18\x05 \x03(\v20.xas.server.v1alpha.MetricDefinition.FilterEntryR\x06filter\x12/\n" +
+	"\x05value\x18\x02 \x01(\v2(.xas.server.v1alpha.MetricDefinitionListR\x05value:\x028\x01\"d\n" +
+	"\x14MetricDefinitionList\x12L\n" +
+	"\vdefinitions\x18\x01 \x03(\v2$.xas.server.v1alpha.MetricDefinitionB\x04\xe2A\x01\x01R\vdefinitions\"\xa1\x01\n" +
+	"\vWorkloadRef\x12\x1a\n" +
+	"\x05group\x18\x01 \x01(\tB\x04\xe2A\x01\x01R\x05group\x12\x1e\n" +
+	"\aversion\x18\x02 \x01(\tB\x04\xe2A\x01\x01R\aversion\x12\x18\n" +
+	"\x04kind\x18\x03 \x01(\tB\x04\xe2A\x01\x01R\x04kind\x12\x18\n" +
+	"\x04name\x18\x04 \x01(\tB\x04\xe2A\x01\x01R\x04name\x12\"\n" +
+	"\tnamespace\x18\x05 \x01(\tB\x04\xe2A\x01\x01R\tnamespace\"\xb9\a\n" +
+	"\x10MetricDefinition\x12\x18\n" +
+	"\x04name\x18\x01 \x01(\tB\x04\xe2A\x01\x02R\x04name\x12/\n" +
+	"\x10recommender_name\x18\x0f \x01(\tB\x04\xe2A\x01\x01R\x0frecommenderName\x12 \n" +
+	"\bprovider\x18\x02 \x01(\tB\x04\xe2A\x01\x01R\bprovider\x12N\n" +
+	"\x06params\x18\x03 \x03(\v20.xas.server.v1alpha.MetricDefinition.ParamsEntryB\x04\xe2A\x01\x01R\x06params\x12N\n" +
+	"\x06filter\x18\x05 \x03(\v20.xas.server.v1alpha.MetricDefinition.FilterEntryB\x04\xe2A\x01\x01R\x06filter\x125\n" +
 	"\x05gauge\x18\n" +
-	" \x01(\v2\x19.xas.server.v1alpha.GaugeR\x05gauge\x12,\n" +
-	"\x04rate\x18\v \x01(\v2\x18.xas.server.v1alpha.RateR\x04rate\x12D\n" +
-	"\fdistribution\x18\f \x01(\v2 .xas.server.v1alpha.DistributionR\fdistribution\x12]\n" +
-	"\x15decaying_distribution\x18\r \x01(\v2(.xas.server.v1alpha.DecayingDistributionR\x14decayingDistribution\x12\x14\n" +
-	"\x05scope\x18\x0e \x01(\tR\x05scope\x12R\n" +
-	"\veligibility\x18\x10 \x01(\v20.xas.server.v1alpha.MetricDefinition.EligibilityR\veligibility\x1a9\n" +
+	" \x01(\v2\x19.xas.server.v1alpha.GaugeB\x04\xe2A\x01\x01R\x05gauge\x122\n" +
+	"\x04rate\x18\v \x01(\v2\x18.xas.server.v1alpha.RateB\x04\xe2A\x01\x01R\x04rate\x12J\n" +
+	"\fdistribution\x18\f \x01(\v2 .xas.server.v1alpha.DistributionB\x04\xe2A\x01\x01R\fdistribution\x12c\n" +
+	"\x15decaying_distribution\x18\r \x01(\v2(.xas.server.v1alpha.DecayingDistributionB\x04\xe2A\x01\x01R\x14decayingDistribution\x12\x1a\n" +
+	"\x05scope\x18\x0e \x01(\tB\x04\xe2A\x01\x01R\x05scope\x12X\n" +
+	"\veligibility\x18\x10 \x01(\v20.xas.server.v1alpha.MetricDefinition.EligibilityB\x04\xe2A\x01\x01R\veligibility\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a9\n" +
 	"\vFilterEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a\x83\x01\n" +
-	"\vEligibility\x12'\n" +
-	"\x0fstartup_samples\x18\x01 \x01(\bR\x0estartupSamples\x12K\n" +
-	"\x14startup_grace_period\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\x12startupGracePeriod\")\n" +
-	"\x05Gauge\x12 \n" +
-	"\vaggregation\x18\x01 \x01(\tR\vaggregation\"[\n" +
-	"\x04Rate\x121\n" +
-	"\x06window\x18\x01 \x01(\v2\x19.google.protobuf.DurationR\x06window\x12 \n" +
-	"\vaggregation\x18\x02 \x01(\tR\vaggregation\"P\n" +
-	"\fDistribution\x12\x1e\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a\x8f\x01\n" +
+	"\vEligibility\x12-\n" +
+	"\x0fstartup_samples\x18\x01 \x01(\bB\x04\xe2A\x01\x01R\x0estartupSamples\x12Q\n" +
+	"\x14startup_grace_period\x18\x02 \x01(\v2\x19.google.protobuf.DurationB\x04\xe2A\x01\x01R\x12startupGracePeriod\"/\n" +
+	"\x05Gauge\x12&\n" +
+	"\vaggregation\x18\x01 \x01(\tB\x04\xe2A\x01\x01R\vaggregation\"g\n" +
+	"\x04Rate\x127\n" +
+	"\x06window\x18\x01 \x01(\v2\x19.google.protobuf.DurationB\x04\xe2A\x01\x02R\x06window\x12&\n" +
+	"\vaggregation\x18\x02 \x01(\tB\x04\xe2A\x01\x01R\vaggregation\"\\\n" +
+	"\fDistribution\x12$\n" +
 	"\n" +
-	"percentile\x18\x01 \x01(\tR\n" +
-	"percentile\x12 \n" +
-	"\vaggregation\x18\x02 \x01(\tR\vaggregation\"\xbe\x01\n" +
-	"\x14DecayingDistribution\x126\n" +
-	"\thalf_life\x18\x01 \x01(\v2\x19.google.protobuf.DurationR\bhalfLife\x12\x1f\n" +
-	"\vbucket_size\x18\x02 \x01(\tR\n" +
-	"bucketSize\x12\x1e\n" +
+	"percentile\x18\x01 \x01(\tB\x04\xe2A\x01\x02R\n" +
+	"percentile\x12&\n" +
+	"\vaggregation\x18\x02 \x01(\tB\x04\xe2A\x01\x01R\vaggregation\"\xd6\x01\n" +
+	"\x14DecayingDistribution\x12<\n" +
+	"\thalf_life\x18\x01 \x01(\v2\x19.google.protobuf.DurationB\x04\xe2A\x01\x02R\bhalfLife\x12%\n" +
+	"\vbucket_size\x18\x02 \x01(\tB\x04\xe2A\x01\x02R\n" +
+	"bucketSize\x12$\n" +
 	"\n" +
-	"percentile\x18\x03 \x01(\tR\n" +
-	"percentile\x12-\n" +
-	"\x04rate\x18\x04 \x01(\v2\x19.google.protobuf.DurationR\x04rate\"\xff\x01\n" +
-	"\x15RecommenderDefinition\x12 \n" +
-	"\vrecommender\x18\x01 \x01(\tR\vrecommender\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
-	"\x04mode\x18\x03 \x01(\tR\x04mode\x12M\n" +
-	"\x06params\x18\x04 \x03(\v25.xas.server.v1alpha.RecommenderDefinition.ParamsEntryR\x06params\x12\x12\n" +
-	"\x04type\x18\x05 \x01(\tR\x04type\x1a9\n" +
+	"percentile\x18\x03 \x01(\tB\x04\xe2A\x01\x02R\n" +
+	"percentile\x123\n" +
+	"\x04rate\x18\x04 \x01(\v2\x19.google.protobuf.DurationB\x04\xe2A\x01\x01R\x04rate\"\x9d\x02\n" +
+	"\x15RecommenderDefinition\x12&\n" +
+	"\vrecommender\x18\x01 \x01(\tB\x04\xe2A\x01\x01R\vrecommender\x12\x18\n" +
+	"\x04name\x18\x02 \x01(\tB\x04\xe2A\x01\x01R\x04name\x12\x18\n" +
+	"\x04mode\x18\x03 \x01(\tB\x04\xe2A\x01\x01R\x04mode\x12S\n" +
+	"\x06params\x18\x04 \x03(\v25.xas.server.v1alpha.RecommenderDefinition.ParamsEntryB\x04\xe2A\x01\x01R\x06params\x12\x18\n" +
+	"\x04type\x18\x05 \x01(\tB\x04\xe2A\x01\x01R\x04type\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x7f\n" +
-	"\x15UpdateWorkloadRequest\x12,\n" +
-	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdR\x02id\x128\n" +
-	"\bworkload\x18\x02 \x01(\v2\x1c.xas.server.v1alpha.WorkloadR\bworkload\"B\n" +
-	"\x12GetWorkloadRequest\x12,\n" +
-	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdR\x02id\"<\n" +
-	"\bWorkload\x120\n" +
-	"\x04pods\x18\x01 \x03(\v2\x1c.xas.server.v1alpha.PodStateR\x04pods\"\x8f\x03\n" +
-	"\bPodState\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
-	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12\x19\n" +
-	"\bis_ready\x18\x03 \x01(\bR\aisReady\x12B\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8b\x01\n" +
+	"\x15UpdateWorkloadRequest\x122\n" +
+	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdB\x04\xe2A\x01\x02R\x02id\x12>\n" +
+	"\bworkload\x18\x02 \x01(\v2\x1c.xas.server.v1alpha.WorkloadB\x04\xe2A\x01\x02R\bworkload\"H\n" +
+	"\x12GetWorkloadRequest\x122\n" +
+	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdB\x04\xe2A\x01\x02R\x02id\"B\n" +
+	"\bWorkload\x126\n" +
+	"\x04pods\x18\x01 \x03(\v2\x1c.xas.server.v1alpha.PodStateB\x04\xe2A\x01\x01R\x04pods\"\xbf\x03\n" +
+	"\bPodState\x12\x18\n" +
+	"\x04name\x18\x01 \x01(\tB\x04\xe2A\x01\x02R\x04name\x12!\n" +
+	"\tnode_name\x18\x02 \x01(\tB\x04\xe2A\x01\x01R\bnodeName\x12\x1f\n" +
+	"\bis_ready\x18\x03 \x01(\bB\x04\xe2A\x01\x01R\aisReady\x12H\n" +
 	"\n" +
-	"containers\x18\x04 \x03(\v2\".xas.server.v1alpha.ContainerStateR\n" +
-	"containers\x12\x14\n" +
-	"\x05phase\x18\x05 \x01(\tR\x05phase\x129\n" +
+	"containers\x18\x04 \x03(\v2\".xas.server.v1alpha.ContainerStateB\x04\xe2A\x01\x01R\n" +
+	"containers\x12\x1a\n" +
+	"\x05phase\x18\x05 \x01(\tB\x04\xe2A\x01\x01R\x05phase\x12?\n" +
 	"\n" +
-	"start_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tstartTime\x12W\n" +
-	"\x1aready_last_transition_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\x17readyLastTransitionTime\x12I\n" +
-	"\x12deletion_timestamp\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x11deletionTimestamp\"\xb2\x02\n" +
-	"\x0eContainerState\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12L\n" +
-	"\brequests\x18\x02 \x03(\v20.xas.server.v1alpha.ContainerState.RequestsEntryR\brequests\x12F\n" +
-	"\x06limits\x18\x03 \x03(\v2..xas.server.v1alpha.ContainerState.LimitsEntryR\x06limits\x1a;\n" +
+	"start_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x04\xe2A\x01\x01R\tstartTime\x12]\n" +
+	"\x1aready_last_transition_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x04\xe2A\x01\x01R\x17readyLastTransitionTime\x12O\n" +
+	"\x12deletion_timestamp\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x04\xe2A\x01\x01R\x11deletionTimestamp\"\xc4\x02\n" +
+	"\x0eContainerState\x12\x18\n" +
+	"\x04name\x18\x01 \x01(\tB\x04\xe2A\x01\x01R\x04name\x12R\n" +
+	"\brequests\x18\x02 \x03(\v20.xas.server.v1alpha.ContainerState.RequestsEntryB\x04\xe2A\x01\x01R\brequests\x12L\n" +
+	"\x06limits\x18\x03 \x03(\v2..xas.server.v1alpha.ContainerState.LimitsEntryB\x04\xe2A\x01\x01R\x06limits\x1a;\n" +
 	"\rRequestsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a9\n" +
 	"\vLimitsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"H\n" +
-	"\x18GetControlMetricsRequest\x12,\n" +
-	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdR\x02id\"\xca\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"N\n" +
+	"\x18GetControlMetricsRequest\x122\n" +
+	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdB\x04\xe2A\x01\x02R\x02id\"\xca\x03\n" +
 	"\x19GetControlMetricsResponse\x128\n" +
 	"\ttimestamp\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12%\n" +
 	"\x0eready_replicas\x18\x02 \x01(\x05R\rreadyReplicas\x12K\n" +
@@ -6277,9 +6280,9 @@ const file_server_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\v2 .xas.server.v1alpha.MetricValuesR\x05value:\x028\x01\x1al\n" +
 	"\x18PodContainerMetricsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12:\n" +
-	"\x05value\x18\x02 \x01(\v2$.xas.server.v1alpha.ContainerMetricsR\x05value:\x028\x01\"?\n" +
-	"\x1aWatchControlMetricsRequest\x12!\n" +
-	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\"\xb2\x03\n" +
+	"\x05value\x18\x02 \x01(\v2$.xas.server.v1alpha.ContainerMetricsR\x05value:\x028\x01\"E\n" +
+	"\x1aWatchControlMetricsRequest\x12'\n" +
+	"\fcluster_name\x18\x01 \x01(\tB\x04\xe2A\x01\x02R\vclusterName\"\xb2\x03\n" +
 	"\x13ControlMetricsEvent\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdR\x02id\x12K\n" +
 	"\x0fcontrol_metrics\x18\x02 \x01(\v2\".xas.server.v1alpha.ControlMetricsR\x0econtrolMetrics\x12\x86\x01\n" +
@@ -6287,30 +6290,30 @@ const file_server_proto_rawDesc = "" +
 	"\x0eready_replicas\x18\x04 \x01(\x05R\rreadyReplicas\x1ap\n" +
 	"\x1eRecommenderControlMetricsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x128\n" +
-	"\x05value\x18\x02 \x01(\v2\".xas.server.v1alpha.ControlMetricsR\x05value:\x028\x01\"\xc4\x01\n" +
-	"\x1dUpdateRecommenderStateRequest\x12,\n" +
-	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdR\x02id\x12)\n" +
-	"\x10recommender_name\x18\x02 \x01(\tR\x0frecommenderName\x12J\n" +
-	"\x0erecommendation\x18\x03 \x01(\v2\".xas.server.v1alpha.RecommendationR\x0erecommendation\"\xce\x02\n" +
-	"\x11ContainerResource\x12%\n" +
-	"\x0econtainer_name\x18\x03 \x01(\tR\rcontainerName\x12O\n" +
-	"\brequests\x18\x01 \x03(\v23.xas.server.v1alpha.ContainerResource.RequestsEntryR\brequests\x12I\n" +
-	"\x06limits\x18\x02 \x03(\v21.xas.server.v1alpha.ContainerResource.LimitsEntryR\x06limits\x1a;\n" +
+	"\x05value\x18\x02 \x01(\v2\".xas.server.v1alpha.ControlMetricsR\x05value:\x028\x01\"\xd6\x01\n" +
+	"\x1dUpdateRecommenderStateRequest\x122\n" +
+	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdB\x04\xe2A\x01\x02R\x02id\x12/\n" +
+	"\x10recommender_name\x18\x02 \x01(\tB\x04\xe2A\x01\x01R\x0frecommenderName\x12P\n" +
+	"\x0erecommendation\x18\x03 \x01(\v2\".xas.server.v1alpha.RecommendationB\x04\xe2A\x01\x01R\x0erecommendation\"\xe0\x02\n" +
+	"\x11ContainerResource\x12+\n" +
+	"\x0econtainer_name\x18\x03 \x01(\tB\x04\xe2A\x01\x01R\rcontainerName\x12U\n" +
+	"\brequests\x18\x01 \x03(\v23.xas.server.v1alpha.ContainerResource.RequestsEntryB\x04\xe2A\x01\x01R\brequests\x12O\n" +
+	"\x06limits\x18\x02 \x03(\v21.xas.server.v1alpha.ContainerResource.LimitsEntryB\x04\xe2A\x01\x01R\x06limits\x1a;\n" +
 	"\rRequestsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a9\n" +
 	"\vLimitsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x89\x01\n" +
-	"\x14PodContainerResource\x12\x19\n" +
-	"\bpod_name\x18\x01 \x01(\tR\apodName\x12V\n" +
-	"\x13container_resources\x18\x02 \x01(\v2%.xas.server.v1alpha.ContainerResourceR\x12containerResources\"\x9b\x02\n" +
-	"\x0eRecommendation\x12\x1a\n" +
-	"\breplicas\x18\x01 \x01(\x05R\breplicas\x12\x1b\n" +
-	"\tis_active\x18\x02 \x01(\bR\bisActive\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\x12T\n" +
-	"\x12workload_resources\x18\x04 \x03(\v2%.xas.server.v1alpha.ContainerResourceR\x11workloadResources\x12`\n" +
-	"\x17pod_container_resources\x18\x05 \x03(\v2(.xas.server.v1alpha.PodContainerResourceR\x15podContainerResources\"\xea\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x95\x01\n" +
+	"\x14PodContainerResource\x12\x1f\n" +
+	"\bpod_name\x18\x01 \x01(\tB\x04\xe2A\x01\x01R\apodName\x12\\\n" +
+	"\x13container_resources\x18\x02 \x01(\v2%.xas.server.v1alpha.ContainerResourceB\x04\xe2A\x01\x01R\x12containerResources\"\xb9\x02\n" +
+	"\x0eRecommendation\x12 \n" +
+	"\breplicas\x18\x01 \x01(\x05B\x04\xe2A\x01\x01R\breplicas\x12!\n" +
+	"\tis_active\x18\x02 \x01(\bB\x04\xe2A\x01\x01R\bisActive\x12\x1e\n" +
+	"\amessage\x18\x03 \x01(\tB\x04\xe2A\x01\x01R\amessage\x12Z\n" +
+	"\x12workload_resources\x18\x04 \x03(\v2%.xas.server.v1alpha.ContainerResourceB\x04\xe2A\x01\x01R\x11workloadResources\x12f\n" +
+	"\x17pod_container_resources\x18\x05 \x03(\v2(.xas.server.v1alpha.PodContainerResourceB\x04\xe2A\x01\x01R\x15podContainerResources\"\xea\x01\n" +
 	"\x10RecommenderState\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12H\n" +
 	"\x06config\x18\x02 \x03(\v20.xas.server.v1alpha.RecommenderState.ConfigEntryR\x06config\x12=\n" +
@@ -6329,15 +6332,15 @@ const file_server_proto_rawDesc = "" +
 	"\breplicas\x18\x01 \x01(\x05R\breplicas\x12T\n" +
 	"\x12workload_resources\x18\t \x03(\v2%.xas.server.v1alpha.ContainerResourceR\x11workloadResources\x12M\n" +
 	"\rpod_resources\x18\n" +
-	" \x03(\v2(.xas.server.v1alpha.PodContainerResourceR\fpodResources\"R\n" +
-	"\"GetArbitratedRecommendationRequest\x12,\n" +
-	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdR\x02id\"\xfa\x01\n" +
+	" \x03(\v2(.xas.server.v1alpha.PodContainerResourceR\fpodResources\"X\n" +
+	"\"GetArbitratedRecommendationRequest\x122\n" +
+	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdB\x04\xe2A\x01\x02R\x02id\"\xfa\x01\n" +
 	"\x18ArbitratedRecommendation\x12J\n" +
 	"\x0erecommendation\x18\x01 \x01(\v2\".xas.server.v1alpha.RecommendationR\x0erecommendation\x12G\n" +
 	"\vexplanation\x18\x03 \x03(\v2%.xas.server.v1alpha.RecommenderStatusR\vexplanation\x12I\n" +
-	"\x0fmetric_statuses\x18\x02 \x03(\v2 .xas.server.v1alpha.MetricStatusR\x0emetricStatuses\"J\n" +
-	"%WatchArbitratedRecommendationsRequest\x12!\n" +
-	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\"\xae\x02\n" +
+	"\x0fmetric_statuses\x18\x02 \x03(\v2 .xas.server.v1alpha.MetricStatusR\x0emetricStatuses\"P\n" +
+	"%WatchArbitratedRecommendationsRequest\x12'\n" +
+	"\fcluster_name\x18\x01 \x01(\tB\x04\xe2A\x01\x02R\vclusterName\"\xae\x02\n" +
 	"\x1eArbitratedRecommendationsEvent\x12,\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdR\x02id\x12J\n" +
 	"\x0erecommendation\x18\x02 \x01(\v2\".xas.server.v1alpha.RecommendationR\x0erecommendation\x12G\n" +
@@ -6347,36 +6350,36 @@ const file_server_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x01R\x05value\x128\n" +
 	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x14\n" +
-	"\x05error\x18\x04 \x01(\tR\x05error\"\xc1\x01\n" +
-	"\x14IngestMetricsRequest\x12!\n" +
-	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\x128\n" +
-	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12L\n" +
-	"\x0epolicy_metrics\x18\x03 \x03(\v2%.xas.server.v1alpha.PolicyMetricBatchR\rpolicyMetrics\"\x80\x01\n" +
-	"\x11PolicyMetricBatch\x12\x1c\n" +
-	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x129\n" +
-	"\abatches\x18\x03 \x03(\v2\x1f.xas.server.v1alpha.MetricBatchR\abatches\"\x8b\x01\n" +
-	"\vMetricBatch\x12\x19\n" +
-	"\bpod_name\x18\x01 \x01(\tR\apodName\x12%\n" +
-	"\x0econtainer_name\x18\x03 \x01(\tR\rcontainerName\x12:\n" +
-	"\asamples\x18\x02 \x03(\v2 .xas.server.v1alpha.MetricSampleR\asamples\"\xa8\x03\n" +
-	"\fMetricSample\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12)\n" +
-	"\x10recommender_name\x18\t \x01(\tR\x0frecommenderName\x12D\n" +
-	"\x06labels\x18\x02 \x03(\v2,.xas.server.v1alpha.MetricSample.LabelsEntryR\x06labels\x12#\n" +
-	"\rresource_name\x18\b \x01(\tR\fresourceName\x128\n" +
-	"\ttimestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x16\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error\"\xd3\x01\n" +
+	"\x14IngestMetricsRequest\x12'\n" +
+	"\fcluster_name\x18\x01 \x01(\tB\x04\xe2A\x01\x02R\vclusterName\x12>\n" +
+	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x04\xe2A\x01\x02R\ttimestamp\x12R\n" +
+	"\x0epolicy_metrics\x18\x03 \x03(\v2%.xas.server.v1alpha.PolicyMetricBatchB\x04\xe2A\x01\x01R\rpolicyMetrics\"\x92\x01\n" +
+	"\x11PolicyMetricBatch\x12\"\n" +
+	"\tnamespace\x18\x01 \x01(\tB\x04\xe2A\x01\x01R\tnamespace\x12\x18\n" +
+	"\x04name\x18\x02 \x01(\tB\x04\xe2A\x01\x01R\x04name\x12?\n" +
+	"\abatches\x18\x03 \x03(\v2\x1f.xas.server.v1alpha.MetricBatchB\x04\xe2A\x01\x01R\abatches\"\x9d\x01\n" +
+	"\vMetricBatch\x12\x1f\n" +
+	"\bpod_name\x18\x01 \x01(\tB\x04\xe2A\x01\x01R\apodName\x12+\n" +
+	"\x0econtainer_name\x18\x03 \x01(\tB\x04\xe2A\x01\x01R\rcontainerName\x12@\n" +
+	"\asamples\x18\x02 \x03(\v2 .xas.server.v1alpha.MetricSampleB\x04\xe2A\x01\x01R\asamples\"\xc6\x03\n" +
+	"\fMetricSample\x12\x18\n" +
+	"\x04name\x18\x01 \x01(\tB\x04\xe2A\x01\x01R\x04name\x12/\n" +
+	"\x10recommender_name\x18\t \x01(\tB\x04\xe2A\x01\x01R\x0frecommenderName\x12J\n" +
+	"\x06labels\x18\x02 \x03(\v2,.xas.server.v1alpha.MetricSample.LabelsEntryB\x04\xe2A\x01\x01R\x06labels\x12)\n" +
+	"\rresource_name\x18\b \x01(\tB\x04\xe2A\x01\x01R\fresourceName\x12>\n" +
+	"\ttimestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x04\xe2A\x01\x01R\ttimestamp\x12\x16\n" +
 	"\x05gauge\x18\x03 \x01(\x01H\x00R\x05gauge\x12\x1a\n" +
 	"\acounter\x18\x06 \x01(\x01H\x00R\acounter\x12=\n" +
 	"\thistogram\x18\x05 \x01(\v2\x1d.xas.server.v1alpha.HistogramH\x00R\thistogram\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x06\n" +
-	"\x04data\"\xb5\x01\n" +
-	"\tHistogram\x12D\n" +
-	"\abuckets\x18\x01 \x03(\v2*.xas.server.v1alpha.Histogram.BucketsEntryR\abuckets\x12\x10\n" +
-	"\x03sum\x18\x02 \x01(\x01R\x03sum\x12\x14\n" +
-	"\x05count\x18\x03 \x01(\x04R\x05count\x1a:\n" +
+	"\x04data\"\xc7\x01\n" +
+	"\tHistogram\x12J\n" +
+	"\abuckets\x18\x01 \x03(\v2*.xas.server.v1alpha.Histogram.BucketsEntryB\x04\xe2A\x01\x01R\abuckets\x12\x16\n" +
+	"\x03sum\x18\x02 \x01(\x01B\x04\xe2A\x01\x01R\x03sum\x12\x1a\n" +
+	"\x05count\x18\x03 \x01(\x04B\x04\xe2A\x01\x01R\x05count\x1a:\n" +
 	"\fBucketsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x04R\x05value:\x028\x01\"1\n" +
