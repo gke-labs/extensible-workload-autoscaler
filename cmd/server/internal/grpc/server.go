@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"strings"
 
 	"google.golang.org/grpc"
@@ -90,8 +91,36 @@ func (s *Server) ListPolicies(ctx context.Context, req *pb.ListPoliciesRequest) 
 	if err := validateListPoliciesRequest(req); err != nil {
 		return nil, err
 	}
-	policies := s.store.ListPolicies(req.GetClusterName())
-	return pb.ListPoliciesResponse_builder{Policies: policies}.Build(), nil
+	cursor, err := decodePageToken(req.GetPageToken(), req.GetClusterName())
+	if err != nil {
+		return nil, err
+	}
+
+	// Sort policies so cursor pagination has a deterministic order across requests.
+	policies := slices.Clone(s.store.ListPolicies(req.GetClusterName()))
+	slices.SortFunc(policies, comparePolicies)
+	policies = policies[startIndex(policies, cursor):]
+
+	size := effectivePageSize(req.GetPageSize())
+	if len(policies) <= size {
+		// Last page: no next_page_token.
+		return pb.ListPoliciesResponse_builder{Policies: policies}.Build(), nil
+	}
+
+	page := policies[:size]
+	last := page[len(page)-1].GetId()
+	token, err := pageCursor{
+		Cluster:   req.GetClusterName(),
+		Namespace: last.GetNamespace(),
+		Name:      last.GetName(),
+	}.encode()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "encoding page token: %v", err)
+	}
+	return pb.ListPoliciesResponse_builder{
+		Policies:      page,
+		NextPageToken: new(token),
+	}.Build(), nil
 }
 
 func (s *Server) UpdateWorkload(ctx context.Context, req *pb.UpdateWorkloadRequest) (*pb.Workload, error) {

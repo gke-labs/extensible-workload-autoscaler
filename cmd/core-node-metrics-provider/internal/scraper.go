@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
+	xasgrpc "github.com/gke-labs/extensible-workload-autoscaler/internal/grpc"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/policy"
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 )
@@ -97,21 +98,20 @@ func (a *CoreNodeMetricsProvider) scrapeAndSend() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	resp, err := a.grpcClient.ListPolicies(ctx, pb.ListPoliciesRequest_builder{
-		ClusterName: new(a.clusterName),
-	}.Build())
+	req := pb.ListPoliciesRequest_builder{ClusterName: new(a.clusterName)}.Build()
+	pols, err := xasgrpc.ListAllPages(ctx, req, a.grpcClient.ListPolicies, (*pb.ListPoliciesResponse).GetPolicies)
 	if err != nil {
 		slog.Error("Error listing policies", "error", err)
 		return
 	}
 
-	slog.Info("Found policies", "count", len(resp.GetPolicies()))
+	slog.Info("Found policies", "count", len(pols))
 
 	// 2. Discover needed Kubelet endpoints and group metrics by Policy
 	kubeletConfigs := make(map[string]bool) // key: "port|path"
 	policies := make(map[string]*groupedPolicy)
 
-	for _, pol := range resp.GetPolicies() {
+	for _, pol := range pols {
 		var relevantMetrics []*pb.MetricDefinition
 		for _, m := range policy.MetricDefinitions(pol) {
 			class, err := a.providerLister.Get(m.GetProvider())
