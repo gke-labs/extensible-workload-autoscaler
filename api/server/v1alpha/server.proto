@@ -2,6 +2,7 @@ edition = "2024";
 
 package xas.server.v1alpha;
 
+import "google/api/field_behavior.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
@@ -75,11 +76,11 @@ service XASServer {
 // PolicyId uniquely identifies a ScalingPolicy across clusters.
 message PolicyId { 
   // The cluster this policy belongs to.
-  string cluster_name = 1;
+  string cluster_name = 1 [(google.api.field_behavior) = REQUIRED];
   // The namespace of the policy.
-  string namespace = 2;
+  string namespace = 2 [(google.api.field_behavior) = REQUIRED];
   // The name of the policy.
-  string name = 3;
+  string name = 3 [(google.api.field_behavior) = REQUIRED];
 }
 
 // --- Policy ---
@@ -87,33 +88,33 @@ message PolicyId {
 // CreatePolicyRequest is used to create a policy definition.
 message CreatePolicyRequest { 
   // The policy definition.
-  Policy policy = 1;
+  Policy policy = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 // UpdatePolicyRequest is used to create or update a policy definition.
 message UpdatePolicyRequest { 
   // The policy definition.
-  Policy policy = 1;
+  Policy policy = 1 [(google.api.field_behavior) = REQUIRED];
   // Creates a new policy only if allow_missing is true
-  bool allow_missing = 2;
+  bool allow_missing = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // GetPolicyRequest identifies a policy by PolicyId to get.
 message GetPolicyRequest {
   // The unique ID of the policy.
-  PolicyId id = 1; 
+  PolicyId id = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 // DeletePolicyRequest identifies a policy to delete.
 message DeletePolicyRequest { 
   // The unique ID of the policy.
-  PolicyId id = 1; 
+  PolicyId id = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 // ListPoliciesRequest is used to list policies.
 message ListPoliciesRequest {
-  // The cluster to list policies for (required).
-  string cluster_name = 1; 
+  // The cluster to list policies for.
+  string cluster_name = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 // ListPoliciesResponse returns the list of matching policies.
@@ -125,33 +126,33 @@ message ListPoliciesResponse {
 // Policy represents the configuration for autoscaling a specific workload.
 message Policy {
   // The unique identifier of the policy.
-  PolicyId id = 1;
+  PolicyId id = 1 [(google.api.field_behavior) = REQUIRED];
   
   // Reference to the target workload to scale.
-  WorkloadRef workload = 3;
+  WorkloadRef workload = 3 [(google.api.field_behavior) = OPTIONAL];
   // Minimum number of replicas.
-  int32 min_replicas = 4;
+  int32 min_replicas = 4 [(google.api.field_behavior) = OPTIONAL];
   // Maximum number of replicas.
-  int32 max_replicas = 5;
+  int32 max_replicas = 5 [(google.api.field_behavior) = OPTIONAL];
   
   // Definitions of metrics to collect and aggregate.
-  repeated MetricDefinition metrics = 6;
+  repeated MetricDefinition metrics = 6 [(google.api.field_behavior) = OPTIONAL];
   
   // Rules for activating/deactivating the workload (Scale to Zero).
-  repeated RecommenderDefinition activation = 7;
+  repeated RecommenderDefinition activation = 7 [(google.api.field_behavior) = OPTIONAL];
   
   // Rules for scaling the workload when active (Horizontal Scaling).
-  repeated RecommenderDefinition scaling = 8;
+  repeated RecommenderDefinition scaling = 8 [(google.api.field_behavior) = OPTIONAL];
   
   // The label selector used to identify pods (e.g. "app=my-app").
-  string selector = 9;
+  string selector = 9 [(google.api.field_behavior) = OPTIONAL];
   
   // Definitions of the metrics owned by individual recommenders, keyed by
   // recommender name.
   //
   // Metric names only need to be unique within their owner. The
   // `recommender_name` field in the metric definition must match.
-  map<string, MetricDefinitionList> recommender_metrics = 10;
+  map<string, MetricDefinitionList> recommender_metrics = 10 [(google.api.field_behavior) = OPTIONAL];
 
   // The tag that holds the hash of the subset of the policy fields that are modified externally.
   // The etag shows the freshness of the policy and ensures no updates derived from old policy states are accepted.
@@ -161,45 +162,47 @@ message Policy {
 // MetricDefinitionList is a list of metric definitions.
 message MetricDefinitionList {
   // The metric definitions.
-  repeated MetricDefinition definitions = 1;
+  repeated MetricDefinition definitions = 1 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // WorkloadRef identifies the Kubernetes resource to scale.
 message WorkloadRef {
   // API Group (e.g., "apps").
-  string group = 1;
+  string group = 1 [(google.api.field_behavior) = OPTIONAL];
   // API Version (e.g., "v1").
-  string version = 2;
+  string version = 2 [(google.api.field_behavior) = OPTIONAL];
   // Resource Kind (e.g., "Deployment").
-  string kind = 3;
+  string kind = 3 [(google.api.field_behavior) = OPTIONAL];
   // Name of the resource.
-  string name = 4;
+  string name = 4 [(google.api.field_behavior) = OPTIONAL];
   // Namespace of the resource.
-  string namespace = 5;
+  string namespace = 5 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // MetricDefinition defines how to collect and process a metric.
 message MetricDefinition {
   // The name of the metric (used as key in ControlMetrics).
-  string name = 1;
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
   // The name of the recommender that owns this metric. Empty for policy-wide metrics.
   // The metric name is only unique within its recommender.
-  string recommender_name = 15;
+  string recommender_name = 15 [(google.api.field_behavior) = OPTIONAL];
   // The provider class to use (e.g., "kubelet", "prometheus").
-  string provider = 2;
+  string provider = 2 [(google.api.field_behavior) = OPTIONAL];
   // Provider-specific parameters (e.g., "type": "cpu").
-  map<string, string> params = 3;
+  map<string, string> params = 3 [(google.api.field_behavior) = OPTIONAL];
   // Label filters to apply to raw samples before processing.
-  map<string, string> filter = 5;
+  map<string, string> filter = 5 [(google.api.field_behavior) = OPTIONAL];
 
   // --- Intents ---
-  Gauge gauge = 10;
-  Rate rate = 11;
-  Distribution distribution = 12;
-  DecayingDistribution decaying_distribution = 13;
+  // Exactly one of gauge, rate, distribution or decaying_distribution is
+  // required.
+  Gauge gauge = 10 [(google.api.field_behavior) = OPTIONAL];
+  Rate rate = 11 [(google.api.field_behavior) = OPTIONAL];
+  Distribution distribution = 12 [(google.api.field_behavior) = OPTIONAL];
+  DecayingDistribution decaying_distribution = 13 [(google.api.field_behavior) = OPTIONAL];
 
   // The scope of the metric: "Global" (default), "Pod", "PodContainer", or "Container".
-  string scope = 14;
+  string scope = 14 [(google.api.field_behavior) = OPTIONAL];
   // Eligibility defines which pod samples a metric considers.
   message Eligibility {
     // Consider the samples emitted during the pod startup or shutdown, i.e.
@@ -208,61 +211,61 @@ message MetricDefinition {
     // considered: the pods that have been ready and are not being deleted,
     // and for CPU usage, that have been ready for long enough for a full
     // sample to be measured, as the HPA does.
-    bool startup_samples = 1;
+    bool startup_samples = 1 [(google.api.field_behavior) = OPTIONAL];
     // Ignore the samples emitted by a pod until this long after it started,
     // on top of the default rules. Unset or zero means no grace period.
     // Incompatible with startup_samples.
-    google.protobuf.Duration startup_grace_period = 2;
+    google.protobuf.Duration startup_grace_period = 2 [(google.api.field_behavior) = OPTIONAL];
   }
   // Which pod samples the metric considers.
-  Eligibility eligibility = 16;
+  Eligibility eligibility = 16 [(google.api.field_behavior) = OPTIONAL];
 }
 
 message Gauge {
   // Pod aggregation method: "Avg", "Sum", "Max", "Min".
-  string aggregation = 1;
+  string aggregation = 1 [(google.api.field_behavior) = OPTIONAL];
 }
 
 message Rate {
   // The temporal period for rate calculation. Zero computes the instantaneous
   // rate, between the last two samples.
-  google.protobuf.Duration window = 1;
+  google.protobuf.Duration window = 1 [(google.api.field_behavior) = REQUIRED];
   // Pod aggregation method: "Avg", "Sum", "Max", "Min".
-  string aggregation = 2;
+  string aggregation = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
 message Distribution {
   // The percentile to extract (e.g. "p99").
-  string percentile = 1;
+  string percentile = 1 [(google.api.field_behavior) = REQUIRED];
   // Pod aggregation method: "Avg", "Sum", "Max", "Min".
-  string aggregation = 2;
+  string aggregation = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
 message DecayingDistribution {
   // Half-life of the samples weight.
-  google.protobuf.Duration half_life = 1;
+  google.protobuf.Duration half_life = 1 [(google.api.field_behavior) = REQUIRED];
   // Bucket size string (e.g. "0.1").
-  string bucket_size = 2;
+  string bucket_size = 2 [(google.api.field_behavior) = REQUIRED];
   // The percentile to extract (e.g. "p100").
-  string percentile = 3;
+  string percentile = 3 [(google.api.field_behavior) = REQUIRED];
   // If set, treat input as Counter and calculate rate over this window before
   // sampling. Zero computes the instantaneous rate, between the last two
   // samples.
-  google.protobuf.Duration rate = 4;
+  google.protobuf.Duration rate = 4 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // RecommenderDefinition configures a specific scaling algorithm.
 message RecommenderDefinition {
   // The class of recommender to use (e.g., "linear-fast").
-  string recommender = 1;
+  string recommender = 1 [(google.api.field_behavior) = OPTIONAL];
   // Unique name for this recommender instance.
-  string name = 2;
+  string name = 2 [(google.api.field_behavior) = OPTIONAL];
   // Mode of operation: "Active" (default) or "DryRun".
-  string mode = 3;
+  string mode = 3 [(google.api.field_behavior) = OPTIONAL];
   // Algorithm-specific parameters.
-  map<string, string> params = 4;
+  map<string, string> params = 4 [(google.api.field_behavior) = OPTIONAL];
   // The type of recommender algorithm (e.g. "Linear", "Threshold").
-  string type = 5;
+  string type = 5 [(google.api.field_behavior) = OPTIONAL];
 }
 
 
@@ -271,53 +274,53 @@ message RecommenderDefinition {
 // UpdateWorkloadRequest synchronizes the Server's view of the workload.
 message UpdateWorkloadRequest {
   // The policy this workload belongs to.
-  PolicyId id = 1;
+  PolicyId id = 1 [(google.api.field_behavior) = REQUIRED];
   // The current state of the workload (pods).
-  Workload workload = 2;
+  Workload workload = 2 [(google.api.field_behavior) = REQUIRED];
 }
 
 // GetWorkloadRequest retrieves the Server's view of the workload of a policy.
 message GetWorkloadRequest {
   // The policy to fetch the workload for.
-  PolicyId id = 1;
+  PolicyId id = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 // Workload represents the set of pods governed by a policy.
 message Workload {
   // List of known pods.
-  repeated PodState pods = 1;
+  repeated PodState pods = 1 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // PodState represents a single pod instance.
 message PodState {
   // The name of the pod.
-  string name = 1;
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
   // The node where the pod is running.
-  string node_name = 2;
+  string node_name = 2 [(google.api.field_behavior) = OPTIONAL];
   // Whether the pod's Ready condition is currently true.
-  bool is_ready = 3;
+  bool is_ready = 3 [(google.api.field_behavior) = OPTIONAL];
   // State of all the pod containers.
-  repeated ContainerState containers = 4;
+  repeated ContainerState containers = 4 [(google.api.field_behavior) = OPTIONAL];
   // The pod phase (e.g. "Pending", "Running", "Succeeded", "Failed").
-  string phase = 5;
+  string phase = 5 [(google.api.field_behavior) = OPTIONAL];
   // When the pod was acknowledged by the kubelet. Unset until then.
-  google.protobuf.Timestamp start_time = 6;
+  google.protobuf.Timestamp start_time = 6 [(google.api.field_behavior) = OPTIONAL];
   // When the pod's Ready condition last changed. Unset if the pod has no
   // Ready condition yet.
-  google.protobuf.Timestamp ready_last_transition_time = 7;
+  google.protobuf.Timestamp ready_last_transition_time = 7 [(google.api.field_behavior) = OPTIONAL];
   // When the pod's deletion was requested (graceful shutdown in progress).
   // Unset if it wasn't.
-  google.protobuf.Timestamp deletion_timestamp = 8;
+  google.protobuf.Timestamp deletion_timestamp = 8 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // ContainerState represents the state of a given container instance.
 message ContainerState {
   // The name of the container.
-  string name = 1;
+  string name = 1 [(google.api.field_behavior) = OPTIONAL];
   // Maps a resource to its target (i.e. spec) requested value (e.g. 'cpu: 5m', 'memory: 10Mi').
-  map<string, string> requests = 2;
+  map<string, string> requests = 2 [(google.api.field_behavior) = OPTIONAL];
   // Maps a resource to its target (i.e. spec) limit value (e.g. 'cpu: 500m', 'memory: 1Gi').
-  map<string, string> limits = 3;
+  map<string, string> limits = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // --- Control Metrics ---
@@ -325,7 +328,7 @@ message ContainerState {
 // GetControlMetricsRequest retrieves control metrics for a policy.
 message GetControlMetricsRequest { 
   // The policy to fetch metrics for.
-  PolicyId id = 1; 
+  PolicyId id = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 // GetControlMetricsResponse contains ControlMetrics (both global and
@@ -368,7 +371,7 @@ message ControlMetrics {
 // WatchControlMetricsRequest retrieves the control metrics of all policies in the
 // requested cluster.
 message WatchControlMetricsRequest {
-  string cluster_name = 1;
+  string cluster_name = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 // ControlMetricsEvent is the response sent on the WatchControlMetrics
@@ -389,11 +392,11 @@ message ControlMetricsEvent {
 // UpdateRecommenderStateRequest updates the status (recommendation) of a recommender.
 message UpdateRecommenderStateRequest {
   // The policy ID.
-  PolicyId id = 1;
+  PolicyId id = 1 [(google.api.field_behavior) = REQUIRED];
   // The name of the recommender to update.
-  string recommender_name = 2;
+  string recommender_name = 2 [(google.api.field_behavior) = OPTIONAL];
   // The new recommendation.
-  Recommendation recommendation = 3;
+  Recommendation recommendation = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // A container resources requests/limits (e.g. CPU and Memory). Can also be
@@ -404,38 +407,38 @@ message UpdateRecommenderStateRequest {
 message ContainerResource {
   // The container this recommendation applies to. If omitted, the resources
   // are pod-level resources.
-  string container_name = 3;
+  string container_name = 3 [(google.api.field_behavior) = OPTIONAL];
   // Maps a resource to its requested value (e.g. 'memory: 10Mi').
-  map<string, string> requests = 1;
+  map<string, string> requests = 1 [(google.api.field_behavior) = OPTIONAL];
   // Maps a resource to its value limit (e.g. 'cpu: 5m').
-  map<string, string> limits = 2;
+  map<string, string> limits = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // The resources requests/limits (e.g. CPU and Memory) for a given pod.
 // Requests/limits can either apply to a given container, or po
 message PodContainerResource {
-  string pod_name = 1;
-  ContainerResource container_resources = 2;
+  string pod_name = 1 [(google.api.field_behavior) = OPTIONAL];
+  ContainerResource container_resources = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // An autoscaling recommendation emitted by a recommender.
 message Recommendation {
   // Recommendation for number of replicas.
-  int32 replicas = 1;
+  int32 replicas = 1 [(google.api.field_behavior) = OPTIONAL];
 
   // If false, this recommender recommends scaling to zero (if Activation type).
-  bool is_active = 2;
+  bool is_active = 2 [(google.api.field_behavior) = OPTIONAL];
 
   // Human-readable reason or message.
-  string message = 3;
+  string message = 3 [(google.api.field_behavior) = OPTIONAL];
   
   // Workload-level resource request/limit recommendations. Resources can be
   // specific to a container, or pod-level resources.
-  repeated ContainerResource workload_resources = 4;
+  repeated ContainerResource workload_resources = 4 [(google.api.field_behavior) = OPTIONAL];
 
   // Per-pod resource request/limit recommendations. Resources can be specific
   // to a container, or pod-level resources.
-  repeated PodContainerResource pod_container_resources = 5;
+  repeated PodContainerResource pod_container_resources = 5 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // RecommenderState represents the full state of a recommender (Config + Status).
@@ -478,7 +481,7 @@ message RecommenderStatus {
 // GetArbitratedRecommendationRequest retrieves the final recommendation for a policy.
 message GetArbitratedRecommendationRequest { 
   // The policy ID.
-  PolicyId id = 1; 
+  PolicyId id = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 // ArbitratedRecommendation wraps the arbitrated recommendation and information
@@ -497,7 +500,7 @@ message ArbitratedRecommendation {
 // WatchArbitratedRecommendationsRequest retrieves all arbitrated recommendations for all
 // policies in the given cluster.
 message WatchArbitratedRecommendationsRequest {
-  string cluster_name = 1;
+  string cluster_name = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 // ArbitratedRecommendationsEvent is the response sent on the WatchArbitratedRecommendations
@@ -535,8 +538,8 @@ message MetricStatus {
 // IngestMetricsRequest pushes a batch of raw metrics to the Server.
 message IngestMetricsRequest {
   // The cluster name where metrics originated.
-  string cluster_name = 1;
-  // Time at which the metrics were collected (i.e. the scrape time). Required.
+  string cluster_name = 1 [(google.api.field_behavior) = REQUIRED];
+  // Time at which the metrics were collected (i.e. the scrape time).
   //
   // This is the default timestamp of every MetricSample that does not set its
   // own. The Server also uses it to track the freshness of each metric series:
@@ -545,20 +548,20 @@ message IngestMetricsRequest {
   //
   // A growing gap between this timestamp and the samples' timestamps indicates
   // that the metric sources (or the scraping) are falling behind.
-  google.protobuf.Timestamp timestamp = 2;
+  google.protobuf.Timestamp timestamp = 2 [(google.api.field_behavior) = REQUIRED];
   // Group metrics by policy.
-  repeated PolicyMetricBatch policy_metrics = 3;
+  repeated PolicyMetricBatch policy_metrics = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // PolicyMetricBatch groups metrics for a specific policy.
 message PolicyMetricBatch {
   // The namespace of the policy.
-  string namespace = 1;
+  string namespace = 1 [(google.api.field_behavior) = OPTIONAL];
   // The name of the policy.
-  string name = 2;
+  string name = 2 [(google.api.field_behavior) = OPTIONAL];
   
   // Batches of metrics, usually grouped by Pod.
-  repeated MetricBatch batches = 3;
+  repeated MetricBatch batches = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // MetricBatch contains metrics for a specific pod, for a given container in a
@@ -566,32 +569,32 @@ message PolicyMetricBatch {
 message MetricBatch {
   // Identifies the source pod.
   // Empty string means the metric applies to the Policy as a whole (Global).
-  string pod_name = 1;
+  string pod_name = 1 [(google.api.field_behavior) = OPTIONAL];
   // Identifies the source container within the pod.
   // Empty string means the metric applies to the pod as a whole.
-  string container_name = 3;
+  string container_name = 3 [(google.api.field_behavior) = OPTIONAL];
   // The list of metric samples.
-  repeated MetricSample samples = 2;
+  repeated MetricSample samples = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // MetricSample represents a single data point.
 message MetricSample {
   // The name of the metric.
-  string name = 1;
+  string name = 1 [(google.api.field_behavior) = OPTIONAL];
   // The metric owning recommender (if any).
-  string recommender_name = 9;
+  string recommender_name = 9 [(google.api.field_behavior) = OPTIONAL];
   // Labels associated with the sample.
-  map<string, string> labels = 2;
+  map<string, string> labels = 2 [(google.api.field_behavior) = OPTIONAL];
   // For resource metrics (e.g. "cpu" or "memory"), the resource name.
-  string resource_name = 8;
-  // Time at which the sample was measured by its source. Optional.
+  string resource_name = 8 [(google.api.field_behavior) = OPTIONAL];
+  // Time at which the sample was measured by its source.
   //
   // Defaults to IngestMetricsRequest.timestamp when unset. Samples older than
   // the last sample of their series are dropped as out of order, and samples
   // timestamped more than 5 minutes after IngestMetricsRequest.timestamp are
   // dropped as invalid. A sample carrying the same timestamp as the last one
   // is ignored: the first sample wins.
-  google.protobuf.Timestamp timestamp = 4;
+  google.protobuf.Timestamp timestamp = 4 [(google.api.field_behavior) = OPTIONAL];
   // The data point itself: a gauge or a counter for scalars, or a histogram
   // for distributions.
   oneof data {
@@ -610,11 +613,11 @@ message MetricSample {
 // A histogram (aka distribution) value.
 message Histogram {
   // Histogram buckets (Le -> Count).
-  map<string, uint64> buckets = 1;
+  map<string, uint64> buckets = 1 [(google.api.field_behavior) = OPTIONAL];
   // Sum of all observations in the histogram.
-  double sum = 2;
+  double sum = 2 [(google.api.field_behavior) = OPTIONAL];
   // Total count of observations in the histogram.
-  uint64 count = 3;
+  uint64 count = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // IngestMetricsResponse acknowledges successful ingestion.
