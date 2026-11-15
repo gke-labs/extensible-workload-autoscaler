@@ -14,6 +14,7 @@ import (
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
+	xasgrpc "github.com/gke-labs/extensible-workload-autoscaler/internal/grpc"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/policy"
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 )
@@ -76,9 +77,8 @@ func (p *CoreClusterMetricsProvider) scrapeAndSend() {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	resp, err := p.grpcClient.ListPolicies(ctx, pb.ListPoliciesRequest_builder{
-		ClusterName: new(p.clusterName),
-	}.Build())
+	req := pb.ListPoliciesRequest_builder{ClusterName: new(p.clusterName)}.Build()
+	pols, err := xasgrpc.ListAllPages(ctx, req, p.grpcClient.ListPolicies, (*pb.ListPoliciesResponse).GetPolicies)
 	if err != nil {
 		slog.Error("Error listing policies", "error", err)
 		return
@@ -86,7 +86,7 @@ func (p *CoreClusterMetricsProvider) scrapeAndSend() {
 
 	var policyBatches []*pb.PolicyMetricBatch
 
-	for _, pol := range resp.GetPolicies() {
+	for _, pol := range pols {
 		var policyMetrics []*pb.MetricBatch
 
 		for _, m := range policy.MetricDefinitions(pol) {

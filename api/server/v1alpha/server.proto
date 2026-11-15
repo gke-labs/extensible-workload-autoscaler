@@ -115,12 +115,24 @@ message DeletePolicyRequest {
 message ListPoliciesRequest {
   // The cluster to list policies for.
   string cluster_name = 1 [(google.api.field_behavior) = REQUIRED];
+  // The maximum number of policies to return. 
+  // Fewer items than the specified page size may be returned. 
+  // Negative values are rejected with INVALID_ARGUMENT.
+  int32 page_size = 2 [(google.api.field_behavior) = OPTIONAL];
+  // A page token received from a previous ListPolicies call.
+  // Provide this to retrieve the subsequent page. If empty, the first page
+  // is returned. When paginating, all other request parameters (e.g.
+  // cluster_name) must match the call that returned the token.
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // ListPoliciesResponse returns the list of matching policies.
 message ListPoliciesResponse { 
   // The list of policies.
   repeated Policy policies = 1; 
+  // A token to retrieve the next page, passed as page_token in the next
+  // ListPoliciesRequest. If empty, there are no more pages.
+  string next_page_token = 2;
 }
 
 // Policy represents the configuration for autoscaling a specific workload.

@@ -489,6 +489,8 @@ func (b0 DeletePolicyRequest_builder) Build() *DeletePolicyRequest {
 type ListPoliciesRequest struct {
 	state                  protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_ClusterName *string                `protobuf:"bytes,1,opt,name=cluster_name,json=clusterName"`
+	xxx_hidden_PageSize    int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize"`
+	xxx_hidden_PageToken   *string                `protobuf:"bytes,3,opt,name=page_token,json=pageToken"`
 	XXX_raceDetectHookData protoimpl.RaceDetectHookData
 	XXX_presence           [1]uint32
 	unknownFields          protoimpl.UnknownFields
@@ -530,9 +532,36 @@ func (x *ListPoliciesRequest) GetClusterName() string {
 	return ""
 }
 
+func (x *ListPoliciesRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.xxx_hidden_PageSize
+	}
+	return 0
+}
+
+func (x *ListPoliciesRequest) GetPageToken() string {
+	if x != nil {
+		if x.xxx_hidden_PageToken != nil {
+			return *x.xxx_hidden_PageToken
+		}
+		return ""
+	}
+	return ""
+}
+
 func (x *ListPoliciesRequest) SetClusterName(v string) {
 	x.xxx_hidden_ClusterName = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 1)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 3)
+}
+
+func (x *ListPoliciesRequest) SetPageSize(v int32) {
+	x.xxx_hidden_PageSize = v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 3)
+}
+
+func (x *ListPoliciesRequest) SetPageToken(v string) {
+	x.xxx_hidden_PageToken = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 3)
 }
 
 func (x *ListPoliciesRequest) HasClusterName() bool {
@@ -542,9 +571,33 @@ func (x *ListPoliciesRequest) HasClusterName() bool {
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
 }
 
+func (x *ListPoliciesRequest) HasPageSize() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
+}
+
+func (x *ListPoliciesRequest) HasPageToken() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 2)
+}
+
 func (x *ListPoliciesRequest) ClearClusterName() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
 	x.xxx_hidden_ClusterName = nil
+}
+
+func (x *ListPoliciesRequest) ClearPageSize() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
+	x.xxx_hidden_PageSize = 0
+}
+
+func (x *ListPoliciesRequest) ClearPageToken() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 2)
+	x.xxx_hidden_PageToken = nil
 }
 
 type ListPoliciesRequest_builder struct {
@@ -552,6 +605,15 @@ type ListPoliciesRequest_builder struct {
 
 	// The cluster to list policies for.
 	ClusterName *string
+	// The maximum number of policies to return.
+	// Fewer items than the specified page size may be returned.
+	// Negative values are rejected with INVALID_ARGUMENT.
+	PageSize *int32
+	// A page token received from a previous ListPolicies call.
+	// Provide this to retrieve the subsequent page. If empty, the first page
+	// is returned. When paginating, all other request parameters (e.g.
+	// cluster_name) must match the call that returned the token.
+	PageToken *string
 }
 
 func (b0 ListPoliciesRequest_builder) Build() *ListPoliciesRequest {
@@ -559,18 +621,29 @@ func (b0 ListPoliciesRequest_builder) Build() *ListPoliciesRequest {
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.ClusterName != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 1)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 3)
 		x.xxx_hidden_ClusterName = b.ClusterName
+	}
+	if b.PageSize != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 3)
+		x.xxx_hidden_PageSize = *b.PageSize
+	}
+	if b.PageToken != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 3)
+		x.xxx_hidden_PageToken = b.PageToken
 	}
 	return m0
 }
 
 // ListPoliciesResponse returns the list of matching policies.
 type ListPoliciesResponse struct {
-	state               protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Policies *[]*Policy             `protobuf:"bytes,1,rep,name=policies"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Policies      *[]*Policy             `protobuf:"bytes,1,rep,name=policies"`
+	xxx_hidden_NextPageToken *string                `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken"`
+	XXX_raceDetectHookData   protoimpl.RaceDetectHookData
+	XXX_presence             [1]uint32
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *ListPoliciesResponse) Reset() {
@@ -607,8 +680,35 @@ func (x *ListPoliciesResponse) GetPolicies() []*Policy {
 	return nil
 }
 
+func (x *ListPoliciesResponse) GetNextPageToken() string {
+	if x != nil {
+		if x.xxx_hidden_NextPageToken != nil {
+			return *x.xxx_hidden_NextPageToken
+		}
+		return ""
+	}
+	return ""
+}
+
 func (x *ListPoliciesResponse) SetPolicies(v []*Policy) {
 	x.xxx_hidden_Policies = &v
+}
+
+func (x *ListPoliciesResponse) SetNextPageToken(v string) {
+	x.xxx_hidden_NextPageToken = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 2)
+}
+
+func (x *ListPoliciesResponse) HasNextPageToken() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
+}
+
+func (x *ListPoliciesResponse) ClearNextPageToken() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
+	x.xxx_hidden_NextPageToken = nil
 }
 
 type ListPoliciesResponse_builder struct {
@@ -616,6 +716,9 @@ type ListPoliciesResponse_builder struct {
 
 	// The list of policies.
 	Policies []*Policy
+	// A token to retrieve the next page, passed as page_token in the next
+	// ListPoliciesRequest. If empty, there are no more pages.
+	NextPageToken *string
 }
 
 func (b0 ListPoliciesResponse_builder) Build() *ListPoliciesResponse {
@@ -623,6 +726,10 @@ func (b0 ListPoliciesResponse_builder) Build() *ListPoliciesResponse {
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_Policies = &b.Policies
+	if b.NextPageToken != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 2)
+		x.xxx_hidden_NextPageToken = b.NextPageToken
+	}
 	return m0
 }
 
@@ -6138,11 +6245,15 @@ const file_server_proto_rawDesc = "" +
 	"\x10GetPolicyRequest\x122\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdB\x04\xe2A\x01\x02R\x02id\"I\n" +
 	"\x13DeletePolicyRequest\x122\n" +
-	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdB\x04\xe2A\x01\x02R\x02id\">\n" +
+	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdB\x04\xe2A\x01\x02R\x02id\"\x86\x01\n" +
 	"\x13ListPoliciesRequest\x12'\n" +
-	"\fcluster_name\x18\x01 \x01(\tB\x04\xe2A\x01\x02R\vclusterName\"N\n" +
+	"\fcluster_name\x18\x01 \x01(\tB\x04\xe2A\x01\x02R\vclusterName\x12!\n" +
+	"\tpage_size\x18\x02 \x01(\x05B\x04\xe2A\x01\x01R\bpageSize\x12#\n" +
+	"\n" +
+	"page_token\x18\x03 \x01(\tB\x04\xe2A\x01\x01R\tpageToken\"v\n" +
 	"\x14ListPoliciesResponse\x126\n" +
-	"\bpolicies\x18\x01 \x03(\v2\x1a.xas.server.v1alpha.PolicyR\bpolicies\"\xc5\x05\n" +
+	"\bpolicies\x18\x01 \x03(\v2\x1a.xas.server.v1alpha.PolicyR\bpolicies\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xc5\x05\n" +
 	"\x06Policy\x122\n" +
 	"\x02id\x18\x01 \x01(\v2\x1c.xas.server.v1alpha.PolicyIdB\x04\xe2A\x01\x02R\x02id\x12A\n" +
 	"\bworkload\x18\x03 \x01(\v2\x1f.xas.server.v1alpha.WorkloadRefB\x04\xe2A\x01\x01R\bworkload\x12'\n" +

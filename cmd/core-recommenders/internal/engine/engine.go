@@ -19,6 +19,7 @@ import (
 	"github.com/gke-labs/extensible-workload-autoscaler/cmd/core-recommenders/internal/linear"
 	"github.com/gke-labs/extensible-workload-autoscaler/cmd/core-recommenders/internal/perpodvertical"
 	"github.com/gke-labs/extensible-workload-autoscaler/cmd/core-recommenders/internal/vpa"
+	xasgrpc "github.com/gke-labs/extensible-workload-autoscaler/internal/grpc"
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
 )
 
@@ -180,13 +181,8 @@ func (e *Engine) fetchPolicies() ([]*pb.Policy, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	resp, err := e.client.ListPolicies(ctx, pb.ListPoliciesRequest_builder{
-		ClusterName: new(e.clusterName),
-	}.Build())
-	if err != nil {
-		return nil, err
-	}
-	return resp.GetPolicies(), nil
+	req := pb.ListPoliciesRequest_builder{ClusterName: new(e.clusterName)}.Build()
+	return xasgrpc.ListAllPages(ctx, req, e.client.ListPolicies, (*pb.ListPoliciesResponse).GetPolicies)
 }
 
 // fetchWorkload reads the workload of a policy: its pods and their current
