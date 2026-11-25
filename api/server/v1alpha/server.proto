@@ -49,6 +49,19 @@ service XASServer {
   // Recommenders use this to decide which pods to resize.
   rpc GetWorkload(GetWorkloadRequest) returns (Workload);
 
+  // --- Workload (Node Metrics Provider -> Server) ---
+  // Stream the workloads (Pods) of every policy on a node. Node metrics
+  // providers use this to know which pods to scrape.
+  rpc WatchWorkloads(WatchWorkloadsRequest) returns (stream WorkloadEvent);
+
+  // --- Metric Provider Classes (Controller -> Server) ---
+  // Create or replace a MetricProviderClass. Its config holds the default
+  // params of the metrics that reference it by name.
+  rpc UpdateMetricProviderClass(UpdateMetricProviderClassRequest) returns (MetricProviderClass);
+
+  // Delete a MetricProviderClass.
+  rpc DeleteMetricProviderClass(DeleteMetricProviderClassRequest) returns (google.protobuf.Empty);
+
   // --- Recommender State (Plugin -> Server) ---
   // Update the status (recommendation) of a specific recommender.
   // Recommenders push their calculated recommendation here.
@@ -231,6 +244,15 @@ message MetricDefinition {
   }
   // Which pod samples the metric considers.
   Eligibility eligibility = 16 [(google.api.field_behavior) = OPTIONAL];
+
+  // The type of the MetricProviderClass named by `provider` (e.g. "Kubelet",
+  // "Prometheus"). Set by the Server when serving the policy, ignored on
+  // write. Providers choose the metrics they collect by this type.
+  string provider_type = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // The config of the MetricProviderClass named by `provider`: the default
+  // params of the metric, overridden by `params`. Set by the Server when
+  // serving the policy, ignored on write.
+  map<string, string> class_config = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message Gauge {
@@ -323,6 +345,8 @@ message PodState {
   // When the pod's deletion was requested (graceful shutdown in progress).
   // Unset if it wasn't.
   google.protobuf.Timestamp deletion_timestamp = 8 [(google.api.field_behavior) = OPTIONAL];
+  // The IP address of the pod. Unset until the pod is assigned one.
+  string pod_ip = 9 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // ContainerState represents the state of a given container instance.
@@ -333,6 +357,60 @@ message ContainerState {
   map<string, string> requests = 2 [(google.api.field_behavior) = OPTIONAL];
   // Maps a resource to its target (i.e. spec) limit value (e.g. 'cpu: 500m', 'memory: 1Gi').
   map<string, string> limits = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// WatchWorkloadsRequest streams the workloads of every policy on a node.
+message WatchWorkloadsRequest {
+  // The cluster of the node.
+  string cluster_name = 1 [(google.api.field_behavior) = REQUIRED];
+  // The node to report the pods of.
+  string node_name = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// WorkloadEvent is the response sent on the WatchWorkloads streaming RPC. The
+// first events describe every policy that has pods on the node. Then, unless
+// throttled, an event is sent each time the pods of a policy on the node
+// change.
+message WorkloadEvent {
+  // The policy the pods belong to.
+  PolicyId id = 1;
+  // The pods of the policy on the node. Empty when the policy no longer has
+  // pods on the node, e.g. because they were deleted or the policy was.
+  Workload workload = 2;
+}
+
+// --- Metric Provider Classes ---
+
+// MetricProviderClassId uniquely identifies a MetricProviderClass across
+// clusters.
+message MetricProviderClassId {
+  // The cluster this class belongs to.
+  string cluster_name = 1 [(google.api.field_behavior) = REQUIRED];
+  // The name of the class, referenced by MetricDefinition.provider.
+  string name = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// MetricProviderClass is a reusable configuration of a metric source.
+message MetricProviderClass {
+  // The unique identifier of the class.
+  MetricProviderClassId id = 1 [(google.api.field_behavior) = REQUIRED];
+  // The provider implementation (e.g. "Kubelet", "Prometheus").
+  string type = 2 [(google.api.field_behavior) = REQUIRED];
+  // The default params of the metrics that reference the class. The params
+  // of a metric take precedence.
+  map<string, string> config = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// UpdateMetricProviderClassRequest creates or replaces a MetricProviderClass.
+message UpdateMetricProviderClassRequest {
+  // The class definition.
+  MetricProviderClass metric_provider_class = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// DeleteMetricProviderClassRequest identifies a MetricProviderClass to delete.
+message DeleteMetricProviderClassRequest {
+  // The unique ID of the class.
+  MetricProviderClassId id = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 // --- Control Metrics ---
