@@ -29,6 +29,9 @@ const (
 	XASServer_GetControlMetrics_FullMethodName              = "/xas.server.v1alpha.XASServer/GetControlMetrics"
 	XASServer_WatchControlMetrics_FullMethodName            = "/xas.server.v1alpha.XASServer/WatchControlMetrics"
 	XASServer_GetWorkload_FullMethodName                    = "/xas.server.v1alpha.XASServer/GetWorkload"
+	XASServer_WatchWorkloads_FullMethodName                 = "/xas.server.v1alpha.XASServer/WatchWorkloads"
+	XASServer_UpdateMetricProviderClass_FullMethodName      = "/xas.server.v1alpha.XASServer/UpdateMetricProviderClass"
+	XASServer_DeleteMetricProviderClass_FullMethodName      = "/xas.server.v1alpha.XASServer/DeleteMetricProviderClass"
 	XASServer_UpdateRecommenderState_FullMethodName         = "/xas.server.v1alpha.XASServer/UpdateRecommenderState"
 	XASServer_GetArbitratedRecommendation_FullMethodName    = "/xas.server.v1alpha.XASServer/GetArbitratedRecommendation"
 	XASServer_WatchArbitratedRecommendations_FullMethodName = "/xas.server.v1alpha.XASServer/WatchArbitratedRecommendations"
@@ -69,6 +72,16 @@ type XASServerClient interface {
 	// policy, as last reported by the Controller with UpdateWorkload.
 	// Recommenders use this to decide which pods to resize.
 	GetWorkload(ctx context.Context, in *GetWorkloadRequest, opts ...grpc.CallOption) (*Workload, error)
+	// --- Workload (Node Metrics Provider -> Server) ---
+	// Stream the workloads (Pods) of every policy on a node. Node metrics
+	// providers use this to know which pods to scrape.
+	WatchWorkloads(ctx context.Context, in *WatchWorkloadsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WorkloadEvent], error)
+	// --- Metric Provider Classes (Controller -> Server) ---
+	// Create or replace a MetricProviderClass. Its config holds the default
+	// params of the metrics that reference it by name.
+	UpdateMetricProviderClass(ctx context.Context, in *UpdateMetricProviderClassRequest, opts ...grpc.CallOption) (*MetricProviderClass, error)
+	// Delete a MetricProviderClass.
+	DeleteMetricProviderClass(ctx context.Context, in *DeleteMetricProviderClassRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// --- Recommender State (Plugin -> Server) ---
 	// Update the status (recommendation) of a specific recommender.
 	// Recommenders push their calculated recommendation here.
@@ -191,6 +204,45 @@ func (c *xASServerClient) GetWorkload(ctx context.Context, in *GetWorkloadReques
 	return out, nil
 }
 
+func (c *xASServerClient) WatchWorkloads(ctx context.Context, in *WatchWorkloadsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WorkloadEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &XASServer_ServiceDesc.Streams[1], XASServer_WatchWorkloads_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[WatchWorkloadsRequest, WorkloadEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type XASServer_WatchWorkloadsClient = grpc.ServerStreamingClient[WorkloadEvent]
+
+func (c *xASServerClient) UpdateMetricProviderClass(ctx context.Context, in *UpdateMetricProviderClassRequest, opts ...grpc.CallOption) (*MetricProviderClass, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MetricProviderClass)
+	err := c.cc.Invoke(ctx, XASServer_UpdateMetricProviderClass_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *xASServerClient) DeleteMetricProviderClass(ctx context.Context, in *DeleteMetricProviderClassRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, XASServer_DeleteMetricProviderClass_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *xASServerClient) UpdateRecommenderState(ctx context.Context, in *UpdateRecommenderStateRequest, opts ...grpc.CallOption) (*RecommenderState, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RecommenderState)
@@ -213,7 +265,7 @@ func (c *xASServerClient) GetArbitratedRecommendation(ctx context.Context, in *G
 
 func (c *xASServerClient) WatchArbitratedRecommendations(ctx context.Context, in *WatchArbitratedRecommendationsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ArbitratedRecommendationsEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &XASServer_ServiceDesc.Streams[1], XASServer_WatchArbitratedRecommendations_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &XASServer_ServiceDesc.Streams[2], XASServer_WatchArbitratedRecommendations_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -274,6 +326,16 @@ type XASServerServer interface {
 	// policy, as last reported by the Controller with UpdateWorkload.
 	// Recommenders use this to decide which pods to resize.
 	GetWorkload(context.Context, *GetWorkloadRequest) (*Workload, error)
+	// --- Workload (Node Metrics Provider -> Server) ---
+	// Stream the workloads (Pods) of every policy on a node. Node metrics
+	// providers use this to know which pods to scrape.
+	WatchWorkloads(*WatchWorkloadsRequest, grpc.ServerStreamingServer[WorkloadEvent]) error
+	// --- Metric Provider Classes (Controller -> Server) ---
+	// Create or replace a MetricProviderClass. Its config holds the default
+	// params of the metrics that reference it by name.
+	UpdateMetricProviderClass(context.Context, *UpdateMetricProviderClassRequest) (*MetricProviderClass, error)
+	// Delete a MetricProviderClass.
+	DeleteMetricProviderClass(context.Context, *DeleteMetricProviderClassRequest) (*emptypb.Empty, error)
 	// --- Recommender State (Plugin -> Server) ---
 	// Update the status (recommendation) of a specific recommender.
 	// Recommenders push their calculated recommendation here.
@@ -323,6 +385,15 @@ func (UnimplementedXASServerServer) WatchControlMetrics(*WatchControlMetricsRequ
 }
 func (UnimplementedXASServerServer) GetWorkload(context.Context, *GetWorkloadRequest) (*Workload, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetWorkload not implemented")
+}
+func (UnimplementedXASServerServer) WatchWorkloads(*WatchWorkloadsRequest, grpc.ServerStreamingServer[WorkloadEvent]) error {
+	return status.Error(codes.Unimplemented, "method WatchWorkloads not implemented")
+}
+func (UnimplementedXASServerServer) UpdateMetricProviderClass(context.Context, *UpdateMetricProviderClassRequest) (*MetricProviderClass, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateMetricProviderClass not implemented")
+}
+func (UnimplementedXASServerServer) DeleteMetricProviderClass(context.Context, *DeleteMetricProviderClassRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteMetricProviderClass not implemented")
 }
 func (UnimplementedXASServerServer) UpdateRecommenderState(context.Context, *UpdateRecommenderStateRequest) (*RecommenderState, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateRecommenderState not implemented")
@@ -512,6 +583,53 @@ func _XASServer_GetWorkload_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _XASServer_WatchWorkloads_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(WatchWorkloadsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(XASServerServer).WatchWorkloads(m, &grpc.GenericServerStream[WatchWorkloadsRequest, WorkloadEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type XASServer_WatchWorkloadsServer = grpc.ServerStreamingServer[WorkloadEvent]
+
+func _XASServer_UpdateMetricProviderClass_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateMetricProviderClassRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(XASServerServer).UpdateMetricProviderClass(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: XASServer_UpdateMetricProviderClass_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(XASServerServer).UpdateMetricProviderClass(ctx, req.(*UpdateMetricProviderClassRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _XASServer_DeleteMetricProviderClass_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteMetricProviderClassRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(XASServerServer).DeleteMetricProviderClass(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: XASServer_DeleteMetricProviderClass_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(XASServerServer).DeleteMetricProviderClass(ctx, req.(*DeleteMetricProviderClassRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _XASServer_UpdateRecommenderState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateRecommenderStateRequest)
 	if err := dec(in); err != nil {
@@ -617,6 +735,14 @@ var XASServer_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _XASServer_GetWorkload_Handler,
 		},
 		{
+			MethodName: "UpdateMetricProviderClass",
+			Handler:    _XASServer_UpdateMetricProviderClass_Handler,
+		},
+		{
+			MethodName: "DeleteMetricProviderClass",
+			Handler:    _XASServer_DeleteMetricProviderClass_Handler,
+		},
+		{
 			MethodName: "UpdateRecommenderState",
 			Handler:    _XASServer_UpdateRecommenderState_Handler,
 		},
@@ -633,6 +759,11 @@ var XASServer_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "WatchControlMetrics",
 			Handler:       _XASServer_WatchControlMetrics_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "WatchWorkloads",
+			Handler:       _XASServer_WatchWorkloads_Handler,
 			ServerStreams: true,
 		},
 		{
