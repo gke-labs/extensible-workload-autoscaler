@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	dto "github.com/prometheus/client_model/go"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -19,6 +20,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/gke-labs/extensible-workload-autoscaler/api/server/v1alpha"
+	xasv1 "github.com/gke-labs/extensible-workload-autoscaler/api/xas/v1"
 	xasgrpc "github.com/gke-labs/extensible-workload-autoscaler/internal/grpc"
 	"github.com/gke-labs/extensible-workload-autoscaler/internal/policy"
 	listers "github.com/gke-labs/extensible-workload-autoscaler/pkg/client/listers/xas/v1"
@@ -43,7 +45,8 @@ type CoreNodeMetricsProvider struct {
 	kubeletClient *http.Client
 	token         string
 
-	lastSamples map[string]SampleState
+	// kubelet exports the metrics scraped from the kubelet.
+	kubelet *kubeletExporter
 }
 
 func NewCoreNodeMetricsProvider(kubeClient kubernetes.Interface, providerLister listers.MetricProviderClassLister, serverAddress, nodeName, hostIP, clusterName string) *CoreNodeMetricsProvider {
@@ -72,7 +75,7 @@ func NewCoreNodeMetricsProvider(kubeClient kubernetes.Interface, providerLister 
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
 		},
-		lastSamples: make(map[string]SampleState),
+		kubelet: newKubeletExporter(),
 	}
 }
 
@@ -123,16 +126,7 @@ func (a *CoreNodeMetricsProvider) scrapeAndSend() {
 			if class.Spec.Type == "Kubelet" {
 				relevantMetrics = append(relevantMetrics, m)
 				// Record needed Kubelet endpoint
-				port := m.GetParams()["port"]
-				if port == "" {
-					port = class.Spec.Config["port"]
-				}
-				path := m.GetParams()["path"]
-				if path == "" {
-					path = class.Spec.Config["path"]
-				}
-				key := fmt.Sprintf("%s|%s", port, path)
-				kubeletConfigs[key] = true
+				kubeletConfigs[kubeletConfigKey(m, class)] = true
 			} else if class.Spec.Type == "Prometheus" {
 				relevantMetrics = append(relevantMetrics, m)
 			}
@@ -150,27 +144,21 @@ func (a *CoreNodeMetricsProvider) scrapeAndSend() {
 	}
 
 	// 3. Scrape all required Kubelet endpoints
-	kubeletMetrics := make(map[string]map[string]*KubeletPodMetrics)
+	kubeletFamilies := make(map[string]map[string]*dto.MetricFamily)
 	for cfg := range kubeletConfigs {
 		parts := strings.Split(cfg, "|")
-		metrics := a.scrapeKubelet(parts[0], parts[1])
-		if metrics != nil {
-			kubeletMetrics[cfg] = metrics
+		families := a.scrapeKubelet(parts[0], parts[1])
+		if families != nil {
+			kubeletFamilies[cfg] = families
 		}
 	}
-
-	seenKeys := make(map[string]bool)
 
 	// 4. Process each policy
 	for _, pol := range policies {
-		a.processGroupedPolicy(pol, kubeletMetrics, seenKeys)
+		a.processGroupedPolicy(pol, kubeletFamilies)
 	}
 
-	for k := range a.lastSamples {
-		if !seenKeys[k] {
-			delete(a.lastSamples, k)
-		}
-	}
+	a.kubelet.forgetUnseen()
 }
 
 type groupedPolicy struct {
@@ -180,7 +168,7 @@ type groupedPolicy struct {
 	Metrics   []*pb.MetricDefinition
 }
 
-func (a *CoreNodeMetricsProvider) processGroupedPolicy(policy *groupedPolicy, kubeletMetrics map[string]map[string]*KubeletPodMetrics, seenKeys map[string]bool) {
+func (a *CoreNodeMetricsProvider) processGroupedPolicy(policy *groupedPolicy, kubeletFamilies map[string]map[string]*dto.MetricFamily) {
 	if policy.Selector == "" {
 		return
 	}
@@ -216,8 +204,8 @@ func (a *CoreNodeMetricsProvider) processGroupedPolicy(policy *groupedPolicy, ku
 
 			switch class.Spec.Type {
 			case "Kubelet":
-				if kubeletMetrics != nil {
-					batches = a.processKubeletMetric(pod, m, kubeletMetrics, seenKeys, class)
+				if families, ok := kubeletFamilies[kubeletConfigKey(m, class)]; ok {
+					batches = a.kubelet.Export(families, pod, m, class)
 				}
 			case "Prometheus":
 				batches = a.processPrometheusMetric(pod, m, class)
@@ -244,6 +232,20 @@ func (a *CoreNodeMetricsProvider) processGroupedPolicy(policy *groupedPolicy, ku
 		}.Build()
 		a.sendBatch(req)
 	}
+}
+
+// kubeletConfigKey returns the "port|path" key of the kubelet endpoint read by
+// a metric.
+func kubeletConfigKey(m *pb.MetricDefinition, class *xasv1.MetricProviderClass) string {
+	port := m.GetParams()["port"]
+	if port == "" {
+		port = class.Spec.Config["port"]
+	}
+	path := m.GetParams()["path"]
+	if path == "" {
+		path = class.Spec.Config["path"]
+	}
+	return fmt.Sprintf("%s|%s", port, path)
 }
 
 func (a *CoreNodeMetricsProvider) sendBatch(pbReq *pb.IngestMetricsRequest) {

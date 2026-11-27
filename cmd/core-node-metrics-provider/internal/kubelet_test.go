@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -246,34 +245,12 @@ func TestProcessKubeletMetric(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &CoreNodeMetricsProvider{
-				lastSamples: make(map[string]SampleState),
-			}
-			seen := make(map[string]bool)
-
-			getParam := func(m *pb.MetricDefinition, class *xasv1.MetricProviderClass, key string) string {
-				if val, ok := m.GetParams()[key]; ok {
-					return val
-				}
-				if class != nil {
-					if val, ok := class.Spec.Config[key]; ok {
-						return val
-					}
-				}
-				return ""
-			}
-
-			port := getParam(tc.def, tc.class, "port")
-			path := getParam(tc.def, tc.class, "path")
-			cfgKey := fmt.Sprintf("%s|%s", port, path)
+			e := newKubeletExporter()
 
 			// T0: a previous scrape, which a rate (utilization) needs. The
 			// samples it reports are not checked.
 			if tc.metrics2 != nil {
-				metricsMap := map[string]map[string]*KubeletPodMetrics{
-					cfgKey: {"default/test-pod": tc.metrics1},
-				}
-				provider.processKubeletMetric(pod, tc.def, metricsMap, seen, tc.class)
+				e.processKubeletMetric(pod, tc.def, map[string]*KubeletPodMetrics{"default/test-pod": tc.metrics1}, tc.class)
 			}
 
 			// T1 (Actual Check)
@@ -282,11 +259,7 @@ func TestProcessKubeletMetric(t *testing.T) {
 				finalMetrics = tc.metrics1
 			}
 
-			metricsMap := map[string]map[string]*KubeletPodMetrics{
-				cfgKey: {"default/test-pod": finalMetrics},
-			}
-
-			got := provider.processKubeletMetric(pod, tc.def, metricsMap, seen, tc.class)
+			got := e.processKubeletMetric(pod, tc.def, map[string]*KubeletPodMetrics{"default/test-pod": finalMetrics}, tc.class)
 
 			if diff := cmp.Diff(tc.want, got, protocmp.Transform(), protocmp.IgnoreDefaultScalars(), cmpopts.EquateApprox(0, 0.0001)); diff != "" {
 				t.Errorf("Mismatch (-want +got):\n%s", diff)

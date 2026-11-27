@@ -1,16 +1,14 @@
 package internal
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"sort"
 	"strings"
 	"time"
 
 	dto "github.com/prometheus/client_model/go"
-	"github.com/prometheus/common/expfmt"
-	"github.com/prometheus/common/model"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	corev1 "k8s.io/api/core/v1"
 
@@ -28,7 +26,7 @@ type KubeletContainerMetrics struct {
 	Timestamp       *int64 // Milliseconds
 }
 
-func (a *CoreNodeMetricsProvider) scrapeKubelet(port, path string) map[string]*KubeletPodMetrics {
+func (a *CoreNodeMetricsProvider) scrapeKubelet(port, path string) map[string]*dto.MetricFamily {
 	if a.hostIP == "" {
 		return nil
 	}
@@ -45,28 +43,53 @@ func (a *CoreNodeMetricsProvider) scrapeKubelet(port, path string) map[string]*K
 
 	url := fmt.Sprintf("https://%s:%s%s", a.hostIP, port, path)
 
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Set("Authorization", "Bearer "+a.token)
-
-	resp, err := a.kubeletClient.Do(req)
+	families, err := scrapeEndpoint(a.kubeletClient, url, a.token, true)
+	var statusErr *unexpectedStatusError
+	if errors.As(err, &statusErr) {
+		slog.Warn("Kubelet returned error", "statusCode", statusErr.statusCode)
+		return nil
+	}
 	if err != nil {
 		slog.Error("Failed to scrape kubelet", "error", err)
 		return nil
 	}
-	defer resp.Body.Close()
+	return families
+}
 
-	if resp.StatusCode != 200 {
-		slog.Warn("Kubelet returned error", "statusCode", resp.StatusCode)
-		return nil
+// kubeletExporter exports the CPU and memory usage of containers scraped
+// from the kubelet's /metrics/resource endpoint. It keeps the previous CPU
+// samples of the containers, which the CPU utilization is computed from.
+type kubeletExporter struct {
+	lastSamples map[string]SampleState
+	// seen holds the keys of the samples used since the last forgetUnseen.
+	seen map[string]bool
+}
+
+func newKubeletExporter() *kubeletExporter {
+	return &kubeletExporter{
+		lastSamples: make(map[string]SampleState),
+		seen:        make(map[string]bool),
 	}
+}
 
-	parser := expfmt.NewTextParser(model.LegacyValidation)
-	families, err := parser.TextToMetricFamilies(resp.Body)
-	if err != nil {
-		slog.Error("Failed to parse kubelet metrics", "error", err)
-		return nil
+func (e *kubeletExporter) Export(families map[string]*dto.MetricFamily, pod corev1.Pod, m *pb.MetricDefinition, class *xasv1.MetricProviderClass) []*pb.MetricBatch {
+	return e.processKubeletMetric(pod, m, kubeletPodMetrics(families), class)
+}
+
+// forgetUnseen forgets the previous samples of the containers that weren't
+// exported since the last call, e.g. because they are gone.
+func (e *kubeletExporter) forgetUnseen() {
+	for k := range e.lastSamples {
+		if !e.seen[k] {
+			delete(e.lastSamples, k)
+		}
 	}
+	e.seen = make(map[string]bool)
+}
 
+// kubeletPodMetrics returns the CPU and memory usage of the containers in the
+// metric families scraped from the kubelet, keyed by "namespace/pod".
+func kubeletPodMetrics(families map[string]*dto.MetricFamily) map[string]*KubeletPodMetrics {
 	result := make(map[string]*KubeletPodMetrics)
 
 	if fam, ok := families["container_cpu_usage_seconds_total"]; ok {
@@ -133,7 +156,7 @@ func getLabel(m *dto.Metric, name string) string {
 	return ""
 }
 
-func (a *CoreNodeMetricsProvider) processKubeletMetric(pod corev1.Pod, m *pb.MetricDefinition, kubeletMetrics map[string]map[string]*KubeletPodMetrics, seenKeys map[string]bool, class *xasv1.MetricProviderClass) []*pb.MetricBatch {
+func (e *kubeletExporter) processKubeletMetric(pod corev1.Pod, m *pb.MetricDefinition, podStatsMap map[string]*KubeletPodMetrics, class *xasv1.MetricProviderClass) []*pb.MetricBatch {
 	getParam := func(key string) string {
 		if val, ok := m.GetParams()[key]; ok {
 			return val
@@ -144,15 +167,6 @@ func (a *CoreNodeMetricsProvider) processKubeletMetric(pod corev1.Pod, m *pb.Met
 			}
 		}
 		return ""
-	}
-
-	port := getParam("port")
-	path := getParam("path")
-	cfgKey := fmt.Sprintf("%s|%s", port, path)
-
-	podStatsMap, ok := kubeletMetrics[cfgKey]
-	if !ok {
-		return nil
 	}
 
 	key := pod.Namespace + "/" + pod.Name
@@ -172,7 +186,7 @@ func (a *CoreNodeMetricsProvider) processKubeletMetric(pod corev1.Pod, m *pb.Met
 	batches := make([]*pb.MetricBatch, 0, len(podStats.Containers))
 
 	for cName, cStats := range podStats.Containers {
-		sample, ok := a.containerSample(pod, cName, cStats, metricType, metricMode, m.GetName(), seenKeys)
+		sample, ok := e.containerSample(pod, cName, cStats, metricType, metricMode, m.GetName())
 		if !ok {
 			continue
 		}
@@ -208,7 +222,7 @@ func (a *CoreNodeMetricsProvider) processKubeletMetric(pod corev1.Pod, m *pb.Met
 // containerUsage). A utilization is a per-container ratio: the container
 // usage over the request of that very same container. A container without a
 // request for the resource has no meaningful ratio, so it is skipped.
-func (a *CoreNodeMetricsProvider) containerSample(pod corev1.Pod, containerName string, cStats *KubeletContainerMetrics, metricType, metricMode, metricName string, seenKeys map[string]bool) (*pb.MetricSample, bool) {
+func (e *kubeletExporter) containerSample(pod corev1.Pod, containerName string, cStats *KubeletContainerMetrics, metricType, metricMode, metricName string) (*pb.MetricSample, bool) {
 	if metricType == "cpu" && metricMode != "utilization" {
 		if cStats.CPUUsageSeconds == nil {
 			return nil, false
@@ -223,7 +237,7 @@ func (a *CoreNodeMetricsProvider) containerSample(pod corev1.Pod, containerName 
 		}.Build(), true
 	}
 
-	val, ts, ok := a.containerUsage(pod, containerName, cStats, metricType, metricName, seenKeys)
+	val, ts, ok := e.containerUsage(pod, containerName, cStats, metricType, metricName)
 	if !ok {
 		return nil, false
 	}
@@ -248,7 +262,7 @@ func (a *CoreNodeMetricsProvider) containerSample(pod corev1.Pod, containerName 
 // This only serves the CPU utilization: the CPU usage itself is reported as a
 // counter, see containerSample.
 // For "memory" the working set gauge is reported as is (bytes).
-func (a *CoreNodeMetricsProvider) containerUsage(pod corev1.Pod, containerName string, cStats *KubeletContainerMetrics, metricType, metricName string, seenKeys map[string]bool) (float64, int64, bool) {
+func (e *kubeletExporter) containerUsage(pod corev1.Pod, containerName string, cStats *KubeletContainerMetrics, metricType, metricName string) (float64, int64, bool) {
 	timestamp := func() int64 {
 		if cStats.Timestamp != nil {
 			return *cStats.Timestamp / 1000
@@ -262,10 +276,10 @@ func (a *CoreNodeMetricsProvider) containerUsage(pod corev1.Pod, containerName s
 		ts := timestamp()
 
 		stateKey := fmt.Sprintf("%s/%s/%s/cpu/%s", pod.Namespace, pod.Name, containerName, metricName)
-		seenKeys[stateKey] = true
+		e.seen[stateKey] = true
 
-		last, ok := a.lastSamples[stateKey]
-		a.lastSamples[stateKey] = SampleState{Timestamp: ts, Value: rawVal}
+		last, ok := e.lastSamples[stateKey]
+		e.lastSamples[stateKey] = SampleState{Timestamp: ts, Value: rawVal}
 
 		if !ok || ts <= last.Timestamp {
 			return 0, 0, false
